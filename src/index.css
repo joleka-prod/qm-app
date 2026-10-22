@@ -173,3 +173,9 @@ button.link { border: none; background: none; color: var(--primary); padding: 0.
 
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 .order-ref { margin: 0.1rem 0 0.4rem; font-weight: 600; }
+.badges { display: inline-flex; gap: 0.35rem; flex-wrap: wrap; justify-content: flex-end; }
+.badge-loeschung { background: #fee4e2; color: #b42318; }
+.danger-card { border-color: var(--danger); }
+.danger-card h2 { color: var(--danger); }
+.input-with-button { display: flex; gap: 0.5rem; }
+.input-with-button input { flex: 1; }

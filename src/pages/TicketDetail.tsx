@@ -12,6 +12,7 @@ import {
   formatDate,
   orderRef,
   ticketNo,
+  type DeletionRequest,
   type Ticket,
   type TicketEvent,
   type TicketPhoto,
@@ -27,6 +28,9 @@ const EVENT_LABEL: Record<string, string> = {
   auftrag: 'Auftrag/Position geändert:',
   status: 'Status geändert auf',
   pruefhinweis: 'Prüfhinweis',
+  loeschantrag: 'Löschung beantragt:',
+  loeschantrag_zurueck: 'Löschantrag zurückgezogen',
+  loeschantrag_abgelehnt: 'Löschantrag abgelehnt',
 }
 
 export function TicketDetail() {
@@ -48,16 +52,20 @@ export function TicketDetail() {
   const [reviewNote, setReviewNote] = useState('')
   const [newFiles, setNewFiles] = useState<File[]>([])
   const [editing, setEditing] = useState(false)
+  const [deletion, setDeletion] = useState<DeletionRequest | null>(null)
+  const [requestingDeletion, setRequestingDeletion] = useState(false)
+  const [deletionReason, setDeletionReason] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [orderNumber, setOrderNumber] = useState('')
   const [positionNumber, setPositionNumber] = useState('')
 
   const load = useCallback(async () => {
-    const [t, p, e] = await Promise.all([
+    const [t, p, e, d] = await Promise.all([
       supabase.from('tickets').select('*').eq('id', ticketId).maybeSingle(),
       supabase.from('ticket_photos').select('*').eq('ticket_id', ticketId).order('created_at'),
       supabase.from('ticket_events').select('*').eq('ticket_id', ticketId).order('created_at'),
+      supabase.from('deletion_requests').select('*').eq('ticket_id', ticketId).maybeSingle(),
     ])
     if (!t.data) {
       setNotFound(true)
@@ -73,6 +81,7 @@ export function TicketDetail() {
     setPositionNumber(tk.position_number)
     setPhotos((p.data ?? []) as TicketPhoto[])
     setEvents((e.data ?? []) as TicketEvent[])
+    setDeletion(d.data as DeletionRequest | null)
   }, [ticketId])
 
   useEffect(() => {
@@ -87,6 +96,7 @@ export function TicketDetail() {
   const closed = ticket.status === 'abgeschlossen'
   const canWork = !closed && (isLead || isAdmin) && ticket.assigned_to !== null
   const canEditBase = isAdmin || (ticket.created_by === profile.id && ticket.status === 'neu')
+  const canRequestDeletion = ticket.created_by === profile.id || isLead || profile.role === 'teamleiter'
   const canEditRef = canEditBase || (isLead && !closed)
   const dirty = cause !== ticket.cause || action !== ticket.corrective_action
 
@@ -122,8 +132,32 @@ export function TicketDetail() {
     await load()
   }
 
+  async function requestDeletion() {
+    setBusy(true)
+    setError('')
+    const { error } = await supabase
+      .from('deletion_requests')
+      .insert({ ticket_id: ticketId, reason: deletionReason.trim() })
+    if (error) setError(error.message)
+    else {
+      setRequestingDeletion(false)
+      setDeletionReason('')
+    }
+    await load()
+    setBusy(false)
+  }
+
+  async function dropDeletionRequest() {
+    setBusy(true)
+    setError('')
+    const { error } = await supabase.from('deletion_requests').delete().eq('ticket_id', ticketId)
+    if (error) setError(error.message)
+    await load()
+    setBusy(false)
+  }
+
   async function removeTicket() {
-    if (!confirm('Ticket mit allen Fotos endgültig löschen?')) return
+    if (!confirm('Ticket mit allen Fotos endgültig löschen? Das kann nicht rückgängig gemacht werden.')) return
     if (photos.length > 0) {
       await supabase.storage.from('ticket-photos').remove(photos.map((p) => p.storage_path))
     }
@@ -327,7 +361,7 @@ export function TicketDetail() {
                 {EVENT_LABEL[ev.kind] ?? ev.kind}
                 {ev.kind === 'status' && <> „{STATUS_LABEL[ev.details as TicketStatus] ?? ev.details}"</>}
                 {ev.kind === 'zugewiesen' && <> {ev.details || '–'}</>}
-                {ev.kind === 'pruefhinweis' && <>: {ev.details}</>}
+                {(ev.kind === 'pruefhinweis' || ev.kind === 'loeschantrag') && <> {ev.details}</>}
                 {ev.kind === 'auftrag' && <> {ev.details || '–'}</>}
                 {ev.actor && <span className="muted"> · {displayName(byId[ev.actor])}</span>}
               </span>
@@ -336,11 +370,50 @@ export function TicketDetail() {
         </ul>
       </section>
 
-      {isAdmin && (
+      {deletion ? (
+        <section className="card danger-card">
+          <h2>Löschung beantragt</h2>
+          <p className="muted small">
+            von {displayName(byId[deletion.requested_by])} am {formatDate(deletion.created_at)}
+          </p>
+          <p className="pre">{deletion.reason}</p>
+          <div className="actions">
+            {isAdmin && (
+              <>
+                <button disabled={busy} onClick={dropDeletionRequest}>Ablehnen</button>
+                <button className="danger" disabled={busy} onClick={removeTicket}>Löschung freigeben</button>
+              </>
+            )}
+            {!isAdmin && deletion.requested_by === profile.id && (
+              <button disabled={busy} onClick={dropDeletionRequest}>Antrag zurückziehen</button>
+            )}
+            {!isAdmin && deletion.requested_by !== profile.id && (
+              <p className="muted small">Wartet auf Freigabe durch QM/Admin.</p>
+            )}
+          </div>
+        </section>
+      ) : isAdmin ? (
         <div className="actions danger-zone">
           <button className="danger" onClick={removeTicket}>Ticket löschen</button>
         </div>
-      )}
+      ) : canRequestDeletion && requestingDeletion ? (
+        <section className="card danger-card">
+          <h2>Löschung beantragen</h2>
+          <p className="muted small">Das Ticket wird erst gelöscht, wenn QM/Admin den Antrag freigibt.</p>
+          <label className="form">
+            Begründung *
+            <textarea rows={3} value={deletionReason} onChange={(e) => setDeletionReason(e.target.value)} placeholder="z. B. doppelt angelegt" />
+          </label>
+          <div className="actions">
+            <button disabled={busy} onClick={() => setRequestingDeletion(false)}>Abbrechen</button>
+            <button className="danger" disabled={busy || !deletionReason.trim()} onClick={requestDeletion}>Antrag stellen</button>
+          </div>
+        </section>
+      ) : canRequestDeletion ? (
+        <div className="actions danger-zone">
+          <button className="danger" onClick={() => setRequestingDeletion(true)}>Löschung beantragen</button>
+        </div>
+      ) : null}
     </div>
   )
 }

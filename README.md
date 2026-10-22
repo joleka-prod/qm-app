@@ -32,13 +32,26 @@ Die Rechte werden in der Datenbank durchgesetzt (Row Level Security), nicht nur 
 5. Für den Live-Betrieb einen eigenen SMTP-Server unter *Authentication → Emails* eintragen,
    da der eingebaute Mailversand nur wenige E-Mails pro Stunde erlaubt.
 
-### 2. Erster Admin
+### 2. Benutzerverwaltung (Edge Function)
 
-Die erste Person, die eingeladen wird, wird automatisch **QM / Admin**.
-Einladen: *Authentication → Users → Invite user*. Alle weiteren Personen starten als Mitarbeiter;
-die Rolle wird dann in der App unter **Benutzer** geändert.
+Damit QM/Admin in der App Benutzer anlegen und Passwörter zurücksetzen kann, wird die Funktion
+`supabase/functions/admin-users/index.ts` benötigt: im Dashboard unter *Edge Functions → Deploy a new function →
+Via Editor* mit dem Namen `admin-users` anlegen und den Inhalt der Datei einfügen
+(oder `npx supabase functions deploy admin-users`).
 
-### 3. App veröffentlichen
+### 3. Erster Admin
+
+Die erste Person, die angelegt wird, wird automatisch **QM / Admin**
+(*Authentication → Users → Add user → Create new user*, „Auto Confirm User“ aktiviert).
+Alle weiteren Benutzer legt QM/Admin direkt in der App unter **Benutzer** an.
+
+### Tickets löschen
+
+Nur QM/Admin löscht Tickets. Alle anderen können die Löschung mit Begründung beantragen;
+QM/Admin gibt den Antrag frei (Ticket wird gelöscht) oder lehnt ihn ab. Anträge stehen in der Ticketliste
+unter dem Filter „Löschung beantragt“.
+
+### 4. App veröffentlichen
 
 Die App ist eine statische Seite und kann z. B. auf Cloudflare Pages kostenlos gehostet werden:
 
@@ -58,7 +71,8 @@ cp .env.example .env            # URL und anon key aus `npx supabase status` ein
 npm run dev
 ```
 
-Rechte und Ablauf testen (lokale Supabase muss laufen):
+Rechte und Ablauf testen (lokale Supabase muss laufen; die Benutzerverwaltung braucht die Edge Function,
+lokal z. B. per `deno run --allow-net --allow-env supabase/functions/admin-users/index.ts` und `FUNCTIONS_URL=http://127.0.0.1:8000`):
 
 ```bash
 SUPABASE_ANON_KEY=... SUPABASE_SERVICE_KEY=... node scripts/test-rules.mjs

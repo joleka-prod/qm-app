@@ -6,17 +6,22 @@ import { supabase } from '../lib/supabase'
 import { STATUS_LABEL, displayName, formatDate, orderRef, ticketNo, type Ticket, type TicketStatus } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 
-type Filter = 'offen' | 'meine' | 'alle' | TicketStatus
+type Filter = 'offen' | 'meine' | 'alle' | 'loeschung' | TicketStatus
 
 export function TicketList() {
   const { profile } = useAuth()
   const { byId } = useProfiles()
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
+  const [deletionIds, setDeletionIds] = useState<Set<number>>(new Set())
   const [filter, setFilter] = useState<Filter>(profile?.role === 'teamleiter' ? 'meine' : 'offen')
   const [query, setQuery] = useState('')
 
   useEffect(() => {
+    supabase
+      .from('deletion_requests')
+      .select('ticket_id')
+      .then(({ data }) => setDeletionIds(new Set((data ?? []).map((d) => d.ticket_id as number))))
     supabase
       .from('tickets')
       .select('*')
@@ -32,7 +37,8 @@ export function TicketList() {
     return tickets.filter((t) => {
       if (filter === 'offen' && t.status === 'abgeschlossen') return false
       if (filter === 'meine' && t.assigned_to !== profile?.id && t.created_by !== profile?.id) return false
-      if (filter !== 'offen' && filter !== 'meine' && filter !== 'alle' && t.status !== filter) return false
+      if (filter === 'loeschung' && !deletionIds.has(t.id)) return false
+      if (filter !== 'offen' && filter !== 'meine' && filter !== 'alle' && filter !== 'loeschung' && t.status !== filter) return false
       if (!q) return true
       return (
         t.title.toLowerCase().includes(q) ||
@@ -42,7 +48,7 @@ export function TicketList() {
         ticketNo(t.id).toLowerCase().includes(q)
       )
     })
-  }, [tickets, filter, query, profile])
+  }, [tickets, filter, query, profile, deletionIds])
 
   return (
     <div>
@@ -55,6 +61,7 @@ export function TicketList() {
           <option value="offen">Alle offenen</option>
           <option value="meine">Meine</option>
           <option value="alle">Alle</option>
+          <option value="loeschung">Löschung beantragt{deletionIds.size > 0 ? ` (${deletionIds.size})` : ''}</option>
           {(Object.keys(STATUS_LABEL) as TicketStatus[]).map((s) => (
             <option key={s} value={s}>{STATUS_LABEL[s]}</option>
           ))}
@@ -72,7 +79,10 @@ export function TicketList() {
               <Link to={`/ticket/${t.id}`} className="card ticket-row">
                 <div className="ticket-row-top">
                   <span className="ticket-no">{ticketNo(t.id)}</span>
-                  <StatusBadge status={t.status} />
+                  <span className="badges">
+                    {deletionIds.has(t.id) && <span className="badge badge-loeschung">Löschung beantragt</span>}
+                    <StatusBadge status={t.status} />
+                  </span>
                 </div>
                 <div className="ticket-title">{t.title}</div>
                 {orderRef(t) && <div className="small">{orderRef(t)}</div>}

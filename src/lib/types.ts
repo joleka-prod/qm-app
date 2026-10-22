@@ -35,6 +35,13 @@ export interface TicketPhoto {
   created_at: string
 }
 
+export interface DeletionRequest {
+  ticket_id: number
+  requested_by: string
+  reason: string
+  created_at: string
+}
+
 export interface TicketEvent {
   id: number
   ticket_id: number

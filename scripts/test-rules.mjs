@@ -15,6 +15,8 @@ async function user(name, role) {
   if (error) throw error
   if (role) await admin.from('profiles').update({ role, full_name: name }).eq('id', data.user.id)
   const c = createClient(url, anon, { auth: { persistSession: false } })
+  // Optional: Edge Functions direkt (z. B. per `deno run`) statt über das Supabase-Gateway ansprechen
+  if (process.env.FUNCTIONS_URL) c.functionsUrl = new URL(process.env.FUNCTIONS_URL)
   const { error: e2 } = await c.auth.signInWithPassword({ email, password: 'passwort123' })
   if (e2) throw e2
   return { id: data.user.id, c }
@@ -156,5 +158,86 @@ await check('Verlauf ist vollständig und für Ersteller sichtbar', async () => 
   const kinds = data.map((e) => e.kind)
   for (const k of ['auftrag', 'erstellt', 'zugewiesen', 'ursache', 'massnahme', 'status', 'pruefhinweis']) assert.ok(kinds.includes(k), k)
 })
+
+// --- Löschanträge ---
+let delId
+await check('Mitarbeiter kann Ticket nicht direkt löschen', async () => {
+  const { data } = await worker.c.from('tickets').insert({ title: 'doppelt' }).select().single()
+  delId = data.id
+  await worker.c.from('tickets').delete().eq('id', delId)
+  const { data: still } = await qm.c.from('tickets').select('id').eq('id', delId)
+  assert.equal(still.length, 1)
+})
+
+await check('Fremder Mitarbeiter kann keine Löschung beantragen', async () => {
+  const { error } = await other.c.from('deletion_requests').insert({ ticket_id: delId, reason: 'x' })
+  assert.ok(error)
+})
+
+await check('Löschantrag braucht Begründung', async () => {
+  const { error } = await worker.c.from('deletion_requests').insert({ ticket_id: delId, reason: '  ' })
+  assert.ok(error)
+})
+
+await check('Ersteller beantragt, QM lehnt ab', async () => {
+  let r = await worker.c.from('deletion_requests').insert({ ticket_id: delId, reason: 'doppelt angelegt' })
+  assert.ifError(r.error)
+  r = await qm.c.from('deletion_requests').delete().eq('ticket_id', delId).select()
+  assert.ifError(r.error)
+  assert.equal(r.data.length, 1)
+  const { data } = await worker.c.from('ticket_events').select('kind').eq('ticket_id', delId)
+  const kinds = data.map((e) => e.kind)
+  assert.ok(kinds.includes('loeschantrag') && kinds.includes('loeschantrag_abgelehnt'))
+})
+
+await check('Antragsteller kann zurückziehen, Teamleiter nicht fremden Antrag', async () => {
+  await worker.c.from('deletion_requests').insert({ ticket_id: delId, reason: 'doppelt' })
+  const bad = await lead.c.from('deletion_requests').delete().eq('ticket_id', delId).select()
+  assert.equal(bad.data.length, 0)
+  const ok = await worker.c.from('deletion_requests').delete().eq('ticket_id', delId).select()
+  assert.equal(ok.data.length, 1)
+})
+
+await check('QM gibt Löschung frei', async () => {
+  await worker.c.from('deletion_requests').insert({ ticket_id: delId, reason: 'doppelt' })
+  const r = await qm.c.from('tickets').delete().eq('id', delId).select()
+  assert.ifError(r.error)
+  assert.equal(r.data.length, 1)
+})
+
+// --- Benutzerverwaltung (Edge Function admin-users) ---
+if (process.env.SKIP_FUNCTIONS !== '1') {
+  const newMail = `neu-${run}@test.local`
+  await check('Mitarbeiter darf keine Benutzer anlegen', async () => {
+    const { error } = await worker.c.functions.invoke('admin-users', { body: { action: 'create', email: newMail, password: 'passwort123', role: 'admin' } })
+    assert.ok(error)
+    assert.equal(error.context.status, 403)
+  })
+
+  await check('QM legt Teamleiter an, Login klappt', async () => {
+    const { data, error } = await qm.c.functions.invoke('admin-users', { body: { action: 'create', email: newMail, full_name: 'Neu Leiter', password: 'Start-1234', role: 'teamleiter' } })
+    assert.ifError(error)
+    const { data: prof } = await admin.from('profiles').select('role, full_name').eq('id', data.id).single()
+    assert.equal(prof.role, 'teamleiter')
+    assert.equal(prof.full_name, 'Neu Leiter')
+    const c = createClient(url, anon, { auth: { persistSession: false } })
+    const login = await c.auth.signInWithPassword({ email: newMail, password: 'Start-1234' })
+    assert.ifError(login.error)
+  })
+
+  await check('Doppelte E-Mail wird abgelehnt', async () => {
+    const { error } = await qm.c.functions.invoke('admin-users', { body: { action: 'create', email: newMail, password: 'passwort123' } })
+    assert.ok(error)
+    assert.match((await error.context.json()).error, /bereits/)
+  })
+
+  await check('QM setzt Passwort neu', async () => {
+    const { error } = await qm.c.functions.invoke('admin-users', { body: { action: 'set_password', user_id: worker.id, password: 'Neu-9999-Pass' } })
+    assert.ifError(error)
+    const c = createClient(url, anon, { auth: { persistSession: false } })
+    const login = await c.auth.signInWithPassword({ email: `worker-${run}@test.local`, password: 'Neu-9999-Pass' })
+    assert.ifError(login.error)
+  })
+}
 
 console.log(`\n${passed} Prüfungen bestanden`)
