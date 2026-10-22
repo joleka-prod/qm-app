@@ -11,6 +11,8 @@ export function NewTicket() {
   const { leads } = useProfiles()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [orderNumber, setOrderNumber] = useState('')
+  const [positionNumber, setPositionNumber] = useState('')
   const [assignedTo, setAssignedTo] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
@@ -22,7 +24,13 @@ export function NewTicket() {
     setError('')
     const { data, error } = await supabase
       .from('tickets')
-      .insert({ title: title.trim(), description: description.trim(), assigned_to: assignedTo || null })
+      .insert({
+        title: title.trim(),
+        description: description.trim(),
+        order_number: orderNumber.trim(),
+        position_number: positionNumber.trim(),
+        assigned_to: assignedTo || null,
+      })
       .select('id')
       .single()
     if (error || !data) {
@@ -45,6 +53,16 @@ export function NewTicket() {
         Kurzbeschreibung *
         <input required maxLength={150} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="z. B. Kratzer an Gehäuse Charge 4711" />
       </label>
+      <div className="row">
+        <label>
+          Auftragsnummer
+          <input value={orderNumber} maxLength={50} onChange={(e) => setOrderNumber(e.target.value)} />
+        </label>
+        <label>
+          Positionsnummer
+          <input value={positionNumber} maxLength={20} onChange={(e) => setPositionNumber(e.target.value)} />
+        </label>
+      </div>
       <label>
         Beschreibung
         <textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Was ist passiert? Wo? Wann?" />

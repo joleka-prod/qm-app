@@ -14,6 +14,8 @@ export interface Ticket {
   id: number
   title: string
   description: string
+  order_number: string
+  position_number: string
   status: TicketStatus
   created_by: string
   assigned_to: string | null
@@ -64,6 +66,13 @@ export function formatDate(iso: string) {
   return new Date(iso).toLocaleString('de-DE', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
   })
+}
+
+export function orderRef(t: Pick<Ticket, 'order_number' | 'position_number'>) {
+  const parts = []
+  if (t.order_number) parts.push(`Auftrag ${t.order_number}`)
+  if (t.position_number) parts.push(`Pos. ${t.position_number}`)
+  return parts.join(' · ')
 }
 
 export function displayName(p: Pick<Profile, 'full_name' | 'email'> | undefined | null) {

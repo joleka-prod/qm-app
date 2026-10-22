@@ -36,8 +36,9 @@ const other = await user('other', 'mitarbeiter')
 let ticketId
 
 await check('Mitarbeiter legt Ticket an, Status neu', async () => {
-  const { data, error } = await worker.c.from('tickets').insert({ title: 'Kratzer', description: 'am Gehäuse', status: 'abgeschlossen', cause: 'x' }).select().single()
+  const { data, error } = await worker.c.from('tickets').insert({ title: 'Kratzer', description: 'am Gehäuse', order_number: '4711', status: 'abgeschlossen', cause: 'x' }).select().single()
   assert.ifError(error)
+  assert.equal(data.order_number, '4711')
   assert.equal(data.status, 'neu')
   assert.equal(data.cause, '')
   assert.equal(data.created_by, worker.id)
@@ -95,6 +96,18 @@ await check('Anderer Teamleiter kann Ursache nicht eintragen', async () => {
   assert.ok(error || data.length === 0)
 })
 
+await check('Teamleiter ergänzt Auftrags- und Positionsnummer', async () => {
+  const { data, error } = await lead.c.from('tickets').update({ order_number: ' A-4711 ', position_number: '3' }).eq('id', ticketId).select().single()
+  assert.ifError(error)
+  assert.equal(data.order_number, 'A-4711')
+  assert.equal(data.position_number, '3')
+})
+
+await check('Anderer Teamleiter kann Auftragsnummer nicht ändern', async () => {
+  const { error, data } = await lead2.c.from('tickets').update({ order_number: 'X' }).eq('id', ticketId).select()
+  assert.ok(error || data.length === 0)
+})
+
 await check('Teamleiter darf Titel nicht ändern', async () => {
   const { error } = await lead.c.from('tickets').update({ title: 'anders' }).eq('id', ticketId)
   assert.ok(error)
@@ -141,7 +154,7 @@ await check('Verlauf ist vollständig und für Ersteller sichtbar', async () => 
   const { data, error } = await worker.c.from('ticket_events').select('kind, details').eq('ticket_id', ticketId).order('id')
   assert.ifError(error)
   const kinds = data.map((e) => e.kind)
-  for (const k of ['erstellt', 'zugewiesen', 'ursache', 'massnahme', 'status', 'pruefhinweis']) assert.ok(kinds.includes(k), k)
+  for (const k of ['auftrag', 'erstellt', 'zugewiesen', 'ursache', 'massnahme', 'status', 'pruefhinweis']) assert.ok(kinds.includes(k), k)
 })
 
 console.log(`\n${passed} Prüfungen bestanden`)

@@ -10,6 +10,7 @@ import {
   STATUS_LABEL,
   displayName,
   formatDate,
+  orderRef,
   ticketNo,
   type Ticket,
   type TicketEvent,
@@ -23,6 +24,7 @@ const EVENT_LABEL: Record<string, string> = {
   zugewiesen: 'Zugewiesen an',
   ursache: 'Ursache bearbeitet',
   massnahme: 'Maßnahme bearbeitet',
+  auftrag: 'Auftrag/Position geändert:',
   status: 'Status geändert auf',
   pruefhinweis: 'Prüfhinweis',
 }
@@ -48,6 +50,8 @@ export function TicketDetail() {
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [orderNumber, setOrderNumber] = useState('')
+  const [positionNumber, setPositionNumber] = useState('')
 
   const load = useCallback(async () => {
     const [t, p, e] = await Promise.all([
@@ -65,6 +69,8 @@ export function TicketDetail() {
     setAction(tk.corrective_action)
     setTitle(tk.title)
     setDescription(tk.description)
+    setOrderNumber(tk.order_number)
+    setPositionNumber(tk.position_number)
     setPhotos((p.data ?? []) as TicketPhoto[])
     setEvents((e.data ?? []) as TicketEvent[])
   }, [ticketId])
@@ -81,6 +87,7 @@ export function TicketDetail() {
   const closed = ticket.status === 'abgeschlossen'
   const canWork = !closed && (isLead || isAdmin) && ticket.assigned_to !== null
   const canEditBase = isAdmin || (ticket.created_by === profile.id && ticket.status === 'neu')
+  const canEditRef = canEditBase || (isLead && !closed)
   const dirty = cause !== ticket.cause || action !== ticket.corrective_action
 
   async function update(patch: Partial<Ticket>) {
@@ -136,21 +143,47 @@ export function TicketDetail() {
         </div>
         {editing ? (
           <div className="form">
-            <label>
-              Kurzbeschreibung
-              <input value={title} maxLength={150} onChange={(e) => setTitle(e.target.value)} />
-            </label>
-            <label>
-              Beschreibung
-              <textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} />
-            </label>
+            {canEditBase && (
+              <label>
+                Kurzbeschreibung
+                <input value={title} maxLength={150} onChange={(e) => setTitle(e.target.value)} />
+              </label>
+            )}
+            <div className="row">
+              <label>
+                Auftragsnummer
+                <input value={orderNumber} maxLength={50} onChange={(e) => setOrderNumber(e.target.value)} />
+              </label>
+              <label>
+                Positionsnummer
+                <input value={positionNumber} maxLength={20} onChange={(e) => setPositionNumber(e.target.value)} />
+              </label>
+            </div>
+            {canEditBase && (
+              <label>
+                Beschreibung
+                <textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} />
+              </label>
+            )}
             <div className="actions">
-              <button onClick={() => { setEditing(false); setTitle(ticket.title); setDescription(ticket.description) }}>Abbrechen</button>
+              <button
+                onClick={() => {
+                  setEditing(false)
+                  setTitle(ticket.title)
+                  setDescription(ticket.description)
+                  setOrderNumber(ticket.order_number)
+                  setPositionNumber(ticket.position_number)
+                }}
+              >
+                Abbrechen
+              </button>
               <button
                 className="primary"
                 disabled={busy || !title.trim()}
                 onClick={async () => {
-                  if (await update({ title: title.trim(), description: description.trim() })) setEditing(false)
+                  const ref = { order_number: orderNumber.trim(), position_number: positionNumber.trim() }
+                  const patch = canEditBase ? { ...ref, title: title.trim(), description: description.trim() } : ref
+                  if (await update(patch)) setEditing(false)
                 }}
               >
                 Speichern
@@ -160,12 +193,17 @@ export function TicketDetail() {
         ) : (
           <>
             <h1 className="ticket-heading">{ticket.title}</h1>
+            {orderRef(ticket) && <p className="order-ref">{orderRef(ticket)}</p>}
             <p className="muted small">
               Erstellt {formatDate(ticket.created_at)} von {displayName(byId[ticket.created_by])}
               {ticket.closed_at && <> · Abgeschlossen {formatDate(ticket.closed_at)}</>}
             </p>
             {ticket.description ? <p className="pre">{ticket.description}</p> : <p className="muted">Keine Beschreibung.</p>}
-            {canEditBase && <button className="link" onClick={() => setEditing(true)}>Bearbeiten</button>}
+            {canEditRef && (
+              <button className="link" onClick={() => setEditing(true)}>
+                {canEditBase ? 'Bearbeiten' : 'Auftrag/Position bearbeiten'}
+              </button>
+            )}
           </>
         )}
       </section>
@@ -290,6 +328,7 @@ export function TicketDetail() {
                 {ev.kind === 'status' && <> „{STATUS_LABEL[ev.details as TicketStatus] ?? ev.details}"</>}
                 {ev.kind === 'zugewiesen' && <> {ev.details || '–'}</>}
                 {ev.kind === 'pruefhinweis' && <>: {ev.details}</>}
+                {ev.kind === 'auftrag' && <> {ev.details || '–'}</>}
                 {ev.actor && <span className="muted"> · {displayName(byId[ev.actor])}</span>}
               </span>
             </li>

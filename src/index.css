@@ -170,3 +170,6 @@ button.link { border: none; background: none; color: var(--primary); padding: 0.
   .history li { flex-direction: row; gap: 1rem; }
   .history li > .muted { flex: 0 0 9.5rem; }
 }
+
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.order-ref { margin: 0.1rem 0 0.4rem; font-weight: 600; }

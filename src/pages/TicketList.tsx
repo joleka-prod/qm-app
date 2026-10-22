@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { StatusBadge } from '../components/StatusBadge'
 import { supabase } from '../lib/supabase'
-import { STATUS_LABEL, displayName, formatDate, ticketNo, type Ticket, type TicketStatus } from '../lib/types'
+import { STATUS_LABEL, displayName, formatDate, orderRef, ticketNo, type Ticket, type TicketStatus } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 
 type Filter = 'offen' | 'meine' | 'alle' | TicketStatus
@@ -37,6 +37,8 @@ export function TicketList() {
       return (
         t.title.toLowerCase().includes(q) ||
         t.description.toLowerCase().includes(q) ||
+        t.order_number.toLowerCase().includes(q) ||
+        t.position_number.toLowerCase().includes(q) ||
         ticketNo(t.id).toLowerCase().includes(q)
       )
     })
@@ -57,7 +59,7 @@ export function TicketList() {
             <option key={s} value={s}>{STATUS_LABEL[s]}</option>
           ))}
         </select>
-        <input type="search" placeholder="Suchen…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input type="search" placeholder="Suchen (auch Auftragsnr.)…" value={query} onChange={(e) => setQuery(e.target.value)} />
       </div>
       {loading ? (
         <p className="muted">Lädt…</p>
@@ -73,6 +75,7 @@ export function TicketList() {
                   <StatusBadge status={t.status} />
                 </div>
                 <div className="ticket-title">{t.title}</div>
+                {orderRef(t) && <div className="small">{orderRef(t)}</div>}
                 <div className="muted small">
                   {formatDate(t.created_at)} · von {displayName(byId[t.created_by])}
                   {t.assigned_to && <> · Verantwortlich: {displayName(byId[t.assigned_to])}</>}
