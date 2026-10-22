@@ -46,7 +46,8 @@ Die App ist eine statische Seite und kann z. B. auf Cloudflare Pages kostenlos g
 - Ausgabeordner: `dist`
 - Umgebungsvariablen: `VITE_SUPABASE_URL` und `VITE_SUPABASE_ANON_KEY` (aus *Project Settings → API*)
 
-Damit Links wie `/ticket/12` direkt funktionieren, liegt `public/_redirects` bei.
+Damit Links wie `/ticket/12` direkt funktionieren, ist in `wrangler.jsonc` die Single-Page-Weiterleitung eingestellt
+(für Cloudflare Workers mit Deploy-Befehl `npx wrangler deploy`). Bei Cloudflare Pages greift sie automatisch.
 
 ## Lokale Entwicklung
 

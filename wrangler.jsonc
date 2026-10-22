@@ -1,0 +1,10 @@
+{
+  // Cloudflare Workers: liefert die gebaute App aus dist/ aus.
+  // Unbekannte Pfade wie /ticket/12 bekommen index.html, damit die App selbst routet.
+  "name": "qm-app",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
