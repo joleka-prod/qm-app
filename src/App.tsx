@@ -1,0 +1,51 @@
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { AuthProvider, useAuth } from './auth'
+import { Layout } from './components/Layout'
+import { configMissing } from './lib/supabase'
+import { Login } from './pages/Login'
+import { NewTicket } from './pages/NewTicket'
+import { ProfilePage } from './pages/ProfilePage'
+import { SetPassword } from './pages/SetPassword'
+import { TicketDetail } from './pages/TicketDetail'
+import { TicketList } from './pages/TicketList'
+import { Users } from './pages/Users'
+
+function Routed() {
+  const { session, profile, loading, needsPassword } = useAuth()
+
+  if (loading) return <p className="center muted">Lädt…</p>
+  if (!session) return <Login />
+  if (needsPassword) return <SetPassword />
+  if (!profile) return <p className="center muted">Profil wird geladen…</p>
+  if (!profile.active) return <p className="center">Dein Zugang ist deaktiviert. Bitte wende dich an die QM-Abteilung.</p>
+
+  return (
+    <Routes>
+      <Route element={<Layout />}>
+        <Route index element={<TicketList />} />
+        <Route path="neu" element={<NewTicket />} />
+        <Route path="ticket/:id" element={<TicketDetail />} />
+        <Route path="profil" element={<ProfilePage />} />
+        {profile.role === 'admin' && <Route path="benutzer" element={<Users />} />}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
+  )
+}
+
+export default function App() {
+  if (configMissing) {
+    return (
+      <p className="center">
+        Supabase ist nicht konfiguriert. Bitte <code>VITE_SUPABASE_URL</code> und <code>VITE_SUPABASE_ANON_KEY</code> setzen.
+      </p>
+    )
+  }
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routed />
+      </BrowserRouter>
+    </AuthProvider>
+  )
+}
