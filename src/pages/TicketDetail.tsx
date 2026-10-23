@@ -363,9 +363,17 @@ export function TicketDetail() {
     else navigate('/', { replace: true })
   }
 
+  // Monteure sehen die Auftragszeit ganz oben
+  const timeOnTop = profile.role === 'monteur'
+  const timeCard = (
+    <TimeCard ticket={ticket} me={profile.id} isInstaller={isInstaller} isPlanner={isPlanner} isAdmin={isAdmin} byId={byId} />
+  )
+
   return (
     <div className="detail">
       <Link to="/" className="back">← Übersicht</Link>
+
+      {einsatz && timeOnTop && timeCard}
 
       <section className="card">
         <div className="ticket-row-top">
@@ -766,9 +774,7 @@ export function TicketDetail() {
         />
       )}
 
-      {einsatz && (
-        <TimeCard ticket={ticket} me={profile.id} isInstaller={isInstaller} isPlanner={isPlanner} isAdmin={isAdmin} byId={byId} />
-      )}
+      {einsatz && !timeOnTop && timeCard}
 
       {einsatz && (
         <section className="card">
