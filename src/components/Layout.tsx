@@ -18,11 +18,13 @@ export function Layout() {
             <>
               <NavLink to="/" end>Mein Kalender</NavLink>
               <NavLink to="/tickets">Service-Aufträge</NavLink>
+              <NavLink to="/stundenzettel">Stundenzettel</NavLink>
             </>
           ) : (
             <NavLink to="/" end>Service-Aufträge</NavLink>
           )}
           {(profile?.role === 'admin' || profile?.role === 'teamleiter') && <NavLink to="/kalender">Kalender</NavLink>}
+          {(profile?.role === 'admin' || profile?.role === 'teamleiter') && <NavLink to="/stundenzettel">Stundenzettel</NavLink>}
           {profile?.role === 'admin' && <NavLink to="/artikel">Artikel</NavLink>}
           {profile?.role === 'admin' && <NavLink to="/benutzer">Benutzer</NavLink>}
           <NavLink to="/profil" title={profile ? ROLE_LABEL[profile.role] : ''}>

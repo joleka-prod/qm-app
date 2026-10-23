@@ -9,6 +9,7 @@ import { SignaturePad, canvasToBlob } from '../components/SignaturePad'
 import { TeamSelect } from '../components/TeamSelect'
 import { AppointmentCard } from '../components/AppointmentCard'
 import { BillingCard } from '../components/BillingCard'
+import { TimeCard } from '../components/TimeCard'
 import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { deletePhoto, signedUrls, uploadPhotos, uploadSignature } from '../lib/photos'
 import { sendReport } from '../lib/reportMail'
@@ -763,6 +764,10 @@ export function TicketDetail() {
           events={events}
           onChanged={load}
         />
+      )}
+
+      {einsatz && (
+        <TimeCard ticket={ticket} me={profile.id} isInstaller={isInstaller} isPlanner={isPlanner} isAdmin={isAdmin} byId={byId} />
       )}
 
       {einsatz && (

@@ -11,6 +11,7 @@ import { ProfilePage } from './pages/ProfilePage'
 import { SetPassword } from './pages/SetPassword'
 import { TicketDetail } from './pages/TicketDetail'
 import { TicketList } from './pages/TicketList'
+import { Timesheet } from './pages/Timesheet'
 import { Users } from './pages/Users'
 
 function Routed() {
@@ -34,6 +35,7 @@ function Routed() {
         <Route path="neu" element={<NewTicket />} />
         <Route path="ticket/:id" element={<TicketDetail />} />
         <Route path="profil" element={<ProfilePage />} />
+        {(isPlanner || profile.role === 'monteur') && <Route path="stundenzettel" element={<Timesheet />} />}
         {profile.role === 'admin' && <Route path="benutzer" element={<Users />} />}
         {profile.role === 'admin' && <Route path="artikel" element={<Articles />} />}
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -691,6 +691,64 @@ await check('Position aus Artikel übernimmt Einheit und Preis', async () => {
   assert.match(inactive.error.message, /nicht mehr aktiv/)
 })
 
+// --- Zeiterfassung ---
+await check('Monteur startet und stoppt Zeiten, nur eine läuft, fremde Monteure nicht', async () => {
+  const { data: job } = await lead2.c.from('tickets')
+    .insert({ ticket_type: 'reparatur', title: 'Zeiten', team_id: T1, montage_date: '2026-11-03' }).select().single()
+  globalThis.timeJob = job.id
+  const other = await m3.c.rpc('start_time_entry', { p_ticket_id: job.id, p_kind: 'arbeit' })
+  assert.match(other.error.message, /Monteure des eingeplanten Teams/)
+  const direct = await m1.c.from('time_entries').insert({ ticket_id: job.id, installer_id: m1.id, kind: 'arbeit' })
+  assert.ok(direct.error)
+  assert.ifError((await m1.c.rpc('start_time_entry', { p_ticket_id: job.id, p_kind: 'fahrt' })).error)
+  assert.ifError((await m1.c.rpc('start_time_entry', { p_ticket_id: job.id, p_kind: 'arbeit' })).error)
+  const { data } = await m1.c.from('time_entries').select('kind, ended_at').eq('ticket_id', job.id).order('id')
+  assert.deepEqual(data.map((e) => [e.kind, e.ended_at !== null]), [['fahrt', true], ['arbeit', false]])
+  const fake = await m1.c.from('time_entries').update({ started_at: '2026-01-01T00:00:00Z' }).eq('ticket_id', job.id).select()
+  assert.ok(fake.error || fake.data.length === 0)
+})
+
+await check('Erledigt melden stoppt laufende Zeit, Planer korrigiert, nur Admin löscht', async () => {
+  const job = globalThis.timeJob
+  await m1.c.from('tickets').update({ work_report: 'fertig', status: 'abgeschlossen' }).eq('id', job)
+  const { data: [e] } = await qm.c.from('time_entries').select('*').eq('ticket_id', job).eq('kind', 'arbeit')
+  assert.ok(e.ended_at)
+  const late = await m1.c.rpc('start_time_entry', { p_ticket_id: job, p_kind: 'arbeit' })
+  assert.ok(late.error)
+  const fix = await lead2.c.from('time_entries').update({ started_at: '2026-10-20T07:00:00Z', ended_at: '2026-10-20T09:30:00Z' }).eq('id', e.id).select().single()
+  assert.ifError(fix.error)
+  assert.equal(fix.data.edited_by, lead2.id)
+  const bad = await lead2.c.from('time_entries').update({ ended_at: '2026-10-20T06:00:00Z' }).eq('id', e.id)
+  assert.ok(bad.error)
+  const del = await lead2.c.from('time_entries').delete().eq('id', e.id).select()
+  assert.equal(del.data.length, 0)
+  assert.equal((await qm.c.from('time_entries').delete().eq('id', e.id).select()).data.length, 1)
+})
+
+await check('Stundenzettel: Monteur trägt eigene Tage ein, Planer korrigiert', async () => {
+  const today = new Date().toISOString().slice(0, 10)
+  const r = await m1.c.from('work_days').insert({ day: today, start_time: '07:00', end_time: '16:00', break_minutes: 45 }).select().single()
+  assert.ifError(r.error)
+  assert.equal(r.data.installer_id, m1.id)
+  const dup = await m1.c.from('work_days').insert({ day: today, start_time: '08:00', end_time: '09:00' })
+  assert.ok(dup.error)
+  const future = await m1.c.from('work_days').insert({ day: '2099-01-01', start_time: '07:00', end_time: '08:00' })
+  assert.match(future.error.message, /Zukunft/)
+  const old = await m1.c.from('work_days').insert({ day: '2026-01-05', start_time: '07:00', end_time: '08:00' })
+  assert.match(old.error.message, /14 Tage/)
+  const backwards = await m1.c.from('work_days').insert({ day: '2026-10-22', start_time: '10:00', end_time: '09:00' })
+  assert.ok(backwards.error)
+  const forOther = await m1.c.from('work_days').insert({ day: '2026-10-21', start_time: '07:00', end_time: '08:00', installer_id: m2.id })
+  assert.ok(forOther.error)
+  assert.equal((await m2.c.from('work_days').select('id').eq('installer_id', m1.id)).data.length, 0)
+  const fix = await lead.c.from('work_days').update({ end_time: '15:30' }).eq('id', r.data.id).select().single()
+  assert.ifError(fix.error)
+  assert.equal(fix.data.edited_by, lead.id)
+  const planner = await lead.c.from('work_days').insert({ installer_id: m2.id, day: '2026-01-05', start_time: '07:00', end_time: '12:00' })
+  assert.ifError(planner.error)
+  assert.equal((await lead.c.from('work_days').delete().eq('id', r.data.id).select()).data.length, 0)
+})
+
 // --- Benutzerverwaltung (Edge Function admin-users) ---
 if (process.env.SKIP_FUNCTIONS !== '1') {
   const newMail = `neu-${run}@test.local`
