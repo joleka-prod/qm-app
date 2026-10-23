@@ -350,6 +350,7 @@ button.crew-star:hover { color: #f79009; }
 .urgent-col.has-urgent { border: 2px solid #d92d20; background: #fef3f2; }
 .urgent-col.has-urgent h2 { color: #b42318; }
 .urgent-group + .urgent-group { margin-top: 1rem; }
+.urgent-empty h3 { color: var(--muted) !important; }
 .urgent-group h3 { margin: 0 0 0.2rem; font-size: 0.95rem; color: #b42318; }
 .urgent-group p { margin: 0 0 0.5rem; }
 .urgent-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }

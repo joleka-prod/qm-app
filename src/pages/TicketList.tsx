@@ -102,35 +102,27 @@ export function TicketList() {
           <h2>Dringender Handlungsbedarf{urgent.count > 0 && ` (${urgent.count})`}</h2>
           {loading ? (
             <p className="muted small">Lädt…</p>
-          ) : urgent.count === 0 ? (
-            <p className="muted small">Im Moment nichts zu tun.</p>
           ) : (
             <>
-              {urgent.moved.length > 0 && (
-                <UrgentGroup
-                  title="Termin verschoben"
-                  hint="Der Termin wurde geändert, nachdem er dem Kunden mitgeteilt wurde. Bitte den Kunden informieren und neu anmelden."
-                  tickets={urgent.moved}
-                  teamName={(id) => teamById[id]?.name}
-                  showTold
-                />
-              )}
-              {urgent.soon.length > 0 && (
-                <UrgentGroup
-                  title="Termin noch nicht angemeldet"
-                  hint={`Einsatz ist in den nächsten ${URGENT_WORKDAYS} Werktagen, der Kunde wurde noch nicht informiert.`}
-                  tickets={urgent.soon}
-                  teamName={(id) => teamById[id]?.name}
-                />
-              )}
-              {urgent.unconfirmed.length > 0 && (
-                <UrgentGroup
-                  title="Termin noch nicht bestätigt"
-                  hint={`Einsatz ist in den nächsten ${URGENT_WORKDAYS} Werktagen, der Kunde hat den Termin noch nicht bestätigt.`}
-                  tickets={urgent.unconfirmed}
-                  teamName={(id) => teamById[id]?.name}
-                />
-              )}
+              <UrgentGroup
+                title="Termin verschoben"
+                hint="Der Termin wurde geändert, nachdem er dem Kunden mitgeteilt wurde. Bitte den Kunden informieren und neu anmelden."
+                tickets={urgent.moved}
+                teamName={(id) => teamById[id]?.name}
+                showTold
+              />
+              <UrgentGroup
+                title="Termin noch nicht angemeldet"
+                hint={`Einsatz ist in den nächsten ${URGENT_WORKDAYS} Werktagen, der Kunde wurde noch nicht informiert.`}
+                tickets={urgent.soon}
+                teamName={(id) => teamById[id]?.name}
+              />
+              <UrgentGroup
+                title="Termin noch nicht bestätigt"
+                hint={`Einsatz ist in den nächsten ${URGENT_WORKDAYS} Werktagen, der Kunde hat den Termin noch nicht bestätigt.`}
+                tickets={urgent.unconfirmed}
+                teamName={(id) => teamById[id]?.name}
+              />
             </>
           )}
         </aside>
@@ -230,6 +222,13 @@ function UrgentGroup({
   teamName: (id: number) => string | undefined
   showTold?: boolean
 }) {
+  if (tickets.length === 0)
+    return (
+      <div className="urgent-group urgent-empty">
+        <h3>{title}</h3>
+        <p className="small muted">Keine Aufträge.</p>
+      </div>
+    )
   return (
     <div className="urgent-group">
       <h3>{title} ({tickets.length})</h3>
