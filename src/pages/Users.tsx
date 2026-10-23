@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useAuth } from '../auth'
-import { createUser, generatePassword, setPassword, updateEmail } from '../lib/adminUsers'
+import { createUser, deleteUser, generatePassword, setPassword, updateEmail } from '../lib/adminUsers'
 import { supabase } from '../lib/supabase'
 import { ROLE_LABEL, displayName, type Profile, type Role } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
@@ -89,6 +89,22 @@ export function Users() {
     } catch (err) {
       setError((err as Error).message)
     }
+  }
+
+  async function remove(p: Profile) {
+    const name = p.full_name || p.email
+    if (!confirm(`${name} wirklich löschen? Das kann nicht rückgängig gemacht werden.\n\nHat ${name} schon Aufträge, Fotos oder Zeiten, wird der Zugang nur deaktiviert.`)) return
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const r = await deleteUser(p.id)
+      setNotice(r.deleted ? `${name} wurde gelöscht.` : `${name} hat schon Daten in der App und wurde deshalb nur deaktiviert.`)
+    } catch (err) {
+      setError((err as Error).message)
+    }
+    await reload()
+    setBusy(false)
   }
 
   return (
@@ -205,6 +221,9 @@ export function Users() {
               <div className="user-controls">
                 <button onClick={() => startEdit(p)} disabled={busy}>Bearbeiten</button>
                 <button className="link" onClick={() => resetPassword(p)}>Passwort zurücksetzen</button>
+                {p.id !== me?.id && (
+                  <button className="link danger" onClick={() => remove(p)} disabled={busy}>Löschen</button>
+                )}
               </div>
             </li>
           ),

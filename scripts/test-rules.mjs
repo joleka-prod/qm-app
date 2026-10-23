@@ -814,6 +814,24 @@ if (process.env.SKIP_FUNCTIONS !== '1') {
     const c = createClient(url, anon, { auth: { persistSession: false } })
     assert.ifError((await c.auth.signInWithPassword({ email: changed, password: 'passwort123' })).error)
   })
+  await check('Admin löscht Benutzer, mit Daten nur deaktiviert, nicht sich selbst', async () => {
+    const empty = await user('loeschbar', 'monteur')
+    let r = await lead.c.functions.invoke('admin-users', { body: { action: 'delete', user_id: empty.id } })
+    assert.equal(r.error.context.status, 403)
+    r = await qm.c.functions.invoke('admin-users', { body: { action: 'delete', user_id: empty.id } })
+    assert.ifError(r.error)
+    assert.equal(r.data.deleted, true)
+    const { data: gone } = await admin.from('profiles').select('id').eq('id', empty.id)
+    assert.equal(gone.length, 0)
+    r = await qm.c.functions.invoke('admin-users', { body: { action: 'delete', user_id: worker.id } })
+    assert.ifError(r.error)
+    assert.equal(r.data.deactivated, true)
+    const { data: w } = await admin.from('profiles').select('active').eq('id', worker.id).single()
+    assert.equal(w.active, false)
+    await admin.from('profiles').update({ active: true }).eq('id', worker.id)
+    r = await qm.c.functions.invoke('admin-users', { body: { action: 'delete', user_id: qm.id } })
+    assert.match((await r.error.context.json()).error, /selbst/)
+  })
 }
 
 await check('Fahrstrecke: nur über den Service-Schlüssel, Adressänderung löscht den Wert', async () => {

@@ -22,6 +22,11 @@ export function setPassword(userId: string, password: string) {
   return call({ action: 'set_password', user_id: userId, password })
 }
 
+// Löscht den Benutzer; mit vorhandenen Daten wird er nur deaktiviert
+export async function deleteUser(userId: string): Promise<{ deleted?: boolean; deactivated?: boolean }> {
+  return call({ action: 'delete', user_id: userId })
+}
+
 // Ändert die Login-E-Mail (Supabase Auth) und die Adresse im Profil
 export function updateEmail(userId: string, email: string) {
   return call({ action: 'update_email', user_id: userId, email })

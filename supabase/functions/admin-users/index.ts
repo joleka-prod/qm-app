@@ -1,4 +1,4 @@
-// Benutzerverwaltung für QM/Admin: Benutzer anlegen, E-Mail-Adresse ändern und Passwort neu setzen.
+// Benutzerverwaltung für QM/Admin: Benutzer anlegen, löschen, E-Mail-Adresse ändern und Passwort neu setzen.
 // Läuft als Supabase Edge Function, weil dafür der geheime Service-Schlüssel nötig ist,
 // der nie im Browser landen darf. Aufrufer muss als aktiver Admin angemeldet sein.
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -84,6 +84,17 @@ Deno.serve(async (req) => {
       .eq('id', data.user.id)
     if (profErr) return reply(500, { error: profErr.message })
     return reply(200, { id: data.user.id })
+  }
+
+  // Löschen; hat der Benutzer schon Aufträge, Fotos, Zeiten usw., wird er nur deaktiviert
+  if (body.action === 'delete') {
+    if (!body.user_id) return reply(400, { error: 'Benutzer fehlt' })
+    if (body.user_id === caller.user.id) return reply(400, { error: 'Du kannst dich nicht selbst löschen.' })
+    const { error } = await admin.auth.admin.deleteUser(body.user_id)
+    if (!error) return reply(200, { deleted: true })
+    const { error: deactErr } = await admin.from('profiles').update({ active: false, supervisor_id: null }).eq('id', body.user_id)
+    if (deactErr) return reply(400, { error: error.message })
+    return reply(200, { deactivated: true })
   }
 
   if (body.action === 'set_password') {
