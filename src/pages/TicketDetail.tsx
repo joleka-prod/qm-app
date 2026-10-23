@@ -16,6 +16,7 @@ import { useTeams } from '../lib/teams'
 import {
   AREA_LABEL,
   SERVICE_AREAS,
+  appointmentMoveWarning,
   TYPE_LABEL,
   displayName,
   formatDate,
@@ -698,14 +699,21 @@ export function TicketDetail() {
                 <button
                   className="primary"
                   disabled={busy || !planDirty}
-                  onClick={() =>
+                  onClick={() => {
+                    const warning = appointmentMoveWarning(
+                      ticket,
+                      montageDate || null,
+                      montageTime || null,
+                      ticket.appointment_told_by ? displayName(byId[ticket.appointment_told_by]) : undefined,
+                    )
+                    if (warning && !confirm(warning)) return
                     update({
                       team_id: teamId ? Number(teamId) : null,
                       montage_date: montageDate || null,
                       montage_time: montageTime || null,
                       ...(area ? { service_area: area } : {}),
                     })
-                  }
+                  }}
                 >
                   Planung speichern
                 </button>

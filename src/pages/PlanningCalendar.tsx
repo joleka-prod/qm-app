@@ -7,6 +7,7 @@ import {
   AREA_LABEL,
   SERVICE_AREAS,
   addDays,
+  appointmentMoveWarning,
   displayName,
   formatDay,
   isoDate,
@@ -76,6 +77,10 @@ export function PlanningCalendar() {
       setError(`Für ${team.name} ist am ${formatDay(date)} noch kein verantwortlicher Monteur eingeteilt.`)
       return
     }
+    const t = planned.find((x) => x.id === ticketId)
+    const warning =
+      t && appointmentMoveWarning(t, date, date ? t.montage_time : null, t.appointment_told_by ? displayName(byId[t.appointment_told_by]) : undefined)
+    if (warning && !confirm(warning)) return
     const { error } = await supabase
       .from('tickets')
       .update({ team_id: team?.id ?? null, montage_date: date, ...(team ? { service_area: team.area } : {}) })

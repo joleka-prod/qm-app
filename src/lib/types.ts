@@ -223,3 +223,20 @@ export function weekNumber(d: Date) {
   const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1))
   return Math.ceil(((t.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
 }
+
+// Warnung, wenn ein dem Kunden schon mitgeteilter Termin verschoben werden soll
+export function appointmentMoveWarning(
+  t: Pick<Ticket, 'status' | 'appointment_state' | 'appointment_date' | 'appointment_time' | 'montage_date' | 'montage_time'>,
+  date: string | null,
+  time: string | null,
+  toldBy?: string,
+) {
+  if (t.status === 'abgeschlossen' || t.appointment_state === 'offen') return null
+  if (date === t.montage_date && formatTime(time) === formatTime(t.montage_time)) return null
+  const when = `${t.appointment_date ? formatDay(t.appointment_date) : ''}${t.appointment_time ? ` um ${formatTime(t.appointment_time)} Uhr` : ''}`
+  const was = t.appointment_state === 'bestaetigt' ? 'mitgeteilt und vom Kunden bestätigt' : 'mitgeteilt'
+  return (
+    `Achtung: Dem Kunden wurde bereits der Termin ${when} ${was}${toldBy ? ` (durch ${toldBy})` : ''}.\n\n` +
+    `Wenn du den Termin änderst, wird die Anmeldung aufgehoben und der Kunde muss über den neuen Termin informiert werden.\n\nTrotzdem ändern?`
+  )
+}
