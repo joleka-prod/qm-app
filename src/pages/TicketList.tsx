@@ -48,6 +48,16 @@ export function TicketList() {
       })
   }, [])
 
+  const isPlanner = profile?.role === 'admin' || profile?.role === 'teamleiter'
+  // Termin wurde dem Kunden mitgeteilt, danach aber verschoben: Kunde muss neu informiert werden
+  const urgent = useMemo(
+    () =>
+      tickets
+        .filter((t) => t.ticket_type !== 'qm' && t.status === 'zugewiesen' && t.appointment_state === 'offen' && t.appointment_announced_at)
+        .sort((a, b) => (a.montage_date ?? '').localeCompare(b.montage_date ?? '')),
+    [tickets],
+  )
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
     return tickets.filter((t) => {
@@ -77,7 +87,39 @@ export function TicketList() {
   }, [tickets, filter, typeFilter, query, profile, deletionIds])
 
   return (
-    <div>
+    <div className={isPlanner ? 'home-layout' : ''}>
+      {isPlanner && (
+        <aside className={`card urgent-col ${urgent.length > 0 ? 'has-urgent' : ''}`}>
+          <h2>Dringender Handlungsbedarf{urgent.length > 0 && ` (${urgent.length})`}</h2>
+          {loading ? (
+            <p className="muted small">Lädt…</p>
+          ) : urgent.length === 0 ? (
+            <p className="muted small">Im Moment nichts zu tun.</p>
+          ) : (
+            <>
+              <p className="small">Termin wurde verschoben, nachdem er dem Kunden mitgeteilt wurde. Bitte den Kunden informieren und neu anmelden.</p>
+              <ul className="urgent-list">
+                {urgent.map((t) => (
+                  <li key={t.id}>
+                    <Link to={`/ticket/${t.id}`} className="urgent-item">
+                      <span className="ticket-no">{ticketNo(t.id, t.ticket_type)} <TypeBadge type={t.ticket_type} /></span>
+                      <span className="ticket-title">{t.title}</span>
+                      {t.customer_name && <span className="small">{t.customer_name}</span>}
+                      <span className="small urgent-dates">
+                        Mitgeteilt: {t.appointment_date ? formatDay(t.appointment_date) : '–'} {formatTime(t.appointment_time)}
+                        <br />
+                        Neu: {t.montage_date ? formatDay(t.montage_date) : '–'} {formatTime(t.montage_time)}
+                        {t.team_id && <> · {teamById[t.team_id]?.name}</>}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </aside>
+      )}
+      <div className="home-main">
       <div className="page-head">
         <h1>Service-Aufträge</h1>
         <Link to="/neu" className="button primary">+ Neu</Link>
@@ -142,6 +184,7 @@ export function TicketList() {
           ))}
         </ul>
       )}
+      </div>
     </div>
   )
 }

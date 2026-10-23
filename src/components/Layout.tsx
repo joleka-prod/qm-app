@@ -5,7 +5,10 @@ import { ROLE_LABEL, displayName } from '../lib/types'
 
 export function Layout() {
   const { profile } = useAuth()
-  const wide = useLocation().pathname === '/kalender'
+  const path = useLocation().pathname
+  const isPlanner = profile?.role === 'admin' || profile?.role === 'teamleiter'
+  // Kalender und die Startseite der Planer (mit Spalte "Dringender Handlungsbedarf") nutzen die volle Breite
+  const wide = path === '/kalender' || (isPlanner && (path === '/' || path === '/tickets'))
   return (
     <div className="app">
       <header className="topbar">
