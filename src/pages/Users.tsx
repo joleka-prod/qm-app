@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useAuth } from '../auth'
-import { createUser, generatePassword, setPassword } from '../lib/adminUsers'
+import { createUser, generatePassword, setPassword, updateEmail } from '../lib/adminUsers'
 import { supabase } from '../lib/supabase'
 import { ROLE_LABEL, type Profile, type Role } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
@@ -20,11 +20,41 @@ export function Users() {
   const [password, setPw] = useState(generatePassword)
   const [busy, setBusy] = useState(false)
 
-  async function patch(p: Profile, change: Partial<Profile>) {
+  const [edit, setEdit] = useState<{ id: string; full_name: string; email: string; role: Role; active: boolean } | null>(null)
+
+  function startEdit(p: Profile) {
     setError('')
-    const { error } = await supabase.from('profiles').update(change).eq('id', p.id)
-    if (error) setError(error.message)
-    reload()
+    setNotice('')
+    setEdit({ id: p.id, full_name: p.full_name, email: p.email, role: p.role, active: p.active })
+  }
+
+  async function saveEdit(e: FormEvent, p: Profile) {
+    e.preventDefault()
+    if (!edit) return
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const change: Partial<Profile> = {}
+      if (edit.full_name.trim() !== p.full_name) change.full_name = edit.full_name.trim()
+      if (edit.role !== p.role) change.role = edit.role
+      if (edit.active !== p.active) change.active = edit.active
+      if (Object.keys(change).length > 0) {
+        const { error } = await supabase.from('profiles').update(change).eq('id', p.id)
+        if (error) throw error
+      }
+      const email = edit.email.trim().toLowerCase()
+      if (email !== p.email) await updateEmail(p.id, email)
+      setNotice(
+        `${edit.full_name.trim() || email} wurde gespeichert.` +
+          (email !== p.email ? ` Neue Login-E-Mail: ${email} (Passwort bleibt gleich).` : ''),
+      )
+      setEdit(null)
+    } catch (err) {
+      setError((err as Error).message)
+    }
+    await reload()
+    setBusy(false)
   }
 
   async function submit(e: FormEvent) {
@@ -107,36 +137,63 @@ export function Users() {
       {error && <p className="error">{error}</p>}
 
       <ul className="user-list">
-        {profiles.map((p) => (
-          <li key={p.id} className={`card user-row ${p.active ? '' : 'inactive'}`}>
-            <div>
-              <div className="ticket-title">{p.full_name || <span className="muted">(kein Name)</span>}</div>
-              <div className="muted small">{p.email}</div>
-            </div>
-            <div className="user-controls">
-              <select
-                value={p.role}
-                disabled={p.id === me?.id}
-                aria-label="Rolle"
-                onChange={(e) => patch(p, { role: e.target.value as Role })}
-              >
-                {ROLES.map((r) => (
-                  <option key={r} value={r}>{ROLE_LABEL[r]}</option>
-                ))}
-              </select>
-              <label className="checkbox">
-                <input
-                  type="checkbox"
-                  checked={p.active}
-                  disabled={p.id === me?.id}
-                  onChange={(e) => patch(p, { active: e.target.checked })}
-                />
-                aktiv
-              </label>
-              <button className="link" onClick={() => resetPassword(p)}>Passwort zurücksetzen</button>
-            </div>
-          </li>
-        ))}
+        {profiles.map((p) =>
+          edit?.id === p.id ? (
+            <li key={p.id} className="card">
+              <form className="form" onSubmit={(e) => saveEdit(e, p)}>
+                <h2>Benutzer bearbeiten</h2>
+                <label>
+                  Name
+                  <input required value={edit.full_name} maxLength={100} onChange={(e) => setEdit({ ...edit, full_name: e.target.value })} />
+                </label>
+                <label>
+                  E-Mail (Login)
+                  <input type="email" required value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} />
+                </label>
+                <label>
+                  Rolle
+                  <select value={edit.role} disabled={p.id === me?.id} onChange={(e) => setEdit({ ...edit, role: e.target.value as Role })}>
+                    {ROLES.map((r) => (
+                      <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={edit.active}
+                    disabled={p.id === me?.id}
+                    onChange={(e) => setEdit({ ...edit, active: e.target.checked })}
+                  />
+                  Zugang aktiv
+                </label>
+                {p.id === me?.id && <p className="muted small">Die eigene Rolle und den eigenen Zugang kannst du nicht ändern.</p>}
+                {edit.email.trim().toLowerCase() !== p.email && (
+                  <p className="muted small">Die Person meldet sich danach mit der neuen E-Mail-Adresse an. Das Passwort bleibt gleich.</p>
+                )}
+                <div className="actions">
+                  <button type="button" onClick={() => setEdit(null)} disabled={busy}>Abbrechen</button>
+                  <button className="primary" disabled={busy}>{busy ? 'Speichert…' : 'Speichern'}</button>
+                </div>
+              </form>
+            </li>
+          ) : (
+            <li key={p.id} className={`card user-row ${p.active ? '' : 'inactive'}`}>
+              <div>
+                <div className="ticket-title">{p.full_name || <span className="muted">(kein Name)</span>}</div>
+                <div className="muted small">{p.email}</div>
+                <div className="small">
+                  {ROLE_LABEL[p.role]}
+                  {!p.active && <span className="muted"> · deaktiviert</span>}
+                </div>
+              </div>
+              <div className="user-controls">
+                <button onClick={() => startEdit(p)} disabled={busy}>Bearbeiten</button>
+                <button className="link" onClick={() => resetPassword(p)}>Passwort zurücksetzen</button>
+              </div>
+            </li>
+          ),
+        )}
       </ul>
     </div>
   )

@@ -1,4 +1,4 @@
-// Benutzerverwaltung für QM/Admin: Benutzer anlegen und Passwort neu setzen.
+// Benutzerverwaltung für QM/Admin: Benutzer anlegen, E-Mail-Adresse ändern und Passwort neu setzen.
 // Läuft als Supabase Edge Function, weil dafür der geheime Service-Schlüssel nötig ist,
 // der nie im Browser landen darf. Aufrufer muss als aktiver Admin angemeldet sein.
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -42,7 +42,24 @@ Deno.serve(async (req) => {
   }
 
   const password = (body.password ?? '').trim()
-  if (password.length < 8) return reply(400, { error: 'Das Passwort muss mindestens 8 Zeichen haben.' })
+  const needsPassword = body.action === 'create' || body.action === 'set_password'
+  if (needsPassword && password.length < 8) return reply(400, { error: 'Das Passwort muss mindestens 8 Zeichen haben.' })
+
+  if (body.action === 'update_email') {
+    const email = (body.email ?? '').trim().toLowerCase()
+    if (!body.user_id) return reply(400, { error: 'Benutzer fehlt' })
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return reply(400, { error: 'Bitte eine gültige E-Mail-Adresse angeben.' })
+    const { data: taken } = await admin.from('profiles').select('id').eq('email', email).neq('id', body.user_id).maybeSingle()
+    if (taken) return reply(400, { error: 'Diese E-Mail-Adresse ist bereits registriert.' })
+    const { error } = await admin.auth.admin.updateUserById(body.user_id, { email, email_confirm: true })
+    if (error) {
+      const msg = /already|registered|exists/i.test(error.message) ? 'Diese E-Mail-Adresse ist bereits registriert.' : error.message
+      return reply(400, { error: msg })
+    }
+    const { error: profErr } = await admin.from('profiles').update({ email }).eq('id', body.user_id)
+    if (profErr) return reply(500, { error: profErr.message })
+    return reply(200, { ok: true })
+  }
 
   if (body.action === 'create') {
     const email = (body.email ?? '').trim().toLowerCase()

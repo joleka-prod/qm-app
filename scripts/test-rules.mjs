@@ -52,6 +52,19 @@ await check('Mitarbeiter kann Rolle nicht selbst ändern', async () => {
   assert.ok(error)
 })
 
+await check('Admin bearbeitet Benutzer, E-Mail nur über die Benutzerverwaltung', async () => {
+  const r = await qm.c.from('profiles').update({ full_name: '  Andere Person ', role: 'teamleiter' }).eq('id', other.id).select().single()
+  assert.ifError(r.error)
+  assert.equal(r.data.full_name, 'Andere Person')
+  await qm.c.from('profiles').update({ role: 'mitarbeiter' }).eq('id', other.id)
+  const mail = await qm.c.from('profiles').update({ email: 'x@y.de' }).eq('id', other.id)
+  assert.match(mail.error.message, /Benutzerverwaltung/)
+  const self = await qm.c.from('profiles').update({ active: false }).eq('id', qm.id)
+  assert.match(self.error.message, /eigenen Zugang/)
+  const own = await worker.c.from('profiles').update({ full_name: 'Neuer Name' }).eq('id', worker.id)
+  assert.ifError(own.error)
+})
+
 await check('Anderer Mitarbeiter sieht fremdes Ticket nicht', async () => {
   const { data } = await other.c.from('tickets').select().eq('id', ticketId)
   assert.equal(data.length, 0)
@@ -612,6 +625,20 @@ if (process.env.SKIP_FUNCTIONS !== '1') {
     const c = createClient(url, anon, { auth: { persistSession: false } })
     const login = await c.auth.signInWithPassword({ email: `worker-${run}@test.local`, password: 'Neu-9999-Pass' })
     assert.ifError(login.error)
+  })
+
+  await check('QM ändert Login-E-Mail, Login mit neuer Adresse klappt', async () => {
+    const changed = `geaendert-${run}@test.local`
+    const bad = await qm.c.functions.invoke('admin-users', { body: { action: 'update_email', user_id: other.id, email: newMail } })
+    assert.match((await bad.error.context.json()).error, /bereits/)
+    const denied = await lead.c.functions.invoke('admin-users', { body: { action: 'update_email', user_id: other.id, email: changed } })
+    assert.equal(denied.error.context.status, 403)
+    const { error } = await qm.c.functions.invoke('admin-users', { body: { action: 'update_email', user_id: other.id, email: ` ${changed.toUpperCase()} ` } })
+    assert.ifError(error)
+    const { data: prof } = await admin.from('profiles').select('email').eq('id', other.id).single()
+    assert.equal(prof.email, changed)
+    const c = createClient(url, anon, { auth: { persistSession: false } })
+    assert.ifError((await c.auth.signInWithPassword({ email: changed, password: 'passwort123' })).error)
   })
 }
 
