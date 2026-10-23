@@ -35,7 +35,8 @@ function Routed() {
         <Route path="neu" element={<NewTicket />} />
         <Route path="ticket/:id" element={<TicketDetail />} />
         <Route path="profil" element={<ProfilePage />} />
-        <Route path="stundenzettel" element={<Timesheet />} />
+        <Route path="zeiterfassung" element={<Timesheet />} />
+        <Route path="stundenzettel" element={<Navigate to="/zeiterfassung" replace />} />
         {profile.role === 'admin' && <Route path="benutzer" element={<Users />} />}
         {profile.role === 'admin' && <Route path="artikel" element={<Articles />} />}
         <Route path="*" element={<Navigate to="/" replace />} />

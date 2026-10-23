@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../auth'
+import { ClockBar } from '../components/ClockBar'
 import { minutesOf, toLocalInput, type TimeEntry } from '../components/TimeCard'
 import { clockTime, formatMinutes, minutesBetween, useClockChanged, type Attendance } from '../lib/clock'
 import { supabase } from '../lib/supabase'
@@ -150,8 +151,10 @@ export function Timesheet() {
 
   return (
     <div>
+      {profile && <ClockBar userId={profile.id} />}
+
       <div className="page-head">
-        <h1>Stundenkonto</h1>
+        <h1>Zeiterfassung</h1>
         <div className="week-nav">
           <button onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Voriger Monat">←</button>
           <button onClick={() => setMonth(today.slice(0, 7))}>{monthName}</button>
@@ -170,7 +173,7 @@ export function Timesheet() {
       )}
 
       <p className="muted small">
-        Die Arbeitszeit kommt aus der Zeiterfassung (Start/Stopp oben in der App). „Aufträge“ zeigt die Zeit, die auf
+        Die Arbeitszeit kommt aus Start und Stopp der Zeiterfassung oben. „Aufträge“ zeigt die Zeit, die auf
         Aufträge gebucht wurde.{canCorrect && ' Fehlende oder falsche Zeiten kannst du hier korrigieren oder nachtragen.'}
       </p>
 

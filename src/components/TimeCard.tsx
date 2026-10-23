@@ -119,7 +119,9 @@ export function TimeCard({ ticket, me, isInstaller, isPlanner, isAdmin, byId }: 
       {isInstaller && !closed && (
         <div className="time-controls">
           {!clock.running && clock.loaded && (
-            <p className="small appointment-warn">Bitte zuerst oben die Zeiterfassung starten.</p>
+            <p className="small appointment-warn">
+              Bitte zuerst im Menüpunkt <Link to="/zeiterfassung">Zeiterfassung</Link> die Zeiterfassung starten.
+            </p>
           )}
           {running && runningHere && (
             <p className="time-running">
