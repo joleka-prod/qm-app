@@ -8,6 +8,7 @@ import { PositionsEditor, isEmptyPosition, newPositionDraft, type PositionDraft 
 import { SignaturePad, canvasToBlob } from '../components/SignaturePad'
 import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { deletePhoto, signedUrls, uploadPhotos, uploadSignature } from '../lib/photos'
+import { sendReport } from '../lib/reportMail'
 import { supabase } from '../lib/supabase'
 import {
   AREA_LABEL,
@@ -39,6 +40,7 @@ const EVENT_LABEL: Record<string, string> = {
   bericht: 'Arbeitsbericht bearbeitet',
   unterschrift: 'Kunde hat unterschrieben:',
   unterschrift_entfernt: 'Unterschrift entfernt',
+  bericht_gesendet: 'Bericht per E-Mail gesendet an',
   bereich: 'Bereich geändert auf',
   zugewiesen: 'Zugewiesen an',
   ursache: 'Ursache bearbeitet',
@@ -215,6 +217,23 @@ export function TicketDetail() {
     }
     await load()
     setBusy(false)
+  }
+
+  async function mailReport(force: boolean) {
+    setBusy(true)
+    setError('')
+    try {
+      await sendReport(ticketId, force)
+    } catch (err) {
+      setError((err as Error).message)
+    }
+    await load()
+    setBusy(false)
+  }
+
+  async function closeJob() {
+    const wantsMail = ticket?.report_by_email && !ticket.report_sent_at
+    if ((await update({ work_report: report, status: 'abgeschlossen' })) && wantsMail) await mailReport(false)
   }
 
   async function saveSignature() {
@@ -698,7 +717,7 @@ export function TicketDetail() {
                   disabled={busy || !report.trim() || openPositions > 0}
                   onClick={() => {
                     if (!ticket.signature_path && !confirm('Es gibt noch keine Kundenunterschrift. Trotzdem als erledigt melden?')) return
-                    update({ work_report: report, status: 'abgeschlossen' })
+                    closeJob()
                   }}
                 >
                   Erledigt melden
@@ -734,6 +753,17 @@ export function TicketDetail() {
                   ? <>✉ Bericht per E-Mail gewünscht an <a href={`mailto:${ticket.customer_email}`}>{ticket.customer_email}</a></>
                   : <span className="muted">Kein Bericht per E-Mail gewünscht.</span>}
               </p>
+              {ticket.report_by_email && ticket.report_sent_at && (
+                <p className="small mail-ok">✓ Bericht gesendet am {formatDate(ticket.report_sent_at)}</p>
+              )}
+              {ticket.report_by_email && !ticket.report_sent_at && ticket.report_send_error && (
+                <p className="small mail-error">Versand fehlgeschlagen: {ticket.report_send_error}</p>
+              )}
+              {ticket.report_by_email && closed && (isPlanner || (isInstaller && !ticket.report_sent_at)) && (
+                <button className="link" disabled={busy} onClick={() => mailReport(!!ticket.report_sent_at)}>
+                  {ticket.report_sent_at ? 'Bericht erneut senden' : 'Bericht jetzt senden'}
+                </button>
+              )}
               {isAdmin && (
                 <button className="link" disabled={busy} onClick={() => update({ signature_path: null })}>
                   Unterschrift entfernen

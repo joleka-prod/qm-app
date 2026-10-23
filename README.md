@@ -39,6 +39,20 @@ Damit QM/Admin in der App Benutzer anlegen und Passwörter zurücksetzen kann, w
 Via Editor* mit dem Namen `admin-users` anlegen und den Inhalt der Datei einfügen
 (oder `npx supabase functions deploy admin-users`).
 
+### 2b. Servicebericht per E-Mail (Edge Function + Resend)
+
+Wünscht der Kunde bei der Unterschrift den Bericht per E-Mail, verschickt die Funktion
+`supabase/functions/send-report/index.ts` nach „Erledigt melden“ ein PDF über [Resend](https://resend.com).
+
+1. Bei Resend ein Konto anlegen, unter *Domains* die eigene Domain hinzufügen (Region EU) und die angezeigten
+   DNS-Einträge beim Domain-Anbieter eintragen, bis die Domain als *Verified* gilt.
+2. Unter *API Keys* einen Schlüssel mit *Sending access* erstellen.
+3. In Supabase unter *Edge Functions → Secrets* eintragen: `RESEND_API_KEY` (der Schlüssel) und
+   `MAIL_FROM` (z. B. `JOLEKA Service <service@joleka.de>`), optional `MAIL_REPLY_TO` und `COMPANY_NAME`.
+4. Die Funktion wie `admin-users` mit dem Namen `send-report` anlegen.
+
+Lokal testen: `scripts/test-report.mjs` (mit einem Test-Mailserver über `RESEND_API_URL`).
+
 ### 3. Erster Admin
 
 Die erste Person, die angelegt wird, wird automatisch **QM / Admin**

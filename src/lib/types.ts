@@ -25,6 +25,8 @@ export interface Ticket {
   customer_name: string
   customer_email: string
   report_by_email: boolean
+  report_sent_at: string | null
+  report_send_error: string
   site_address: string
   work_report: string
   service_area: ServiceArea | null
