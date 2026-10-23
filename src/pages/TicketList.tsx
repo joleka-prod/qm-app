@@ -53,15 +53,18 @@ export function TicketList() {
   const isPlanner = profile?.role === 'admin' || profile?.role === 'teamleiter'
   const urgent = useMemo(() => {
     const planned = tickets
-      .filter((t) => t.ticket_type !== 'qm' && t.status === 'zugewiesen' && t.montage_date && t.appointment_state === 'offen')
+      .filter((t) => t.ticket_type !== 'qm' && t.status === 'zugewiesen' && t.montage_date)
       .sort((a, b) => `${a.montage_date}${a.montage_time ?? ''}`.localeCompare(`${b.montage_date}${b.montage_time ?? ''}`))
-    // Termin wurde dem Kunden mitgeteilt, danach aber verschoben: Kunde muss neu informiert werden
-    const moved = planned.filter((t) => t.appointment_announced_at)
-    // Noch nie angemeldet und der Termin ist heute oder in den nächsten 2 Werktagen
     const today = isoDate(new Date())
     const limit = isoDate(addWorkdays(new Date(), URGENT_WORKDAYS))
-    const soon = planned.filter((t) => !t.appointment_announced_at && t.montage_date! >= today && t.montage_date! <= limit)
-    return { moved, soon, count: moved.length + soon.length }
+    const near = (t: Ticket) => t.montage_date! >= today && t.montage_date! <= limit
+    // Termin wurde dem Kunden mitgeteilt, danach aber verschoben: Kunde muss neu informiert werden
+    const moved = planned.filter((t) => t.appointment_state === 'offen' && t.appointment_announced_at)
+    // Noch nie angemeldet und der Termin steht in den nächsten Werktagen an
+    const soon = planned.filter((t) => t.appointment_state === 'offen' && !t.appointment_announced_at && near(t))
+    // Angemeldet, aber der Kunde hat noch nicht bestätigt
+    const unconfirmed = planned.filter((t) => t.appointment_state === 'angemeldet' && near(t))
+    return { moved, soon, unconfirmed, count: moved.length + soon.length + unconfirmed.length }
   }, [tickets])
 
   const visible = useMemo(() => {
@@ -117,6 +120,14 @@ export function TicketList() {
                   title="Termin noch nicht angemeldet"
                   hint={`Einsatz ist in den nächsten ${URGENT_WORKDAYS} Werktagen, der Kunde wurde noch nicht informiert.`}
                   tickets={urgent.soon}
+                  teamName={(id) => teamById[id]?.name}
+                />
+              )}
+              {urgent.unconfirmed.length > 0 && (
+                <UrgentGroup
+                  title="Termin noch nicht bestätigt"
+                  hint={`Einsatz ist in den nächsten ${URGENT_WORKDAYS} Werktagen, der Kunde hat den Termin noch nicht bestätigt.`}
+                  tickets={urgent.unconfirmed}
                   teamName={(id) => teamById[id]?.name}
                 />
               )}
@@ -195,7 +206,7 @@ export function TicketList() {
 }
 
 // So viele Werktage vor dem Einsatz muss der Termin beim Kunden angemeldet sein
-const URGENT_WORKDAYS = 2
+const URGENT_WORKDAYS = 3
 
 function addWorkdays(d: Date, n: number) {
   let r = d
