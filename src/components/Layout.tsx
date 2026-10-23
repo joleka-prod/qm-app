@@ -23,6 +23,7 @@ export function Layout() {
             <NavLink to="/" end>Service-Aufträge</NavLink>
           )}
           {(profile?.role === 'admin' || profile?.role === 'teamleiter') && <NavLink to="/kalender">Kalender</NavLink>}
+          {profile?.role === 'admin' && <NavLink to="/artikel">Artikel</NavLink>}
           {profile?.role === 'admin' && <NavLink to="/benutzer">Benutzer</NavLink>}
           <NavLink to="/profil" title={profile ? ROLE_LABEL[profile.role] : ''}>
             {displayName(profile)}

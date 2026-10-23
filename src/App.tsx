@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth'
 import { Layout } from './components/Layout'
 import { configMissing } from './lib/supabase'
+import { Articles } from './pages/Articles'
 import { InstallerCalendar } from './pages/InstallerCalendar'
 import { Login } from './pages/Login'
 import { NewTicket } from './pages/NewTicket'
@@ -34,6 +35,7 @@ function Routed() {
         <Route path="ticket/:id" element={<TicketDetail />} />
         <Route path="profil" element={<ProfilePage />} />
         {profile.role === 'admin' && <Route path="benutzer" element={<Users />} />}
+        {profile.role === 'admin' && <Route path="artikel" element={<Articles />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

@@ -85,6 +85,7 @@ export function NewTicket() {
       sort: i,
       position_number: p.position_number.trim(),
       description: p.description.trim(),
+      article_id: p.article_id ?? null,
     }))
     let saved: { id: number; sort: number }[] = []
     if (einsatz && posRows.length > 0) {

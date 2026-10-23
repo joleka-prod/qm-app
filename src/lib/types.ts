@@ -83,6 +83,7 @@ export interface TicketPosition {
   price: number | null
   quantity: number
   unit: string
+  article_id: number | null
   done_by: string | null
   done_at: string | null
 }

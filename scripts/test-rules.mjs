@@ -662,6 +662,35 @@ await check('Nur Admin öffnet Berechnung wieder, andere Einsätze haben keine B
   assert.ok(closedOther.every((t) => t.billing_state === 'keine'))
 })
 
+// --- Artikel ---
+await check('Nur Admin pflegt Artikel, alle können sie sehen', async () => {
+  const denied = await lead.c.from('articles').insert({ description: 'Anfahrt', price: 45 }).select()
+  assert.ok(denied.error)
+  const { data: art, error } = await qm.c.from('articles').insert({ article_number: ` A-${run} `, description: ' Anfahrtspauschale ', unit: 'pauschal', price: 45 }).select().single()
+  assert.ifError(error)
+  assert.equal(art.article_number, `A-${run}`)
+  assert.equal(art.description, 'Anfahrtspauschale')
+  const dup = await qm.c.from('articles').insert({ article_number: `a-${run}`, description: 'doppelt' })
+  assert.ok(dup.error)
+  const seen = await worker.c.from('articles').select('id').eq('id', art.id)
+  assert.equal(seen.data.length, 1)
+  const upd = await lead.c.from('articles').update({ price: 1 }).eq('id', art.id).select()
+  assert.ok(upd.error || upd.data.length === 0)
+  globalThis.articleId = art.id
+})
+
+await check('Position aus Artikel übernimmt Einheit und Preis', async () => {
+  const { data: t } = await worker.c.from('tickets').insert({ ticket_type: 'reparatur', title: 'Artikel-Test' }).select().single()
+  const { data: pos, error } = await worker.c.from('ticket_positions')
+    .insert({ ticket_id: t.id, description: 'Anfahrtspauschale', article_id: globalThis.articleId, price: 1, unit: 'kg' }).select().single()
+  assert.ifError(error)
+  assert.equal(pos.unit, 'pauschal')
+  assert.equal(pos.price, 45)
+  await qm.c.from('articles').update({ active: false }).eq('id', globalThis.articleId)
+  const inactive = await worker.c.from('ticket_positions').insert({ ticket_id: t.id, description: 'x', article_id: globalThis.articleId })
+  assert.match(inactive.error.message, /nicht mehr aktiv/)
+})
+
 // --- Benutzerverwaltung (Edge Function admin-users) ---
 if (process.env.SKIP_FUNCTIONS !== '1') {
   const newMail = `neu-${run}@test.local`
