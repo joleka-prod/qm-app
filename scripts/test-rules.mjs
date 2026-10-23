@@ -728,8 +728,9 @@ await check('Erledigt melden stoppt laufende Zeit, Planer korrigiert, nur Admin 
   assert.equal((await qm.c.from('time_entries').delete().eq('id', e.id).select()).data.length, 1)
 })
 
-await check('Stempeluhr: nur Monteure, eine laufende Zeit, Ausstempeln stoppt Auftragszeit', async () => {
-  assert.ok((await lead.c.rpc('clock_in')).error)
+await check('Stempeluhr: alle Mitarbeiter, eine laufende Zeit, Ausstempeln stoppt Auftragszeit', async () => {
+  assert.ifError((await worker.c.rpc('clock_in')).error)
+  assert.ifError((await worker.c.rpc('clock_out')).error)
   const { data: a1 } = await m1.c.rpc('clock_in')
   const { data: a2 } = await m1.c.rpc('clock_in')
   assert.equal(a1, a2)
@@ -755,8 +756,13 @@ await check('Planer korrigiert und trägt Stempelzeiten nach, nur Admin löscht'
   assert.equal(add.data.edited_by, lead.id)
   const bad = await lead.c.from('attendance').update({ ended_at: '2026-10-20T05:00:00Z' }).eq('id', add.data.id)
   assert.ok(bad.error)
-  const notInstaller = await lead.c.from('attendance').insert({ installer_id: worker.id, started_at: '2026-10-20T06:00:00Z' })
-  assert.match(notInstaller.error.message, /nur für Monteure/)
+  const forWorker = await lead.c.from('attendance').insert({ installer_id: worker.id, started_at: '2026-10-20T06:00:00Z', ended_at: '2026-10-20T07:00:00Z' })
+  assert.ifError(forWorker.error)
+  assert.equal((await worker.c.from('attendance').select('id').eq('installer_id', worker.id)).data.length, 2)
+  const own = await lead.c.from('attendance').insert({ installer_id: lead.id, started_at: '2026-10-20T06:00:00Z' })
+  assert.match(own.error.message, /Eigene Zeiten kann nur der Admin/)
+  assert.ifError((await lead.c.rpc('clock_in')).error)
+  assert.ifError((await lead.c.rpc('clock_out')).error)
   assert.equal((await lead.c.from('attendance').delete().eq('id', add.data.id).select()).data.length, 0)
   assert.equal((await qm.c.from('attendance').delete().eq('id', add.data.id).select()).data.length, 1)
 })

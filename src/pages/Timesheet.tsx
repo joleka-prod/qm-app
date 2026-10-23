@@ -26,16 +26,17 @@ function shiftMonth(month: string, n: number) {
 
 type Edit = { id?: number; start: string; end: string }
 
-// Stundenkonto: Tage, Wochen und Monat aus den Stempelzeiten. Monteure sehen ihr eigenes,
+// Stundenkonto: Tage, Wochen und Monat aus den Stempelzeiten. Mitarbeiter sehen ihr eigenes,
 // QM und Teamleiter alle und können Zeiten korrigieren oder nachtragen.
 export function Timesheet() {
   const { profile } = useAuth()
-  const { installers, byId } = useProfiles()
+  const { profiles, byId } = useProfiles()
+  const staff = profiles.filter((p) => p.active)
   const isPlanner = profile?.role === 'admin' || profile?.role === 'teamleiter'
   const isAdmin = profile?.role === 'admin'
   const today = isoDate(new Date())
 
-  const [installerId, setInstallerId] = useState(isPlanner ? '' : profile?.id ?? '')
+  const [installerId, setInstallerId] = useState(profile?.id ?? '')
   const [month, setMonth] = useState(today.slice(0, 7))
   const [sessions, setSessions] = useState<Attendance[]>([])
   const [jobs, setJobs] = useState<TimeEntry[]>([])
@@ -43,10 +44,8 @@ export function Timesheet() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const now = Date.now()
-
-  useEffect(() => {
-    if (isPlanner && !installerId && installers.length > 0) setInstallerId(installers[0].id)
-  }, [isPlanner, installerId, installers])
+  // Eigene Zeiten korrigiert nur der Admin
+  const canCorrect = isAdmin || (isPlanner && installerId !== profile?.id)
 
   const range = useMemo(() => {
     const all = monthDays(month)
@@ -162,8 +161,8 @@ export function Timesheet() {
 
       {isPlanner && (
         <div className="filters">
-          <select value={installerId} onChange={(e) => { setEdit(null); setInstallerId(e.target.value) }} aria-label="Monteur">
-            {installers.map((p) => (
+          <select value={installerId} onChange={(e) => { setEdit(null); setInstallerId(e.target.value) }} aria-label="Mitarbeiter">
+            {staff.map((p) => (
               <option key={p.id} value={p.id}>{displayName(p)}</option>
             ))}
           </select>
@@ -172,7 +171,7 @@ export function Timesheet() {
 
       <p className="muted small">
         Die Arbeitszeit kommt aus der Zeiterfassung (Start/Stopp oben in der App). „Aufträge“ zeigt die Zeit, die auf
-        Aufträge gebucht wurde.{isPlanner && ' Fehlende oder falsche Zeiten kannst du hier korrigieren oder nachtragen.'}
+        Aufträge gebucht wurde.{canCorrect && ' Fehlende oder falsche Zeiten kannst du hier korrigieren oder nachtragen.'}
       </p>
 
       <div className="timesheet-days">
@@ -200,7 +199,7 @@ export function Timesheet() {
                           {clockTime(s.started_at)} – {s.ended_at ? clockTime(s.ended_at) : <span className="time-running">läuft</span>}
                           {s.edited_by && <span className="muted"> · korrigiert von {displayName(byId[s.edited_by])}</span>}
                         </span>
-                        {isPlanner && (
+                        {canCorrect && (
                           <button
                             className="link"
                             onClick={() => {
@@ -218,7 +217,7 @@ export function Timesheet() {
                     {pause > 0 && <span>Pause {formatMinutes(pause)}</span>}
                     {!!jobsByDay[d] && <span>Aufträge {formatMinutes(jobsByDay[d])}</span>}
                     {short && <span className="appointment-warn">Pause unter {minBreak(work)} Min.</span>}
-                    {isPlanner && !edit && d <= today && (
+                    {canCorrect && !edit && d <= today && (
                       <button
                         className="link"
                         onClick={() => {
