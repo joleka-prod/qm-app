@@ -304,3 +304,4 @@ fieldset.plan input, fieldset.plan select { width: 100%; min-width: 0; }
 .mail-ok { color: #166534; margin: 0.2rem 0; }
 .mail-error { color: var(--danger, #b42318); margin: 0.2rem 0; }
 @media (prefers-color-scheme: dark) { .mail-ok { color: #86efac; } }
+.app-version { text-align: center; font-size: 0.75rem; color: var(--muted); padding: 1rem 0 1.5rem; }

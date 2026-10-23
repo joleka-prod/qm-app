@@ -30,6 +30,7 @@ export function Layout() {
       <main className={wide ? 'content wide' : 'content'}>
         <Outlet />
       </main>
+      <footer className="app-version">Version {__BUILD__}</footer>
     </div>
   )
 }
