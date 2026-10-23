@@ -233,7 +233,7 @@ export function TicketDetail() {
         if (error) throw error
       }
       for (const [i, p] of keep.entries()) {
-        const row = { sort: i, position_number: p.position_number.trim(), description: p.description.trim(), article_id: p.article_id ?? null }
+        const row = { sort: i, position_number: String(i + 1), description: p.description.trim(), article_id: p.article_id ?? null }
         const { error } = p.id
           ? await supabase.from('ticket_positions').update(row).eq('id', p.id)
           : await supabase.from('ticket_positions').insert({ ...row, ticket_id: ticketId })

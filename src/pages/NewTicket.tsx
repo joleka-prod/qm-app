@@ -83,7 +83,7 @@ export function NewTicket() {
     const posRows = filled.map((p, i) => ({
       ticket_id: data.id,
       sort: i,
-      position_number: p.position_number.trim(),
+      position_number: String(i + 1),
       description: p.description.trim(),
       article_id: p.article_id ?? null,
     }))

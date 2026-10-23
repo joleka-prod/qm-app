@@ -15,7 +15,7 @@ export function newPositionDraft(): PositionDraft {
 }
 
 export function isEmptyPosition(p: PositionDraft) {
-  return !p.position_number.trim() && !p.description.trim()
+  return !p.description.trim()
 }
 
 interface Props {
@@ -24,12 +24,18 @@ interface Props {
   withPhotos?: boolean
 }
 
-// Eingabeliste für Positionen eines Einsatzes (Pos.-Nr. + was zu tun ist).
+// Eingabeliste für Positionen eines Einsatzes. Die Positionsnummer ergibt sich aus der Reihenfolge (1, 2, 3 …).
 export function PositionsEditor({ positions, onChange, withPhotos }: Props) {
   const { articles } = useArticles()
 
   function patch(key: string, change: Partial<PositionDraft>) {
     onChange(positions.map((p) => (p.key === key ? { ...p, ...change } : p)))
+  }
+
+  function move(i: number, dir: -1 | 1) {
+    const next = [...positions]
+    ;[next[i], next[i + dir]] = [next[i + dir], next[i]]
+    onChange(next)
   }
 
   function articleText(id: number) {
@@ -52,14 +58,22 @@ export function PositionsEditor({ positions, onChange, withPhotos }: Props) {
       {positions.map((p, i) => (
         <div className="position-item" key={p.key}>
         <div className="position-row">
-          <input
-            className="pos-no"
-            aria-label={`Positionsnummer ${i + 1}`}
-            placeholder="Pos."
-            maxLength={20}
-            value={p.position_number}
-            onChange={(e) => patch(p.key, { position_number: e.target.value })}
-          />
+          <div className="pos-no">
+            <span className="pos-no-label">Pos. {i + 1}</span>
+            <span className="pos-move">
+              <button type="button" aria-label={`Position ${i + 1} nach oben`} disabled={i === 0} onClick={() => move(i, -1)}>
+                ↑
+              </button>
+              <button
+                type="button"
+                aria-label={`Position ${i + 1} nach unten`}
+                disabled={i === positions.length - 1}
+                onClick={() => move(i, 1)}
+              >
+                ↓
+              </button>
+            </span>
+          </div>
           <div className="pos-desc-wrap">
           {p.article_id && (
             <span className="pos-article">
