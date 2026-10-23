@@ -1,4 +1,4 @@
--- Fahrstrecke bei Beanstandungen: km vom Hauptstandort zur Kundenadresse, Hin- und Rückweg.
+-- Fahrstrecke bei Service-Aufträgen (anfangs nur Beanstandungen): km vom Hauptstandort zur Kundenadresse, Hin- und Rückweg.
 -- Wird nur von der Edge Function calc-distance (Service-Schlüssel) gesetzt. Ändert sich die
 -- Adresse, wird der alte Wert gelöscht und neu berechnet.
 

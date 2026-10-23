@@ -491,7 +491,7 @@ export function TicketDetail() {
                 )}
               </p>
             )}
-            {ticket.ticket_type === 'beanstandung' && <DistanceLine ticket={ticket} onChanged={load} />}
+            {einsatz && <DistanceLine ticket={ticket} onChanged={load} />}
             <p className="muted small">
               Erstellt {formatDate(ticket.created_at)} von {displayName(byId[ticket.created_by])}
               {ticket.closed_at && <> · {einsatz ? 'Erledigt' : 'Abgeschlossen'} {formatDate(ticket.closed_at)}</>}

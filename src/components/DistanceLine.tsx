@@ -5,7 +5,7 @@ import type { Ticket } from '../lib/types'
 
 const km = (v: number) => v.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
-// Fahrstrecke bei Beanstandungen (Hauptstandort → Kunde → zurück). Wird automatisch berechnet,
+// Fahrstrecke bei Service-Aufträgen (Hauptstandort → Kunde → zurück). Wird automatisch berechnet,
 // sobald eine Adresse da ist, die noch nicht berechnet wurde (Edge Function calc-distance).
 export function DistanceLine({ ticket, onChanged }: { ticket: Ticket; onChanged: () => void }) {
   const [busy, setBusy] = useState(false)
