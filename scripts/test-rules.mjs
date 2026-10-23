@@ -816,6 +816,19 @@ if (process.env.SKIP_FUNCTIONS !== '1') {
   })
 }
 
+await check('Fahrstrecke: nur über den Service-Schlüssel, Adressänderung löscht den Wert', async () => {
+  const { data: b } = await qm.c.from('tickets').insert({ ticket_type: 'beanstandung', title: 'km', site_address: 'Hauptstr. 1\n54550 Daun', distance_km: 5 }).select().single()
+  assert.equal(b.distance_km, null)
+  let r = await qm.c.from('tickets').update({ distance_km: 9, distance_address: 'x' }).eq('id', b.id).select().single()
+  assert.equal(r.data.distance_km, null)
+  await admin.from('tickets').update({ distance_km: 84.2, distance_address: b.site_address }).eq('id', b.id)
+  r = await qm.c.from('tickets').update({ title: 'km2' }).eq('id', b.id).select().single()
+  assert.equal(Number(r.data.distance_km), 84.2)
+  r = await qm.c.from('tickets').update({ site_address: 'Markt 1\n54568 Gerolstein' }).eq('id', b.id).select().single()
+  assert.equal(r.data.distance_km, null)
+  assert.equal(r.data.distance_address, '')
+})
+
 // Testteams wieder entfernen, damit sie nicht im Kalender auftauchen
 await admin.from('tickets').update({ team_id: null }).in('team_id', [T1, T2])
 await admin.from('teams').delete().in('id', [T1, T2])

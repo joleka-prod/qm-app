@@ -30,6 +30,9 @@ export interface Ticket {
   report_by_email: boolean
   report_sent_at: string | null
   report_send_error: string
+  distance_km: number | null
+  distance_address: string
+  distance_error: string
   site_address: string
   work_report: string
   service_area: ServiceArea | null

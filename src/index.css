@@ -443,3 +443,4 @@ button.link.danger { color: #b42318; }
 .time-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.5rem 1rem; margin: 0 0 0.75rem; font-variant-numeric: tabular-nums; }
 .time-summary dt { font-size: 0.8rem; color: var(--muted, #667085); }
 .time-summary dd { margin: 0; font-weight: 600; }
+.distance { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; align-items: baseline; }

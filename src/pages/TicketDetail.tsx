@@ -10,6 +10,7 @@ import { TeamSelect } from '../components/TeamSelect'
 import { AppointmentCard } from '../components/AppointmentCard'
 import { BillingCard } from '../components/BillingCard'
 import { TimeCard } from '../components/TimeCard'
+import { DistanceLine } from '../components/DistanceLine'
 import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { deletePhoto, signedUrls, uploadPhotos, uploadSignature } from '../lib/photos'
 import { sendReport } from '../lib/reportMail'
@@ -490,6 +491,7 @@ export function TicketDetail() {
                 )}
               </p>
             )}
+            {ticket.ticket_type === 'beanstandung' && <DistanceLine ticket={ticket} onChanged={load} />}
             <p className="muted small">
               Erstellt {formatDate(ticket.created_at)} von {displayName(byId[ticket.created_by])}
               {ticket.closed_at && <> · {einsatz ? 'Erledigt' : 'Abgeschlossen'} {formatDate(ticket.closed_at)}</>}
