@@ -2,8 +2,10 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { PhotoPicker } from '../components/PhotoPicker'
+import { TeamSelect } from '../components/TeamSelect'
 import { PositionsEditor, isEmptyPosition, newPositionDraft, type PositionDraft } from '../components/PositionsEditor'
 import { uploadPhotos } from '../lib/photos'
+import { useTeams } from '../lib/teams'
 import { supabase } from '../lib/supabase'
 import {
   AREA_LABEL,
@@ -21,7 +23,8 @@ export function NewTicket() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const { profile } = useAuth()
-  const { leads, installers } = useProfiles()
+  const { leads } = useProfiles()
+  const { teams, teamById } = useTeams()
   const canPlan = profile?.role === 'admin' || profile?.role === 'teamleiter'
 
   const [type, setType] = useState<TicketType>(
@@ -39,7 +42,7 @@ export function NewTicket() {
   const [customerEmail, setCustomerEmail] = useState('')
   const [address, setAddress] = useState('')
   const [assignedTo, setAssignedTo] = useState('')
-  const [installer, setInstaller] = useState(params.get('monteur') ?? '')
+  const [teamId, setTeamId] = useState(params.get('team') ?? '')
   const [montageDate, setMontageDate] = useState(params.get('datum') ?? '')
   const [montageTime, setMontageTime] = useState('')
   const [files, setFiles] = useState<File[]>([])
@@ -65,7 +68,7 @@ export function NewTicket() {
         customer_email: einsatz ? customerEmail.trim() : '',
         site_address: einsatz ? address.trim() : '',
         assigned_to: !einsatz && assignedTo ? assignedTo : null,
-        installer_id: einsatz && canPlan && installer ? installer : null,
+        team_id: einsatz && canPlan && teamId ? Number(teamId) : null,
         montage_date: einsatz && canPlan && montageDate ? montageDate : null,
         montage_time: einsatz && canPlan && montageTime ? montageTime : null,
       })
@@ -200,13 +203,16 @@ export function NewTicket() {
           <fieldset className="plan">
             <legend>Einplanen</legend>
             <label>
-              Monteur
-              <select value={installer} onChange={(e) => setInstaller(e.target.value)}>
-                <option value="">– noch nicht eingeplant –</option>
-                {installers.map((p) => (
-                  <option key={p.id} value={p.id}>{displayName(p)}</option>
-                ))}
-              </select>
+              Team
+              <TeamSelect
+                teams={teams}
+                value={teamId}
+                onChange={(id) => {
+                  setTeamId(id)
+                  const t = teamById[Number(id)]
+                  if (t) setArea(t.area)
+                }}
+              />
             </label>
             <div className="row">
               <label>
@@ -220,7 +226,7 @@ export function NewTicket() {
             </div>
           </fieldset>
         ) : (
-          <p className="muted small">Monteur und Termin werden von QM oder einem Teamleiter eingeplant.</p>
+          <p className="muted small">Team und Termin werden von QM oder einem Teamleiter eingeplant.</p>
         )
       ) : (
         <label>

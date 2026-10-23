@@ -1,13 +1,18 @@
 -- JOLEKA Service Dashboard: Testdaten
 -- Legt je 10 QM-Tickets, Restarbeiten, Beanstandungen und Reparaturaufträge an.
 -- Alle Testaufträge beginnen mit "[TEST]" und lassen sich mit testdaten-loeschen.sql wieder entfernen.
--- Voraussetzung: Mindestens ein Admin existiert. Monteure und Teamleiter werden, falls vorhanden, reihum zugewiesen.
+-- Voraussetzung: Mindestens ein Admin existiert. Einsätze werden auf die Teams verteilt; vorhandene Monteure
+-- werden an den Einsatztagen in diese Teams eingeteilt (höchstens 2 pro Team, jeder Monteur nur in einem Team pro Tag).
 
 do $$
 declare
   v_admin uuid;
   v_leads uuid[];
   v_fitters uuid[];
+  v_mteams smallint[];
+  v_kteams smallint[];
+  v_area public.service_area;
+  r record;
   v_id bigint;
   v_type public.ticket_type;
   v_day date;
@@ -38,6 +43,8 @@ begin
   end if;
   select coalesce(array_agg(id order by created_at), '{}') into v_leads
     from public.profiles where role = 'teamleiter' and active;
+  select array_agg(id order by sort) into v_mteams from public.teams where area = 'montage' and active;
+  select array_agg(id order by sort) into v_kteams from public.teams where area = 'kundendienst' and active;
   select coalesce(array_agg(id order by created_at), '{}') into v_fitters
     from public.profiles where role::text = 'monteur' and active;
 
@@ -77,20 +84,22 @@ begin
             v_day := v_day + sign((i - 5) + (t - 2))::int;
           end loop;
         end loop;
+        v_area := case when v_type = 'restarbeit' or i % 3 = 0 then 'montage'::public.service_area else 'kundendienst'::public.service_area end;
         insert into public.tickets (ticket_type, service_area, title, description, order_number, customer_name, site_address,
-                                    created_by, installer_id, montage_date, montage_time)
+                                    created_by, team_id, montage_date, montage_time)
         values (
           v_type,
-          case when v_type = 'restarbeit' or i % 3 = 0 then 'montage'::public.service_area else 'kundendienst'::public.service_area end,
+          v_area,
           '[TEST] ' || job_titles[1 + (i + t) % 10],
           'Testauftrag für ' || customers[i] || '.',
           'A-2026-' || lpad((4000 + n)::text, 5, '0'),
           customers[i],
           streets[1 + (i + t) % 10] || chr(10) || places[1 + i % 5],
           v_admin,
-          case when i > 3 and cardinality(v_fitters) > 0 then v_fitters[1 + (i + t) % cardinality(v_fitters)] end,
-          case when i > 3 and cardinality(v_fitters) > 0 then v_day end,
-          case when i > 3 and cardinality(v_fitters) > 0 then (time '07:30' + ((i % 4) * interval '2 hours')) end
+          case when i > 3 then (case when v_area = 'montage' then v_mteams[1 + (i + t) % cardinality(v_mteams)]
+                                     else v_kteams[1 + (i + t) % cardinality(v_kteams)] end) end,
+          case when i > 3 then v_day end,
+          case when i > 3 then (time '07:30' + ((i % 4) * interval '2 hours')) end
         )
         returning id into v_id;
 
@@ -99,7 +108,7 @@ begin
           from generate_series(1, 2 + (i + t) % 3) k;
 
         -- Ein Einsatz pro Art ist bereits erledigt
-        if i = 4 and cardinality(v_fitters) > 0 then
+        if i = 4 then
           update public.ticket_positions set state = 'erledigt' where ticket_id = v_id;
           update public.tickets
              set work_report = 'Testbericht: Alle Positionen erledigt, Kunde zufrieden.',
@@ -108,6 +117,20 @@ begin
         end if;
       end if;
     end loop;
+  end loop;
+
+  -- Monteure an den Einsatztagen in die Teams einteilen
+  for r in
+    select distinct t.team_id, t.montage_date from public.tickets t
+    where t.title like '[TEST]%' and t.team_id is not null
+    order by t.montage_date, t.team_id
+  loop
+    insert into public.team_members (team_id, day, installer_id)
+    select r.team_id, r.montage_date, f.id
+      from unnest(v_fitters) as f(id)
+     where not exists (select 1 from public.team_members m where m.day = r.montage_date and m.installer_id = f.id)
+       and (select count(*) from public.team_members m where m.team_id = r.team_id and m.day = r.montage_date) = 0
+     limit 2;
   end loop;
 
   raise notice '% Testaufträge angelegt (Teamleiter: %, Monteure: %)', n, cardinality(v_leads), cardinality(v_fitters);

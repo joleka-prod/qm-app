@@ -138,7 +138,13 @@ Deno.serve(async (req) => {
   const { data: t } = await admin.from('tickets').select('*').eq('id', body.ticket_id ?? 0).maybeSingle()
   if (!t || t.ticket_type === 'qm') return reply(404, { error: 'Auftrag nicht gefunden' })
   const planner = me.role === 'admin' || me.role === 'teamleiter'
-  if (!planner && t.installer_id !== caller.user.id) return reply(403, { error: 'Kein Zugriff' })
+  const { data: crew } = await admin
+    .from('team_members')
+    .select('installer_id')
+    .eq('team_id', t.team_id ?? 0)
+    .eq('day', t.montage_date ?? '1900-01-01')
+  const crewIds = (crew ?? []).map((m) => m.installer_id as string)
+  if (!planner && !crewIds.includes(caller.user.id)) return reply(403, { error: 'Kein Zugriff' })
   if (t.status !== 'abgeschlossen') return reply(400, { error: 'Der Auftrag ist noch nicht erledigt.' })
   if (!t.report_by_email || !t.customer_email) return reply(400, { error: 'Der Kunde hat keinen Bericht per E-Mail gewünscht.' })
   if (t.report_sent_at && !(body.force && planner)) return reply(200, { already: true, sent_at: t.report_sent_at })
@@ -152,10 +158,11 @@ Deno.serve(async (req) => {
   }
   if (!apiKey || !from) return fail('E-Mail-Versand ist noch nicht eingerichtet (RESEND_API_KEY / MAIL_FROM fehlen).')
 
-  const [{ data: positions }, { data: photos }, { data: profiles }] = await Promise.all([
+  const [{ data: positions }, { data: photos }, { data: profiles }, { data: team }] = await Promise.all([
     admin.from('ticket_positions').select('*').eq('ticket_id', t.id).order('sort').order('id'),
     admin.from('ticket_photos').select('*').eq('ticket_id', t.id).order('created_at'),
     admin.from('profiles').select('id, full_name, email'),
+    admin.from('teams').select('name').eq('id', t.team_id ?? 0).maybeSingle(),
   ])
   const name = (id: string | null) => {
     const p = profiles?.find((x) => x.id === id)
@@ -177,7 +184,8 @@ Deno.serve(async (req) => {
     ['Kunde', t.customer_name],
     ['Einsatzort', (t.site_address ?? '').replace(/\n/g, ', ')],
     ['Auftragsnummer', t.order_number],
-    ['Monteur', name(t.installer_id)],
+    ['Team', team?.name ?? ''],
+    ['Monteure', crewIds.map(name).filter(Boolean).join(', ')],
     ['Montagedatum', fmtDate(t.montage_date, false)],
     ['Erledigt am', fmtDate(t.closed_at)],
   ]

@@ -162,29 +162,81 @@ await check('Verlauf ist vollständig und für Ersteller sichtbar', async () => 
 // --- Einsätze (Restarbeit, Beanstandung, Reparatur) ---
 const m1 = await user('monteur1', 'monteur')
 const m2 = await user('monteur2', 'monteur')
+const m3 = await user('monteur3', 'monteur')
+const m4 = await user('monteur4', 'monteur')
+const { data: testTeams } = await admin.from('teams').insert([
+  { name: `Test A ${run}`, area: 'montage', sort: 900 },
+  { name: `Test B ${run}`, area: 'kundendienst', sort: 901 },
+]).select().order('sort')
+const [T1, T2] = testTeams.map((t) => t.id)
 let jobId
+
+await check('Teamleiter besetzt Teams pro Tag, Monteur nicht', async () => {
+  let r = await lead2.c.from('team_members').insert([
+    { team_id: T1, day: '2026-11-02', installer_id: m1.id },
+    { team_id: T1, day: '2026-11-03', installer_id: m1.id },
+    { team_id: T2, day: '2026-11-02', installer_id: m2.id },
+  ])
+  assert.ifError(r.error)
+  r = await m1.c.from('team_members').insert({ team_id: T1, day: '2026-11-04', installer_id: m1.id }).select()
+  assert.ok(r.error || r.data.length === 0)
+  r = await lead2.c.from('team_members').insert({ team_id: T1, day: '2026-11-02', installer_id: worker.id })
+  assert.ok(r.error, 'nur Monteure')
+})
+
+await check('Monteur ist pro Tag nur in einem Team, höchstens 3 pro Team', async () => {
+  let r = await lead2.c.from('team_members').insert({ team_id: T2, day: '2026-11-03', installer_id: m1.id })
+  assert.ok(r.error)
+  r = await lead2.c.from('team_members').insert([
+    { team_id: T2, day: '2026-11-05', installer_id: m1.id },
+    { team_id: T2, day: '2026-11-05', installer_id: m2.id },
+    { team_id: T2, day: '2026-11-05', installer_id: m3.id },
+  ])
+  assert.ifError(r.error)
+  r = await lead2.c.from('team_members').insert({ team_id: T2, day: '2026-11-05', installer_id: m4.id })
+  assert.ok(r.error)
+})
 
 await check('Mitarbeiter legt Restarbeit an, Planung wird ignoriert', async () => {
   const { data, error } = await worker.c.from('tickets').insert({
     ticket_type: 'restarbeit', title: 'Griff tauschen', customer_name: 'Müller', site_address: 'Hauptstr. 1',
-    installer_id: m1.id, montage_date: '2026-11-02', assigned_to: lead.id,
+    team_id: T1, montage_date: '2026-11-02', assigned_to: lead.id,
   }).select().single()
   assert.ifError(error)
   assert.equal(data.status, 'neu')
-  assert.equal(data.installer_id, null)
+  assert.equal(data.team_id, null)
   assert.equal(data.assigned_to, null)
   jobId = data.id
 })
 
-await check('Nur Monteure können eingeplant werden', async () => {
-  const { error } = await lead2.c.from('tickets').update({ installer_id: worker.id, montage_date: '2026-11-02' }).eq('id', jobId)
+await check('Nur aktive Teams können eingeplant werden', async () => {
+  await admin.from('teams').update({ active: false }).eq('id', T2)
+  const { error } = await lead2.c.from('tickets').update({ team_id: T2, montage_date: '2026-11-02' }).eq('id', jobId)
   assert.ok(error)
+  await admin.from('teams').update({ active: true }).eq('id', T2)
 })
 
-await check('Teamleiter plant Monteur und Datum, Status geplant', async () => {
-  const { data, error } = await lead2.c.from('tickets').update({ installer_id: m1.id, montage_date: '2026-11-02', montage_time: '08:30' }).eq('id', jobId).select().single()
+await check('Teamleiter plant Team und Datum, Status geplant', async () => {
+  const { data, error } = await lead2.c.from('tickets').update({ team_id: T1, montage_date: '2026-11-02', montage_time: '08:30' }).eq('id', jobId).select().single()
   assert.ifError(error)
   assert.equal(data.status, 'zugewiesen')
+})
+
+await check('Monteur sieht nur Einsätze seines Teams am jeweiligen Tag', async () => {
+  const other = await m1.c.from('tickets').select('id').eq('id', jobId)
+  assert.equal(other.data.length, 1)
+  // m3 ist am 02.11. in keinem Team, am 05.11. in T2
+  const m3view = await m3.c.from('tickets').select('id').eq('id', jobId)
+  assert.equal(m3view.data.length, 0)
+})
+
+await check('Zweiter Monteur im Team sieht den Einsatz, nach dem Austragen nicht mehr', async () => {
+  await lead2.c.from('team_members').insert({ team_id: T1, day: '2026-11-02', installer_id: m4.id })
+  let v = await m4.c.from('tickets').select('id').eq('id', jobId)
+  assert.equal(v.data.length, 1)
+  await lead2.c.from('team_members').delete().match({ team_id: T1, day: '2026-11-02', installer_id: m4.id })
+  v = await m4.c.from('tickets').select('id').eq('id', jobId)
+  assert.equal(v.data.length, 0)
 })
 
 await check('Monteur sieht nur eigene Einsätze', async () => {
@@ -279,7 +331,7 @@ await check('Erledigter Einsatz ist für Monteur gesperrt, Admin öffnet wieder'
 })
 
 await check('Planung entfernen setzt Einsatz auf ungeplant', async () => {
-  const { data, error } = await qm.c.from('tickets').update({ installer_id: null, montage_date: null }).eq('id', jobId).select().single()
+  const { data, error } = await qm.c.from('tickets').update({ team_id: null, montage_date: null }).eq('id', jobId).select().single()
   assert.ifError(error)
   assert.equal(data.status, 'neu')
 })
@@ -291,9 +343,9 @@ await check('Einsatz-Verlauf enthält Planung und Bericht', async () => {
 })
 
 await check('QM-Ticket ignoriert Monteur-Felder', async () => {
-  const { data, error } = await qm.c.from('tickets').insert({ title: 'QM', installer_id: m1.id, montage_date: '2026-11-02' }).select().single()
+  const { data, error } = await qm.c.from('tickets').insert({ title: 'QM', team_id: T1, montage_date: '2026-11-02' }).select().single()
   assert.ifError(error)
-  assert.equal(data.installer_id, null)
+  assert.equal(data.team_id, null)
   assert.equal(data.montage_date, null)
 })
 
@@ -315,7 +367,7 @@ await check('Ersteller legt Positionen an, solange ungeplant', async () => {
 })
 
 await check('Nach Planung kann Ersteller keine Positionen mehr ändern, Teamleiter schon', async () => {
-  await lead.c.from('tickets').update({ installer_id: m1.id, montage_date: '2026-11-03' }).eq('id', posJob)
+  await lead.c.from('tickets').update({ team_id: T1, montage_date: '2026-11-03' }).eq('id', posJob)
   const r = await worker.c.from('ticket_positions').insert({ ticket_id: posJob, description: 'x' })
   assert.ok(r.error)
   const u = await lead.c.from('ticket_positions').insert({ ticket_id: posJob, sort: 2, position_number: '30', description: 'Silikon' }).select().single()
@@ -494,5 +546,9 @@ if (process.env.SKIP_FUNCTIONS !== '1') {
     assert.ifError(login.error)
   })
 }
+
+// Testteams wieder entfernen, damit sie nicht im Kalender auftauchen
+await admin.from('tickets').update({ team_id: null }).in('team_id', [T1, T2])
+await admin.from('teams').delete().in('id', [T1, T2])
 
 console.log(`\n${passed} Prüfungen bestanden`)

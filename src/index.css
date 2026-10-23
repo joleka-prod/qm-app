@@ -305,3 +305,25 @@ fieldset.plan input, fieldset.plan select { width: 100%; min-width: 0; }
 .mail-error { color: var(--danger, #b42318); margin: 0.2rem 0; }
 @media (prefers-color-scheme: dark) { .mail-ok { color: #86efac; } }
 .app-version { text-align: center; font-size: 0.75rem; color: var(--muted); padding: 1rem 0 1.5rem; }
+
+/* --- Teams im Kalender --- */
+.cal-copy { display: block; margin: 0.15rem auto 0; font-weight: 500; font-size: 0.72rem; }
+.cal-group th { text-align: left; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 0.35rem 0.5rem; background: var(--bg); position: sticky; left: 0; }
+.cal-team-montage { border-left: 4px solid #7a5af8 !important; }
+.cal-team-kundendienst { border-left: 4px solid #2e90fa !important; }
+.crew { display: flex; flex-wrap: wrap; gap: 0.2rem; margin-bottom: 0.3rem; }
+.crew-chip { display: inline-flex; align-items: center; gap: 0.1rem; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 0 0.15rem 0 0.45rem; font-size: 0.75rem; }
+.crew-chip a { color: var(--text); text-decoration: none; font-weight: 600; }
+.crew-chip button { border: none; background: none; padding: 0 0.25rem; min-height: 0; font-size: 0.9rem; color: var(--muted); cursor: pointer; }
+.crew-add { font-size: 0.75rem; padding: 0.1rem 0.3rem; min-height: 0; height: auto; width: auto; max-width: 100%; border-style: dashed; color: var(--muted); }
+.crew-missing { font-size: 0.72rem; color: var(--danger, #b42318); }
+.installer-links { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; }
+.crew-line { margin: -0.2rem 0 0.6rem; font-size: 0.9rem; }
+.calendar-layout { display: flex; flex-direction: column; gap: 1rem; }
+.calendar-layout .unplanned { margin: 0; }
+@media (min-width: 1200px) {
+  .calendar-layout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; align-items: start; }
+  .calendar-layout .unplanned { grid-column: 2; grid-row: 1; position: sticky; top: 4.5rem; max-height: calc(100vh - 6rem); overflow-y: auto; }
+  .calendar-layout .unplanned-list { display: flex; flex-direction: column; }
+  .calendar-layout .cal-scroll { grid-column: 1; grid-row: 1; margin: 0; padding: 0; }
+}

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { supabase } from '../lib/supabase'
+import { useTeams } from '../lib/teams'
 import {
   STATUS_LABEL,
   TICKET_TYPES,
@@ -24,6 +25,7 @@ type Filter = 'offen' | 'meine' | 'alle' | 'loeschung' | TicketStatus
 export function TicketList() {
   const { profile } = useAuth()
   const { byId } = useProfiles()
+  const { teamById } = useTeams()
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
   const [deletionIds, setDeletionIds] = useState<Set<number>>(new Set())
@@ -51,7 +53,8 @@ export function TicketList() {
     return tickets.filter((t) => {
       if (filter === 'offen' && t.status === 'abgeschlossen') return false
       if (typeFilter && t.ticket_type !== typeFilter) return false
-      if (filter === 'meine' && t.assigned_to !== profile?.id && t.installer_id !== profile?.id && t.created_by !== profile?.id) return false
+      // Monteure sehen ohnehin nur die Einsätze ihrer Teams
+      if (filter === 'meine' && profile?.role !== 'monteur' && t.assigned_to !== profile?.id && t.created_by !== profile?.id) return false
       if (filter === 'loeschung' && !deletionIds.has(t.id)) return false
       if (filter !== 'offen' && filter !== 'meine' && filter !== 'alle' && filter !== 'loeschung' && t.status !== filter) return false
       if (!q) return true
@@ -115,9 +118,9 @@ export function TicketList() {
                 {!!t.ticket_positions?.[0]?.count && (
                   <div className="small muted">{t.ticket_positions[0].count} Position(en)</div>
                 )}
-                {t.installer_id && t.montage_date && (
+                {t.team_id && t.montage_date && (
                   <div className="small plan-line">
-                    {formatDay(t.montage_date)} {formatTime(t.montage_time)} · {displayName(byId[t.installer_id])}
+                    {formatDay(t.montage_date)} {formatTime(t.montage_time)} · {teamById[t.team_id]?.name}
                   </div>
                 )}
                 <div className="muted small">

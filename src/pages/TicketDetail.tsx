@@ -6,10 +6,12 @@ import { PhotoPicker } from '../components/PhotoPicker'
 import { PositionPhotos } from '../components/PositionPhotos'
 import { PositionsEditor, isEmptyPosition, newPositionDraft, type PositionDraft } from '../components/PositionsEditor'
 import { SignaturePad, canvasToBlob } from '../components/SignaturePad'
+import { TeamSelect } from '../components/TeamSelect'
 import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { deletePhoto, signedUrls, uploadPhotos, uploadSignature } from '../lib/photos'
 import { sendReport } from '../lib/reportMail'
 import { supabase } from '../lib/supabase'
+import { useTeams } from '../lib/teams'
 import {
   AREA_LABEL,
   SERVICE_AREAS,
@@ -58,7 +60,9 @@ export function TicketDetail() {
   const ticketId = Number(id)
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const { byId, leads, installers } = useProfiles()
+  const { byId, leads } = useProfiles()
+  const { teams, teamById } = useTeams()
+  const [crew, setCrew] = useState<string[]>([])
 
   const [ticket, setTicket] = useState<Ticket | null>(null)
   const [photos, setPhotos] = useState<TicketPhoto[]>([])
@@ -84,7 +88,7 @@ export function TicketDetail() {
   const [wantsEmail, setWantsEmail] = useState(false)
   const [signEmail, setSignEmail] = useState('')
   const [address, setAddress] = useState('')
-  const [installer, setInstaller] = useState('')
+  const [teamId, setTeamId] = useState('')
   const [montageDate, setMontageDate] = useState('')
   const [montageTime, setMontageTime] = useState('')
   const [report, setReport] = useState('')
@@ -124,7 +128,15 @@ export function TicketDetail() {
     setCustomer(tk.customer_name)
     setCustomerEmail(tk.customer_email)
     setAddress(tk.site_address)
-    setInstaller(tk.installer_id ?? '')
+    setTeamId(tk.team_id ? String(tk.team_id) : '')
+    if (tk.team_id && tk.montage_date) {
+      const { data: m } = await supabase
+        .from('team_members')
+        .select('installer_id')
+        .eq('team_id', tk.team_id)
+        .eq('day', tk.montage_date)
+      setCrew((m ?? []).map((x) => x.installer_id as string))
+    } else setCrew([])
     setMontageDate(tk.montage_date ?? '')
     setMontageTime(formatTime(tk.montage_time))
     // Ungespeicherten Bericht nicht überschreiben, wenn z. B. nur eine Position abgehakt wurde
@@ -153,14 +165,15 @@ export function TicketDetail() {
   const canWork = !closed && (isLead || isAdmin) && ticket.assigned_to !== null
   const einsatz = isEinsatz(ticket)
   const isPlanner = isAdmin || profile.role === 'teamleiter'
-  const isInstaller = ticket.installer_id === profile.id
+  // Monteur ist, wer am Einsatztag im eingeplanten Team ist
+  const isInstaller = crew.includes(profile.id)
   const canPlan = einsatz && isPlanner && !closed
   const canEditBase =
     isAdmin || (einsatz && isPlanner && !closed) || (ticket.created_by === profile.id && ticket.status === 'neu')
   const canRequestDeletion = ticket.created_by === profile.id || isLead || profile.role === 'teamleiter'
   const canEditRef = canEditBase || (isLead && !closed)
   const planDirty =
-    installer !== (ticket.installer_id ?? '') ||
+    teamId !== (ticket.team_id ? String(ticket.team_id) : '') ||
     montageDate !== (ticket.montage_date ?? '') ||
     montageTime !== formatTime(ticket.montage_time) ||
     area !== (ticket.service_area ?? '')
@@ -651,13 +664,16 @@ export function TicketDetail() {
                 </div>
               </div>
               <label>
-                Monteur
-                <select value={installer} onChange={(e) => setInstaller(e.target.value)}>
-                  <option value="">– nicht eingeplant –</option>
-                  {installers.map((p) => (
-                    <option key={p.id} value={p.id}>{displayName(p)}</option>
-                  ))}
-                </select>
+                Team
+                <TeamSelect
+                  teams={teams}
+                  value={teamId}
+                  onChange={(id) => {
+                    setTeamId(id)
+                    const t = teamById[Number(id)]
+                    if (t) setArea(t.area)
+                  }}
+                />
               </label>
               <div className="row">
                 <label>
@@ -675,7 +691,7 @@ export function TicketDetail() {
                   disabled={busy || !planDirty}
                   onClick={() =>
                     update({
-                      installer_id: installer || null,
+                      team_id: teamId ? Number(teamId) : null,
                       montage_date: montageDate || null,
                       montage_time: montageTime || null,
                       ...(area ? { service_area: area } : {}),
@@ -686,15 +702,24 @@ export function TicketDetail() {
                 </button>
               </div>
             </div>
-          ) : ticket.installer_id || ticket.montage_date ? (
+          ) : ticket.team_id || ticket.montage_date ? (
             <p>
               <AreaBadge area={ticket.service_area} />{' '}
-              {displayName(byId[ticket.installer_id ?? ''])}
+              {ticket.team_id ? teamById[ticket.team_id]?.name : 'Kein Team'}
               {ticket.montage_date && <> · {formatDay(ticket.montage_date)}</>}
               {ticket.montage_time && <> · {formatTime(ticket.montage_time)} Uhr</>}
             </p>
           ) : (
             <p className="muted">Noch nicht eingeplant.</p>
+          )}
+          {ticket.team_id && ticket.montage_date && (
+            <p className="small">
+              {crew.length > 0 ? (
+                <>Monteure an dem Tag: {crew.map((id) => displayName(byId[id])).join(', ')}</>
+              ) : (
+                <span className="crew-missing">Für diesen Tag ist noch kein Monteur im Team eingeteilt (im Kalender zuordnen).</span>
+              )}
+            </p>
           )}
         </section>
       )}

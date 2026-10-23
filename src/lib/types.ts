@@ -20,6 +20,7 @@ export interface Ticket {
   position_number: string
   ticket_type: TicketType
   installer_id: string | null
+  team_id: number | null
   montage_date: string | null
   montage_time: string | null
   customer_name: string

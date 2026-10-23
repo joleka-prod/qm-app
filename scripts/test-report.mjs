@@ -40,9 +40,14 @@ const m2 = await user('monteur2', 'monteur')
 const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082', 'hex')
 const jpg = process.env.TEST_JPG ? readFileSync(process.env.TEST_JPG) : null
 
+const { data: team } = await admin.from('teams').insert({ name: `Report ${run}`, area: 'kundendienst', sort: 950 }).select().single()
+await admin.from('team_members').insert([
+  { team_id: team.id, day: '2026-11-02', installer_id: m1.id },
+  { team_id: team.id, day: '2026-11-03', installer_id: m2.id },
+])
 const { data: job } = await qm.c.from('tickets').insert({
   ticket_type: 'reparatur', title: 'Fenster undicht', customer_name: 'Familie Müller', customer_email: 'kunde@example.test',
-  site_address: 'Hauptstr. 1\n88400 Biberach', installer_id: m1.id, montage_date: '2026-11-02', order_number: 'A-4711',
+  site_address: 'Hauptstr. 1\n88400 Biberach', team_id: team.id, montage_date: '2026-11-02', order_number: 'A-4711',
 }).select().single()
 const { data: pos } = await qm.c.from('ticket_positions').insert([
   { ticket_id: job.id, sort: 0, position_number: '10', description: 'Dichtung tauschen' },
@@ -98,7 +103,7 @@ await check('Kein doppelter Versand, Monteur kann nicht erzwingen, Teamleiter sc
 })
 
 await check('Fehler beim Versand wird gespeichert', async () => {
-  const { data: j2 } = await qm.c.from('tickets').insert({ ticket_type: 'restarbeit', title: 'Fehlertest', customer_email: 'fail@example.test', installer_id: m1.id, montage_date: '2026-11-02' }).select().single()
+  const { data: j2 } = await qm.c.from('tickets').insert({ ticket_type: 'restarbeit', title: 'Fehlertest', customer_email: 'fail@example.test', team_id: team.id, montage_date: '2026-11-02' }).select().single()
   await m1.c.from('tickets').update({ report_by_email: true, work_report: 'x', status: 'abgeschlossen' }).eq('id', j2.id)
   const r = await send(m1, j2.id)
   assert.equal(r.status, 502)
@@ -106,5 +111,8 @@ await check('Fehler beim Versand wird gespeichert', async () => {
   assert.equal(data.report_sent_at, null)
   assert.match(data.report_send_error, /422/)
 })
+
+await admin.from('tickets').update({ team_id: null }).eq('team_id', team.id)
+await admin.from('teams').delete().eq('id', team.id)
 
 console.log(`\n${passed} Prüfungen bestanden`)
