@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { APPOINTMENT_LABEL, displayName, formatDate, formatDay, formatTime, type Profile, type Ticket } from '../lib/types'
+import { APPOINTMENT_LABEL, displayName, formatDate, formatDay, formatTime, type Profile, type Ticket, type TicketEvent } from '../lib/types'
 
 interface Props {
   ticket: Ticket
@@ -8,11 +8,19 @@ interface Props {
   byId: Record<string, Profile>
   me: string
   canEdit: boolean
+  events: TicketEvent[]
   onChanged: () => Promise<void>
 }
 
+const HISTORY_LABEL: Record<string, string> = {
+  eingeplant: 'Eingeplant',
+  termin_angemeldet: 'Termin bei Kunde angemeldet',
+  termin_bestaetigt: 'Termin von Kunde bestätigt',
+  termin_zurueckgesetzt: 'Anmeldung aufgehoben',
+}
+
 // Termin mit dem Kunden: angemeldet (wer hat welchen Termin mitgeteilt) und bestätigt
-export function AppointmentCard({ ticket: t, profiles, byId, me, canEdit, onChanged }: Props) {
+export function AppointmentCard({ ticket: t, profiles, byId, me, canEdit, events, onChanged }: Props) {
   const [form, setForm] = useState<{ date: string; time: string; toldBy: string; note: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -23,6 +31,7 @@ export function AppointmentCard({ ticket: t, profiles, byId, me, canEdit, onChan
   const differs =
     state !== 'offen' &&
     (t.appointment_date !== t.montage_date || (!!t.montage_time && formatTime(t.appointment_time) !== formatTime(t.montage_time)))
+  const history = events.filter((e) => e.kind in HISTORY_LABEL)
   const staff = profiles.filter((p) => p.active || p.id === form?.toldBy)
 
   function openForm() {
@@ -147,6 +156,24 @@ export function AppointmentCard({ ticket: t, profiles, byId, me, canEdit, onChan
         </div>
       )}
       {error && <p className="error">{error}</p>}
+
+      {history.length > 0 && (
+        <>
+          <h3 className="appointment-history-title">Verlauf</h3>
+          <ul className="history appointment-history">
+            {history.map((ev) => (
+              <li key={ev.id} className={`appointment-ev appointment-ev-${ev.kind}`}>
+                <span className="muted small">{formatDate(ev.created_at)}</span>
+                <span>
+                  <strong>{HISTORY_LABEL[ev.kind]}</strong>
+                  {ev.details && <>: {ev.details}</>}
+                  {ev.actor && <span className="muted"> · {displayName(byId[ev.actor])}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </section>
   )
 }

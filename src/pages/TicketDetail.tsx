@@ -115,7 +115,7 @@ export function TicketDetail() {
     const [t, p, e, d, pos] = await Promise.all([
       supabase.from('tickets').select('*').eq('id', ticketId).maybeSingle(),
       supabase.from('ticket_photos').select('*').eq('ticket_id', ticketId).order('created_at'),
-      supabase.from('ticket_events').select('*').eq('ticket_id', ticketId).order('created_at'),
+      supabase.from('ticket_events').select('*').eq('ticket_id', ticketId).order('created_at').order('id'),
       supabase.from('deletion_requests').select('*').eq('ticket_id', ticketId).maybeSingle(),
       supabase.from('ticket_positions').select('*').eq('ticket_id', ticketId).order('sort').order('id'),
     ])
@@ -751,6 +751,7 @@ export function TicketDetail() {
           byId={byId}
           me={profile.id}
           canEdit={isPlanner}
+          events={events}
           onChanged={load}
         />
       )}
