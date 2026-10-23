@@ -8,10 +8,12 @@ import {
   STATUS_LABEL,
   TICKET_TYPES,
   TYPE_LABEL,
+  addDays,
   displayName,
   formatDate,
   formatDay,
   formatTime,
+  isoDate,
   orderRef,
   ticketNo,
   type Ticket,
@@ -49,14 +51,18 @@ export function TicketList() {
   }, [])
 
   const isPlanner = profile?.role === 'admin' || profile?.role === 'teamleiter'
-  // Termin wurde dem Kunden mitgeteilt, danach aber verschoben: Kunde muss neu informiert werden
-  const urgent = useMemo(
-    () =>
-      tickets
-        .filter((t) => t.ticket_type !== 'qm' && t.status === 'zugewiesen' && t.appointment_state === 'offen' && t.appointment_announced_at)
-        .sort((a, b) => (a.montage_date ?? '').localeCompare(b.montage_date ?? '')),
-    [tickets],
-  )
+  const urgent = useMemo(() => {
+    const planned = tickets
+      .filter((t) => t.ticket_type !== 'qm' && t.status === 'zugewiesen' && t.montage_date && t.appointment_state === 'offen')
+      .sort((a, b) => `${a.montage_date}${a.montage_time ?? ''}`.localeCompare(`${b.montage_date}${b.montage_time ?? ''}`))
+    // Termin wurde dem Kunden mitgeteilt, danach aber verschoben: Kunde muss neu informiert werden
+    const moved = planned.filter((t) => t.appointment_announced_at)
+    // Noch nie angemeldet und der Termin ist heute oder in den nächsten 2 Werktagen
+    const today = isoDate(new Date())
+    const limit = isoDate(addWorkdays(new Date(), URGENT_WORKDAYS))
+    const soon = planned.filter((t) => !t.appointment_announced_at && t.montage_date! >= today && t.montage_date! <= limit)
+    return { moved, soon, count: moved.length + soon.length }
+  }, [tickets])
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -89,32 +95,31 @@ export function TicketList() {
   return (
     <div className={isPlanner ? 'home-layout' : ''}>
       {isPlanner && (
-        <aside className={`card urgent-col ${urgent.length > 0 ? 'has-urgent' : ''}`}>
-          <h2>Dringender Handlungsbedarf{urgent.length > 0 && ` (${urgent.length})`}</h2>
+        <aside className={`card urgent-col ${urgent.count > 0 ? 'has-urgent' : ''}`}>
+          <h2>Dringender Handlungsbedarf{urgent.count > 0 && ` (${urgent.count})`}</h2>
           {loading ? (
             <p className="muted small">Lädt…</p>
-          ) : urgent.length === 0 ? (
+          ) : urgent.count === 0 ? (
             <p className="muted small">Im Moment nichts zu tun.</p>
           ) : (
             <>
-              <p className="small">Termin wurde verschoben, nachdem er dem Kunden mitgeteilt wurde. Bitte den Kunden informieren und neu anmelden.</p>
-              <ul className="urgent-list">
-                {urgent.map((t) => (
-                  <li key={t.id}>
-                    <Link to={`/ticket/${t.id}`} className="urgent-item">
-                      <span className="ticket-no">{ticketNo(t.id, t.ticket_type)} <TypeBadge type={t.ticket_type} /></span>
-                      <span className="ticket-title">{t.title}</span>
-                      {t.customer_name && <span className="small">{t.customer_name}</span>}
-                      <span className="small urgent-dates">
-                        Mitgeteilt: {t.appointment_date ? formatDay(t.appointment_date) : '–'} {formatTime(t.appointment_time)}
-                        <br />
-                        Neu: {t.montage_date ? formatDay(t.montage_date) : '–'} {formatTime(t.montage_time)}
-                        {t.team_id && <> · {teamById[t.team_id]?.name}</>}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              {urgent.moved.length > 0 && (
+                <UrgentGroup
+                  title="Termin verschoben"
+                  hint="Der Termin wurde geändert, nachdem er dem Kunden mitgeteilt wurde. Bitte den Kunden informieren und neu anmelden."
+                  tickets={urgent.moved}
+                  teamName={(id) => teamById[id]?.name}
+                  showTold
+                />
+              )}
+              {urgent.soon.length > 0 && (
+                <UrgentGroup
+                  title="Termin noch nicht angemeldet"
+                  hint={`Einsatz ist in den nächsten ${URGENT_WORKDAYS} Werktagen, der Kunde wurde noch nicht informiert.`}
+                  tickets={urgent.soon}
+                  teamName={(id) => teamById[id]?.name}
+                />
+              )}
             </>
           )}
         </aside>
@@ -185,6 +190,61 @@ export function TicketList() {
         </ul>
       )}
       </div>
+    </div>
+  )
+}
+
+// So viele Werktage vor dem Einsatz muss der Termin beim Kunden angemeldet sein
+const URGENT_WORKDAYS = 2
+
+function addWorkdays(d: Date, n: number) {
+  let r = d
+  while (n > 0) {
+    r = addDays(r, 1)
+    if (r.getDay() !== 0 && r.getDay() !== 6) n--
+  }
+  return r
+}
+
+function UrgentGroup({
+  title,
+  hint,
+  tickets,
+  teamName,
+  showTold,
+}: {
+  title: string
+  hint: string
+  tickets: Ticket[]
+  teamName: (id: number) => string | undefined
+  showTold?: boolean
+}) {
+  return (
+    <div className="urgent-group">
+      <h3>{title} ({tickets.length})</h3>
+      <p className="small">{hint}</p>
+      <ul className="urgent-list">
+        {tickets.map((t) => (
+          <li key={t.id}>
+            <Link to={`/ticket/${t.id}`} className="urgent-item">
+              <span className="ticket-no">{ticketNo(t.id, t.ticket_type)} <TypeBadge type={t.ticket_type} /></span>
+              <span className="ticket-title">{t.title}</span>
+              {t.customer_name && <span className="small">{t.customer_name}</span>}
+              <span className="small urgent-dates">
+                {showTold && (
+                  <>
+                    Mitgeteilt: {t.appointment_date ? formatDay(t.appointment_date) : '–'} {formatTime(t.appointment_time)}
+                    <br />
+                  </>
+                )}
+                {showTold ? 'Neu: ' : 'Termin: '}
+                {t.montage_date ? formatDay(t.montage_date) : '–'} {formatTime(t.montage_time)}
+                {t.team_id && <> · {teamName(t.team_id)}</>}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

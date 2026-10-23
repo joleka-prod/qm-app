@@ -349,6 +349,9 @@ button.crew-star:hover { color: #f79009; }
 .urgent-col h2 { margin-top: 0; }
 .urgent-col.has-urgent { border: 2px solid #d92d20; background: #fef3f2; }
 .urgent-col.has-urgent h2 { color: #b42318; }
+.urgent-group + .urgent-group { margin-top: 1rem; }
+.urgent-group h3 { margin: 0 0 0.2rem; font-size: 0.95rem; color: #b42318; }
+.urgent-group p { margin: 0 0 0.5rem; }
 .urgent-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .urgent-item { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.6rem; border-radius: 8px; background: #fff; border: 1px solid #fecdca; color: inherit; text-decoration: none; }
 .urgent-item:hover { border-color: #d92d20; }
