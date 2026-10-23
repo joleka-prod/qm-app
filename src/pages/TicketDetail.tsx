@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { PhotoGallery } from '../components/PhotoGallery'
 import { PhotoPicker } from '../components/PhotoPicker'
+import { PositionPhotos } from '../components/PositionPhotos'
 import { PositionsEditor, isEmptyPosition, newPositionDraft, type PositionDraft } from '../components/PositionsEditor'
 import { SignaturePad, canvasToBlob } from '../components/SignaturePad'
 import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
@@ -152,6 +153,7 @@ export function TicketDetail() {
   const canEditPositions =
     einsatz && (isAdmin || (profile.role === 'teamleiter' && !closed) || (ticket.created_by === profile.id && ticket.status === 'neu'))
   const canCheckPositions = einsatz && !closed && (isInstaller || canEditPositions)
+  const canDeletePhoto = (p: TicketPhoto) => isAdmin || (p.uploaded_by === profile.id && !closed)
   const openPositions = positions.filter((p) => !p.done).length
   const canSign = einsatz && (isAdmin || (!closed && (isInstaller || isPlanner)))
   const dirty = cause !== ticket.cause || action !== ticket.corrective_action
@@ -231,6 +233,18 @@ export function TicketDetail() {
     try {
       await uploadPhotos(ticketId, newFiles)
       setNewFiles([])
+    } catch (err) {
+      setError((err as Error).message)
+    }
+    await load()
+    setBusy(false)
+  }
+
+  async function addPositionPhotos(positionId: number, files: File[]) {
+    setBusy(true)
+    setError('')
+    try {
+      await uploadPhotos(ticketId, files, positionId)
     } catch (err) {
       setError((err as Error).message)
     }
@@ -436,6 +450,13 @@ export function TicketDetail() {
                           )}
                         </span>
                       </label>
+                      <PositionPhotos
+                        photos={photos.filter((f) => f.position_id === p.id)}
+                        canAdd={!closed}
+                        canDelete={canDeletePhoto}
+                        onAdd={(files) => addPositionPhotos(p.id, files)}
+                        onDelete={removePhoto}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -451,6 +472,7 @@ export function TicketDetail() {
                             id: p.id,
                             position_number: p.position_number,
                             description: p.description,
+                            files: [],
                           }))
                         : [newPositionDraft()],
                     )
@@ -465,10 +487,10 @@ export function TicketDetail() {
       )}
 
       <section className="card">
-        <h2>Fotos</h2>
+        <h2>{einsatz ? 'Fotos zum Auftrag' : 'Fotos'}</h2>
         <PhotoGallery
-          photos={photos}
-          canDelete={(p) => isAdmin || (p.uploaded_by === profile.id && !closed)}
+          photos={photos.filter((p) => p.position_id === null)}
+          canDelete={canDeletePhoto}
           onDelete={removePhoto}
         />
         {!closed && (

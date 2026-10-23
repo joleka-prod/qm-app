@@ -172,6 +172,7 @@ button.link { border: none; background: none; color: var(--primary); padding: 0.
 }
 
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.row > * { min-width: 0; }
 .order-ref { margin: 0.1rem 0 0.4rem; font-weight: 600; }
 .badges { display: inline-flex; gap: 0.35rem; flex-wrap: wrap; justify-content: flex-end; }
 .badge-loeschung { background: #fee4e2; color: #b42318; }
@@ -185,7 +186,7 @@ button.link { border: none; background: none; color: var(--primary); padding: 0.
 .segmented button { min-height: 44px; }
 .segmented button.active { background: var(--primary); border-color: var(--primary); color: var(--primary-text); font-weight: 600; }
 @media (min-width: 700px) { .segmented { grid-template-columns: repeat(4, 1fr); } }
-fieldset.plan { border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; margin: 0; }
+fieldset.plan { border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; margin: 0; min-width: 0; }
 fieldset.plan legend { font-weight: 600; padding: 0 0.3rem; }
 fieldset.plan label { display: flex; flex-direction: column; gap: 0.3rem; font-weight: 500; }
 .type-tag { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 0.05rem 0.4rem; border-radius: 4px; vertical-align: middle; }
@@ -274,3 +275,11 @@ fieldset.plan label { display: flex; flex-direction: column; gap: 0.3rem; font-w
 .position-check { display: flex; gap: 0.65rem; align-items: flex-start; padding: 0.55rem 0; cursor: pointer; }
 .position-check input { width: 22px; height: 22px; flex: 0 0 auto; margin-top: 0.05rem; }
 .position-list li.done .position-check > span { text-decoration: line-through; color: var(--muted); }
+.position-item { display: flex; flex-direction: column; gap: 0.3rem; }
+.position-item + .position-item { border-top: 1px dashed var(--border); padding-top: 0.4rem; }
+.position-photos { padding: 0 0 0.55rem 2.2rem; }
+.positions-editor .position-photos { padding: 0; }
+.position-photos .thumbs { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 0.4rem; margin-bottom: 0.3rem; }
+.position-photos .thumb-add span { font-size: 0.8rem; }
+.add-position-photo { display: inline-block; cursor: pointer; }
+fieldset.plan input, fieldset.plan select { width: 100%; min-width: 0; }

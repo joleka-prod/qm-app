@@ -334,6 +334,26 @@ await check('Monteur kann Text nicht ändern und nichts löschen', async () => {
   assert.equal(data.length, 3)
 })
 
+await check('Monteur hängt Foto an Position, fremde Position wird abgelehnt', async () => {
+  const ok = await m1.c.from('ticket_photos').insert({ ticket_id: posJob, position_id: posIds[1], storage_path: `${posJob}/pos-${run}.jpg` }).select().single()
+  assert.ifError(ok.error)
+  assert.equal(ok.data.position_id, posIds[1])
+  const { data: other } = await qm.c.from('tickets').insert({ ticket_type: 'restarbeit', title: 'anders' }).select().single()
+  const { data: op } = await qm.c.from('ticket_positions').insert({ ticket_id: other.id, description: 'x' }).select().single()
+  const bad = await m1.c.from('ticket_photos').insert({ ticket_id: posJob, position_id: op.id, storage_path: `${posJob}/bad-${run}.jpg` })
+  assert.ok(bad.error)
+})
+
+await check('Position löschen: Fotos bleiben am Auftrag', async () => {
+  const { data: pos } = await lead.c.from('ticket_positions').insert({ ticket_id: posJob, sort: 9, description: 'weg' }).select().single()
+  const ph = await lead.c.from('ticket_photos').insert({ ticket_id: posJob, position_id: pos.id, storage_path: `${posJob}/weg-${run}.jpg` }).select().single()
+  assert.ifError(ph.error)
+  const del = await lead.c.from('ticket_positions').delete().eq('id', pos.id)
+  assert.ifError(del.error)
+  const { data } = await qm.c.from('ticket_photos').select('position_id').eq('id', ph.data.id).single()
+  assert.equal(data.position_id, null)
+})
+
 await check('Nach Erledigt sind Positionen für Monteur und Teamleiter gesperrt', async () => {
   const r = await m1.c.from('tickets').update({ work_report: 'fertig', status: 'abgeschlossen' }).eq('id', posJob).select().single()
   assert.ifError(r.error)

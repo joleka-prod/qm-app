@@ -13,7 +13,7 @@ async function compress(file: File) {
   })
 }
 
-export async function uploadPhotos(ticketId: number, files: File[]) {
+export async function uploadPhotos(ticketId: number, files: File[], positionId: number | null = null) {
   for (const file of files) {
     const small = await compress(file)
     const path = `${ticketId}/${crypto.randomUUID()}.jpg`
@@ -23,7 +23,7 @@ export async function uploadPhotos(ticketId: number, files: File[]) {
     if (upErr) throw upErr
     const { error: dbErr } = await supabase
       .from('ticket_photos')
-      .insert({ ticket_id: ticketId, storage_path: path })
+      .insert({ ticket_id: ticketId, storage_path: path, position_id: positionId })
     if (dbErr) throw dbErr
   }
 }

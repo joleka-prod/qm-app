@@ -74,15 +74,22 @@ export function NewTicket() {
       setBusy(false)
       return
     }
-    const posRows = positions
-      .filter((p) => !isEmptyPosition(p))
-      .map((p, i) => ({ ticket_id: data.id, sort: i, position_number: p.position_number.trim(), description: p.description.trim() }))
+    const filled = positions.filter((p) => !isEmptyPosition(p))
+    const posRows = filled.map((p, i) => ({
+      ticket_id: data.id,
+      sort: i,
+      position_number: p.position_number.trim(),
+      description: p.description.trim(),
+    }))
+    let saved: { id: number; sort: number }[] = []
     if (einsatz && posRows.length > 0) {
-      const { error: posErr } = await supabase.from('ticket_positions').insert(posRows)
+      const { data: rows, error: posErr } = await supabase.from('ticket_positions').insert(posRows).select('id, sort')
       if (posErr) alert(`Auftrag wurde angelegt, aber die Positionen konnten nicht gespeichert werden: ${posErr.message}`)
+      saved = rows ?? []
     }
     try {
       await uploadPhotos(data.id, files)
+      for (const row of saved) await uploadPhotos(data.id, filled[row.sort].files, row.id)
     } catch (err) {
       alert(`Service-Auftrag wurde angelegt, aber nicht alle Fotos konnten hochgeladen werden: ${(err as Error).message}`)
     }
@@ -131,7 +138,7 @@ export function NewTicket() {
       {einsatz && (
         <div className="field">
           <span>Positionen</span>
-          <PositionsEditor positions={positions} onChange={setPositions} />
+          <PositionsEditor positions={positions} onChange={setPositions} withPhotos />
         </div>
       )}
       {einsatz && (
@@ -171,7 +178,7 @@ export function NewTicket() {
         />
       </label>
       <div className="field">
-        <span>Fotos</span>
+        <span>{einsatz ? 'Fotos zum Auftrag' : 'Fotos'}</span>
         <PhotoPicker files={files} onChange={setFiles} />
       </div>
       {einsatz ? (

@@ -45,6 +45,7 @@ export interface Ticket {
 export interface TicketPhoto {
   id: number
   ticket_id: number
+  position_id: number | null
   storage_path: string
   uploaded_by: string
   created_at: string

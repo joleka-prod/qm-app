@@ -1,12 +1,15 @@
+import { PhotoPicker } from './PhotoPicker'
+
 export interface PositionDraft {
   key: string
   id?: number
   position_number: string
   description: string
+  files: File[]
 }
 
 export function newPositionDraft(): PositionDraft {
-  return { key: crypto.randomUUID(), position_number: '', description: '' }
+  return { key: crypto.randomUUID(), position_number: '', description: '', files: [] }
 }
 
 export function isEmptyPosition(p: PositionDraft) {
@@ -16,10 +19,11 @@ export function isEmptyPosition(p: PositionDraft) {
 interface Props {
   positions: PositionDraft[]
   onChange: (positions: PositionDraft[]) => void
+  withPhotos?: boolean
 }
 
 // Eingabeliste für Positionen eines Einsatzes (Pos.-Nr. + was zu tun ist).
-export function PositionsEditor({ positions, onChange }: Props) {
+export function PositionsEditor({ positions, onChange, withPhotos }: Props) {
   function patch(key: string, change: Partial<PositionDraft>) {
     onChange(positions.map((p) => (p.key === key ? { ...p, ...change } : p)))
   }
@@ -27,7 +31,8 @@ export function PositionsEditor({ positions, onChange }: Props) {
   return (
     <div className="positions-editor">
       {positions.map((p, i) => (
-        <div className="position-row" key={p.key}>
+        <div className="position-item" key={p.key}>
+        <div className="position-row">
           <input
             className="pos-no"
             aria-label={`Positionsnummer ${i + 1}`}
@@ -52,6 +57,12 @@ export function PositionsEditor({ positions, onChange }: Props) {
           >
             ×
           </button>
+        </div>
+        {withPhotos && (
+          <div className="position-photos">
+            <PhotoPicker files={p.files} onChange={(files) => patch(p.key, { files })} />
+          </div>
+        )}
         </div>
       ))}
       <button type="button" className="link" onClick={() => onChange([...positions, newPositionDraft()])}>
