@@ -39,11 +39,11 @@ export function PlanningCalendar() {
     const [p, u] = await Promise.all([
       supabase
         .from('tickets')
-        .select('*')
+        .select('*, ticket_positions(count)')
         .neq('ticket_type', 'qm')
         .gte('montage_date', isoDate(weekStart))
         .lte('montage_date', isoDate(addDays(weekStart, DAYS - 1))),
-      supabase.from('tickets').select('*').neq('ticket_type', 'qm').eq('status', 'neu').order('created_at'),
+      supabase.from('tickets').select('*, ticket_positions(count)').neq('ticket_type', 'qm').eq('status', 'neu').order('created_at'),
     ])
     setPlanned(((p.data ?? []) as Ticket[]).filter((t) => t.installer_id))
     setUnplanned((u.data ?? []) as Ticket[])

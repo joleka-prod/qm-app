@@ -29,6 +29,8 @@ export interface Ticket {
   signature_path: string | null
   signer_name: string
   signed_at: string | null
+  // nur gefüllt, wenn mit select('*, ticket_positions(count)') geladen
+  ticket_positions?: { count: number }[]
   status: TicketStatus
   created_by: string
   assigned_to: string | null
@@ -46,6 +48,17 @@ export interface TicketPhoto {
   storage_path: string
   uploaded_by: string
   created_at: string
+}
+
+export interface TicketPosition {
+  id: number
+  ticket_id: number
+  sort: number
+  position_number: string
+  description: string
+  done: boolean
+  done_by: string | null
+  done_at: string | null
 }
 
 export interface DeletionRequest {

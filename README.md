@@ -24,7 +24,7 @@ Die Rechte werden in der Datenbank durchgesetzt (Row Level Security), nicht nur 
 ### 1. Supabase-Projekt
 
 1. Auf [supabase.com](https://supabase.com) ein Projekt anlegen, Region **Central EU (Frankfurt)**.
-2. Im SQL-Editor den Inhalt von `supabase/migrations/20261022000000_qm_schema.sql` ausführen
+2. Im SQL-Editor nacheinander alle Dateien aus `supabase/migrations/` ausführen (in der Reihenfolge der Dateinamen)
    (oder mit der CLI: `npx supabase link` und `npx supabase db push`).
 3. Unter *Authentication → Sign In / Providers* die Option **Allow new users to sign up** ausschalten,
    damit nur eingeladene Personen Zugang bekommen.

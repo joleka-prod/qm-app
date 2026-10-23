@@ -31,13 +31,13 @@ export function InstallerCalendar() {
     const [w, o] = await Promise.all([
       supabase
         .from('tickets')
-        .select('*')
+        .select('*, ticket_positions(count)')
         .eq('installer_id', installerId)
         .gte('montage_date', days[0])
         .lte('montage_date', days[6]),
       supabase
         .from('tickets')
-        .select('*')
+        .select('*, ticket_positions(count)')
         .eq('installer_id', installerId)
         .lt('montage_date', today)
         .neq('status', 'abgeschlossen')

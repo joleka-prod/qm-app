@@ -262,3 +262,15 @@ fieldset.plan label { display: flex; flex-direction: column; gap: 0.3rem; font-w
 .signature-line { position: absolute; left: 1rem; right: 1rem; top: 150px; border-top: 1px solid #98a2b3; font-size: 0.7rem; color: #98a2b3; padding-top: 0.15rem; pointer-events: none; }
 .signature-pad .link { margin-top: 0.3rem; }
 .signature-img { display: block; max-width: 100%; width: 360px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+
+/* --- Positionen --- */
+.positions-editor { display: flex; flex-direction: column; gap: 0.4rem; align-items: stretch; }
+.positions-editor .link { align-self: flex-start; }
+.position-row { display: grid; grid-template-columns: 4.5rem 1fr 44px; gap: 0.4rem; }
+.pos-remove { padding: 0; font-size: 1.2rem; color: var(--muted); }
+.position-list { list-style: none; margin: 0 0 0.5rem; padding: 0; }
+.position-list li { border-bottom: 1px solid var(--border); }
+.position-list li:last-child { border-bottom: none; }
+.position-check { display: flex; gap: 0.65rem; align-items: flex-start; padding: 0.55rem 0; cursor: pointer; }
+.position-check input { width: 22px; height: 22px; flex: 0 0 auto; margin-top: 0.05rem; }
+.position-list li.done .position-check > span { text-decoration: line-through; color: var(--muted); }

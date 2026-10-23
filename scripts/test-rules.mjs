@@ -284,6 +284,74 @@ await check('QM-Ticket ignoriert Monteur-Felder', async () => {
   assert.equal(data.montage_date, null)
 })
 
+// --- Positionen ---
+let posJob, posIds
+await check('Ersteller legt Positionen an, solange ungeplant', async () => {
+  const { data: job } = await worker.c.from('tickets').insert({ ticket_type: 'beanstandung', title: 'Mehrere Mängel' }).select().single()
+  posJob = job.id
+  const { data, error } = await worker.c.from('ticket_positions').insert([
+    { ticket_id: posJob, sort: 0, position_number: ' 10 ', description: 'Tür einstellen', done: true },
+    { ticket_id: posJob, sort: 1, position_number: '20', description: 'Dichtung tauschen' },
+  ]).select().order('sort')
+  assert.ifError(error)
+  assert.equal(data[0].position_number, '10')
+  assert.equal(data[0].done, false)
+  posIds = data.map((p) => p.id)
+  const empty = await worker.c.from('ticket_positions').insert({ ticket_id: posJob, position_number: ' ', description: '' })
+  assert.ok(empty.error)
+})
+
+await check('Nach Planung kann Ersteller keine Positionen mehr ändern, Teamleiter schon', async () => {
+  await lead.c.from('tickets').update({ installer_id: m1.id, montage_date: '2026-11-03' }).eq('id', posJob)
+  const r = await worker.c.from('ticket_positions').insert({ ticket_id: posJob, description: 'x' })
+  assert.ok(r.error)
+  const u = await lead.c.from('ticket_positions').insert({ ticket_id: posJob, sort: 2, position_number: '30', description: 'Silikon' }).select().single()
+  assert.ifError(u.error)
+  posIds.push(u.data.id)
+})
+
+await check('Fremder Monteur sieht Positionen nicht', async () => {
+  const { data } = await m2.c.from('ticket_positions').select('id').eq('ticket_id', posJob)
+  assert.equal(data.length, 0)
+  const r = await m2.c.from('ticket_positions').update({ done: true }).eq('id', posIds[0]).select()
+  assert.ok(r.error || r.data.length === 0)
+})
+
+await check('Monteur hakt ab, Erledigt-Vermerk wird gesetzt', async () => {
+  const { data, error } = await m1.c.from('ticket_positions').update({ done: true, done_by: lead.id }).eq('id', posIds[0]).select().single()
+  assert.ifError(error)
+  assert.equal(data.done, true)
+  assert.equal(data.done_by, m1.id)
+  assert.ok(data.done_at)
+})
+
+await check('Monteur kann Text nicht ändern und nichts löschen', async () => {
+  const r = await m1.c.from('ticket_positions').update({ description: 'anders' }).eq('id', posIds[1])
+  assert.ok(r.error)
+  const d = await m1.c.from('ticket_positions').delete().eq('id', posIds[1]).select()
+  assert.ok(d.error || d.data.length === 0)
+  const { data } = await qm.c.from('ticket_positions').select('id').eq('ticket_id', posJob)
+  assert.equal(data.length, 3)
+})
+
+await check('Nach Erledigt sind Positionen für Monteur und Teamleiter gesperrt', async () => {
+  const r = await m1.c.from('tickets').update({ work_report: 'fertig', status: 'abgeschlossen' }).eq('id', posJob).select().single()
+  assert.ifError(r.error)
+  const a = await m1.c.from('ticket_positions').update({ done: true }).eq('id', posIds[1]).select()
+  assert.ok(a.error || a.data.length === 0)
+  const b = await lead.c.from('ticket_positions').update({ description: 'neu' }).eq('id', posIds[1]).select()
+  assert.ok(b.error || b.data.length === 0)
+  const c = await qm.c.from('ticket_positions').update({ done: true }).eq('id', posIds[1]).select().single()
+  assert.ifError(c.error)
+  assert.equal(c.data.done_by, qm.id)
+})
+
+await check('QM-Ticket bekommt keine Positionen', async () => {
+  const { data: t } = await qm.c.from('tickets').insert({ title: 'QM ohne Pos' }).select().single()
+  const r = await qm.c.from('ticket_positions').insert({ ticket_id: t.id, description: 'x' })
+  assert.ok(r.error)
+})
+
 // --- Löschanträge ---
 let delId
 await check('Mitarbeiter kann Ticket nicht direkt löschen', async () => {

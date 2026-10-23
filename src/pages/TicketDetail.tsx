@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { PhotoGallery } from '../components/PhotoGallery'
 import { PhotoPicker } from '../components/PhotoPicker'
+import { PositionsEditor, isEmptyPosition, newPositionDraft, type PositionDraft } from '../components/PositionsEditor'
 import { SignaturePad, canvasToBlob } from '../components/SignaturePad'
 import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { deletePhoto, signedUrls, uploadPhotos, uploadSignature } from '../lib/photos'
@@ -24,6 +25,7 @@ import {
   type Ticket,
   type TicketEvent,
   type TicketPhoto,
+  type TicketPosition,
   type TicketStatus,
 } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
@@ -84,13 +86,16 @@ export function TicketDetail() {
   const [signing, setSigning] = useState(false)
   const [signatureUrl, setSignatureUrl] = useState('')
   const signatureCanvas = useRef<HTMLCanvasElement>(null)
+  const [positions, setPositions] = useState<TicketPosition[]>([])
+  const [positionDrafts, setPositionDrafts] = useState<PositionDraft[] | null>(null)
 
   const load = useCallback(async () => {
-    const [t, p, e, d] = await Promise.all([
+    const [t, p, e, d, pos] = await Promise.all([
       supabase.from('tickets').select('*').eq('id', ticketId).maybeSingle(),
       supabase.from('ticket_photos').select('*').eq('ticket_id', ticketId).order('created_at'),
       supabase.from('ticket_events').select('*').eq('ticket_id', ticketId).order('created_at'),
       supabase.from('deletion_requests').select('*').eq('ticket_id', ticketId).maybeSingle(),
+      supabase.from('ticket_positions').select('*').eq('ticket_id', ticketId).order('sort').order('id'),
     ])
     if (!t.data) {
       setNotFound(true)
@@ -117,6 +122,7 @@ export function TicketDetail() {
     setPhotos((p.data ?? []) as TicketPhoto[])
     setEvents((e.data ?? []) as TicketEvent[])
     setDeletion(d.data as DeletionRequest | null)
+    setPositions((pos.data ?? []) as TicketPosition[])
   }, [ticketId])
 
   useEffect(() => {
@@ -143,6 +149,10 @@ export function TicketDetail() {
     montageDate !== (ticket.montage_date ?? '') ||
     montageTime !== formatTime(ticket.montage_time) ||
     area !== (ticket.service_area ?? '')
+  const canEditPositions =
+    einsatz && (isAdmin || (profile.role === 'teamleiter' && !closed) || (ticket.created_by === profile.id && ticket.status === 'neu'))
+  const canCheckPositions = einsatz && !closed && (isInstaller || canEditPositions)
+  const openPositions = positions.filter((p) => !p.done).length
   const canSign = einsatz && (isAdmin || (!closed && (isInstaller || isPlanner)))
   const dirty = cause !== ticket.cause || action !== ticket.corrective_action
 
@@ -154,6 +164,39 @@ export function TicketDetail() {
     await load()
     setBusy(false)
     return !error
+  }
+
+  async function toggleDone(p: TicketPosition) {
+    setError('')
+    const { error } = await supabase.from('ticket_positions').update({ done: !p.done }).eq('id', p.id)
+    if (error) setError(error.message)
+    await load()
+  }
+
+  async function savePositions() {
+    if (!positionDrafts) return
+    setBusy(true)
+    setError('')
+    try {
+      const keep = positionDrafts.filter((p) => !isEmptyPosition(p))
+      const removed = positions.filter((p) => !keep.some((k) => k.id === p.id)).map((p) => p.id)
+      if (removed.length > 0) {
+        const { error } = await supabase.from('ticket_positions').delete().in('id', removed)
+        if (error) throw error
+      }
+      for (const [i, p] of keep.entries()) {
+        const row = { sort: i, position_number: p.position_number.trim(), description: p.description.trim() }
+        const { error } = p.id
+          ? await supabase.from('ticket_positions').update(row).eq('id', p.id)
+          : await supabase.from('ticket_positions').insert({ ...row, ticket_id: ticketId })
+        if (error) throw error
+      }
+      setPositionDrafts(null)
+    } catch (err) {
+      setError((err as Error).message)
+    }
+    await load()
+    setBusy(false)
   }
 
   async function saveSignature() {
@@ -263,10 +306,12 @@ export function TicketDetail() {
                 Auftragsnummer
                 <input value={orderNumber} maxLength={50} onChange={(e) => setOrderNumber(e.target.value)} />
               </label>
-              <label>
-                Positionsnummer
-                <input value={positionNumber} maxLength={20} onChange={(e) => setPositionNumber(e.target.value)} />
-              </label>
+              {!einsatz && (
+                <label>
+                  Positionsnummer
+                  <input value={positionNumber} maxLength={20} onChange={(e) => setPositionNumber(e.target.value)} />
+                </label>
+              )}
             </div>
             {einsatz && canEditBase && (
               <>
@@ -350,6 +395,74 @@ export function TicketDetail() {
           </>
         )}
       </section>
+
+      {einsatz && (
+        <section className="card">
+          <h2>
+            Positionen
+            {positions.length > 0 && (
+              <span className="muted small"> · {positions.length - openPositions} von {positions.length} erledigt</span>
+            )}
+          </h2>
+          {positionDrafts ? (
+            <div className="form">
+              <PositionsEditor positions={positionDrafts} onChange={setPositionDrafts} />
+              <div className="actions">
+                <button disabled={busy} onClick={() => setPositionDrafts(null)}>Abbrechen</button>
+                <button className="primary" disabled={busy} onClick={savePositions}>Positionen speichern</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {positions.length === 0 ? (
+                <p className="muted">Keine Positionen.</p>
+              ) : (
+                <ul className="position-list">
+                  {positions.map((p) => (
+                    <li key={p.id} className={p.done ? 'done' : ''}>
+                      <label className="position-check">
+                        <input
+                          type="checkbox"
+                          checked={p.done}
+                          disabled={!canCheckPositions}
+                          onChange={() => toggleDone(p)}
+                        />
+                        <span>
+                          {p.position_number && <strong>Pos. {p.position_number}</strong>}
+                          {p.position_number && p.description && ' – '}
+                          {p.description}
+                          {p.done && p.done_by && (
+                            <span className="muted small"> · erledigt von {displayName(byId[p.done_by])}</span>
+                          )}
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {canEditPositions && (
+                <button
+                  className="link"
+                  onClick={() =>
+                    setPositionDrafts(
+                      positions.length > 0
+                        ? positions.map((p) => ({
+                            key: String(p.id),
+                            id: p.id,
+                            position_number: p.position_number,
+                            description: p.description,
+                          }))
+                        : [newPositionDraft()],
+                    )
+                  }
+                >
+                  Positionen bearbeiten
+                </button>
+              )}
+            </>
+          )}
+        </section>
+      )}
 
       <section className="card">
         <h2>Fotos</h2>
@@ -451,6 +564,7 @@ export function TicketDetail() {
                   className="primary"
                   disabled={busy || !report.trim()}
                   onClick={() => {
+                    if (openPositions > 0 && !confirm(`${openPositions} Position(en) sind noch nicht abgehakt. Trotzdem als erledigt melden?`)) return
                     if (!ticket.signature_path && !confirm('Es gibt noch keine Kundenunterschrift. Trotzdem als erledigt melden?')) return
                     update({ work_report: report, status: 'abgeschlossen' })
                   }}

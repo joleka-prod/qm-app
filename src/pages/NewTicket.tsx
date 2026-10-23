@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { PhotoPicker } from '../components/PhotoPicker'
+import { PositionsEditor, isEmptyPosition, newPositionDraft, type PositionDraft } from '../components/PositionsEditor'
 import { uploadPhotos } from '../lib/photos'
 import { supabase } from '../lib/supabase'
 import {
@@ -33,6 +34,7 @@ export function NewTicket() {
   const [area, setArea] = useState<ServiceArea | null>(
     SERVICE_AREAS.includes(params.get('bereich') as ServiceArea) ? (params.get('bereich') as ServiceArea) : null,
   )
+  const [positions, setPositions] = useState<PositionDraft[]>(() => [newPositionDraft()])
   const [customer, setCustomer] = useState('')
   const [address, setAddress] = useState('')
   const [assignedTo, setAssignedTo] = useState('')
@@ -57,7 +59,7 @@ export function NewTicket() {
         title: title.trim(),
         description: description.trim(),
         order_number: orderNumber.trim(),
-        position_number: positionNumber.trim(),
+        position_number: einsatz ? '' : positionNumber.trim(),
         customer_name: einsatz ? customer.trim() : '',
         site_address: einsatz ? address.trim() : '',
         assigned_to: !einsatz && assignedTo ? assignedTo : null,
@@ -71,6 +73,13 @@ export function NewTicket() {
       setError(error?.message ?? 'Service-Auftrag konnte nicht angelegt werden.')
       setBusy(false)
       return
+    }
+    const posRows = positions
+      .filter((p) => !isEmptyPosition(p))
+      .map((p, i) => ({ ticket_id: data.id, sort: i, position_number: p.position_number.trim(), description: p.description.trim() }))
+    if (einsatz && posRows.length > 0) {
+      const { error: posErr } = await supabase.from('ticket_positions').insert(posRows)
+      if (posErr) alert(`Auftrag wurde angelegt, aber die Positionen konnten nicht gespeichert werden: ${posErr.message}`)
     }
     try {
       await uploadPhotos(data.id, files)
@@ -112,11 +121,19 @@ export function NewTicket() {
           Auftragsnummer
           <input value={orderNumber} maxLength={50} onChange={(e) => setOrderNumber(e.target.value)} />
         </label>
-        <label>
-          Positionsnummer
-          <input value={positionNumber} maxLength={20} onChange={(e) => setPositionNumber(e.target.value)} />
-        </label>
+        {!einsatz && (
+          <label>
+            Positionsnummer
+            <input value={positionNumber} maxLength={20} onChange={(e) => setPositionNumber(e.target.value)} />
+          </label>
+        )}
       </div>
+      {einsatz && (
+        <div className="field">
+          <span>Positionen</span>
+          <PositionsEditor positions={positions} onChange={setPositions} />
+        </div>
+      )}
       {einsatz && (
         <>
           <div className="field">

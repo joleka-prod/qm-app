@@ -33,6 +33,7 @@ export function JobCard({ ticket: t, draggable, showAddress }: Props) {
       </div>
       <div className="job-title">{t.title}</div>
       {t.customer_name && <div className="job-sub">{t.customer_name}</div>}
+      {!!t.ticket_positions?.[0]?.count && <div className="job-sub">{t.ticket_positions[0].count} Pos.</div>}
       {showAddress && t.site_address && <div className="job-sub pre">{t.site_address}</div>}
     </Link>
   )

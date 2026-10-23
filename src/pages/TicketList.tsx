@@ -38,7 +38,7 @@ export function TicketList() {
       .then(({ data }) => setDeletionIds(new Set((data ?? []).map((d) => d.ticket_id as number))))
     supabase
       .from('tickets')
-      .select('*')
+      .select('*, ticket_positions(count)')
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         setTickets((data ?? []) as Ticket[])
@@ -111,6 +111,9 @@ export function TicketList() {
                 <div className="ticket-title">{t.title}</div>
                 {(orderRef(t) || t.customer_name) && (
                   <div className="small">{[t.customer_name, orderRef(t)].filter(Boolean).join(' · ')}</div>
+                )}
+                {!!t.ticket_positions?.[0]?.count && (
+                  <div className="small muted">{t.ticket_positions[0].count} Position(en)</div>
                 )}
                 {t.installer_id && t.montage_date && (
                   <div className="small plan-line">
