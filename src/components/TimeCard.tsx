@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { formatMinutes, notifyClockChanged, useClock, useClockChanged } from '../lib/clock'
 import { supabase } from '../lib/supabase'
 import { displayName, formatDate, type Profile, type Ticket } from '../lib/types'
 
@@ -23,16 +24,13 @@ export function minutesOf(e: Pick<TimeEntry, 'started_at' | 'ended_at'>, now = D
   return Math.max(0, Math.round((end - new Date(e.started_at).getTime()) / 60000))
 }
 
-export function formatMinutes(m: number) {
-  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')} h`
-}
 
-function clock(iso: string) {
+function clockAt(iso: string) {
   return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
 }
 
 // ISO -> Wert für <input type="datetime-local"> in Ortszeit
-function toLocalInput(iso: string | null) {
+export function toLocalInput(iso: string | null) {
   if (!iso) return ''
   const d = new Date(iso)
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
@@ -47,7 +45,8 @@ interface Props {
   byId: Record<string, Profile>
 }
 
-// Zeiterfassung im Einsatz: Start/Stopp für Monteure, Übersicht und Korrektur für Planer
+// Auftragszeit: Monteure starten und stoppen die Arbeit am Auftrag (nur eingestempelt),
+// Planer sehen und korrigieren alle Zeiten
 export function TimeCard({ ticket, me, isInstaller, isPlanner, isAdmin, byId }: Props) {
   const [entries, setEntries] = useState<TimeEntry[]>([])
   const [running, setRunning] = useState<TimeEntry | null>(null)
@@ -55,6 +54,7 @@ export function TimeCard({ ticket, me, isInstaller, isPlanner, isAdmin, byId }: 
   const [edit, setEdit] = useState<{ id: number; start: string; end: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const clock = useClock(isInstaller ? me : undefined)
 
   const load = useCallback(async () => {
     const [list, mine] = await Promise.all([
@@ -68,6 +68,7 @@ export function TimeCard({ ticket, me, isInstaller, isPlanner, isAdmin, byId }: 
   useEffect(() => {
     load()
   }, [load, ticket.status])
+  useClockChanged(load)
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30000)
@@ -80,6 +81,7 @@ export function TimeCard({ ticket, me, isInstaller, isPlanner, isAdmin, byId }: 
     const { error } = await fn()
     if (error) setError(error.message)
     await load()
+    notifyClockChanged()
     setNow(Date.now())
     setBusy(false)
   }
@@ -112,30 +114,31 @@ export function TimeCard({ ticket, me, isInstaller, isPlanner, isAdmin, byId }: 
 
   return (
     <section className="card">
-      <h2>Zeiterfassung</h2>
+      <h2>Zeit für diesen Auftrag</h2>
 
       {isInstaller && !closed && (
         <div className="time-controls">
+          {!clock.running && clock.loaded && (
+            <p className="small appointment-warn">Bitte zuerst oben die Zeiterfassung starten.</p>
+          )}
           {running && runningHere && (
             <p className="time-running">
-              ● {KIND_LABEL[running.kind]} läuft seit {clock(running.started_at)} ({formatMinutes(minutesOf(running, now))})
+              ● Arbeit am Auftrag läuft seit {clockAt(running.started_at)} ({formatMinutes(minutesOf(running, now))})
             </p>
           )}
           {running && !runningHere && (
             <p className="small muted">
-              Bei dir läuft noch {KIND_LABEL[running.kind]} in einem <Link to={`/ticket/${running.ticket_id}`}>anderen Einsatz</Link>.
-              Ein Start hier beendet sie.
+              Bei dir läuft noch die Zeit für einen <Link to={`/ticket/${running.ticket_id}`}>anderen Auftrag</Link>. Ein Start hier
+              beendet sie.
             </p>
           )}
           <div className="time-buttons">
-            <button disabled={busy || (runningHere && running?.kind === 'fahrt')} onClick={() => start('fahrt')}>
-              🚐 Fahrt starten
-            </button>
-            <button disabled={busy || (runningHere && running?.kind === 'arbeit')} onClick={() => start('arbeit')}>
-              🔧 Arbeit starten
-            </button>
-            {runningHere && (
-              <button className="primary" disabled={busy} onClick={stop}>■ Stopp</button>
+            {runningHere ? (
+              <button className="primary" disabled={busy} onClick={stop}>■ Arbeit am Auftrag stoppen</button>
+            ) : (
+              <button className="primary" disabled={busy || !clock.running} onClick={() => start('arbeit')}>
+                ▶ Arbeit am Auftrag starten
+              </button>
             )}
           </div>
         </div>
@@ -169,7 +172,7 @@ export function TimeCard({ ticket, me, isInstaller, isPlanner, isAdmin, byId }: 
                   <span className={`time-kind time-kind-${e.kind}`}>{KIND_LABEL[e.kind]}</span>
                   <span className="time-who">{displayName(byId[e.installer_id])}</span>
                   <span className="time-span small">
-                    {formatDate(e.started_at)} – {e.ended_at ? clock(e.ended_at) : 'läuft'}
+                    {formatDate(e.started_at)} – {e.ended_at ? clockAt(e.ended_at) : 'läuft'}
                     {e.edited_by && <span className="muted"> · korrigiert von {displayName(byId[e.edited_by])}</span>}
                   </span>
                   <span className="time-dur">{formatMinutes(minutesOf(e, now))}</span>
@@ -188,8 +191,8 @@ export function TimeCard({ ticket, me, isInstaller, isPlanner, isAdmin, byId }: 
             )}
           </ul>
           <div className="time-totals">
-            <span>Fahrt {formatMinutes(totals.fahrt)}</span>
-            <span>Arbeit {formatMinutes(totals.arbeit)}</span>
+            {totals.fahrt > 0 && <span>Fahrt {formatMinutes(totals.fahrt)}</span>}
+            {totals.fahrt > 0 && <span>Arbeit {formatMinutes(totals.arbeit)}</span>}
             <strong>Gesamt {formatMinutes(totals.fahrt + totals.arbeit)}</strong>
           </div>
         </>
