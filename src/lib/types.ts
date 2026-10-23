@@ -23,6 +23,8 @@ export interface Ticket {
   montage_date: string | null
   montage_time: string | null
   customer_name: string
+  customer_email: string
+  report_by_email: boolean
   site_address: string
   work_report: string
   service_area: ServiceArea | null
@@ -140,6 +142,10 @@ export const ROLE_LABEL: Record<Role, string> = {
 
 export function ticketNo(id: number, type: TicketType = 'qm') {
   return `${TYPE_PREFIX[type]}-${String(id).padStart(4, '0')}`
+}
+
+export function isEmail(s: string) {
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim())
 }
 
 export function formatDate(iso: string) {

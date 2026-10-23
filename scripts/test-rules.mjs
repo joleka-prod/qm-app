@@ -232,6 +232,19 @@ await check('Monteur speichert Kundenunterschrift', async () => {
   assert.equal(photos.length, 0)
 })
 
+await check('Kunde wünscht Bericht per E-Mail, Adresse wird geprüft', async () => {
+  let r = await m1.c.from('tickets').update({ report_by_email: true }).eq('id', jobId)
+  assert.ok(r.error)
+  r = await m1.c.from('tickets').update({ report_by_email: true, customer_email: 'keine-adresse' }).eq('id', jobId)
+  assert.ok(r.error)
+  const ok = await m1.c.from('tickets').update({ report_by_email: true, customer_email: ' Mueller@Example.de ' }).eq('id', jobId).select().single()
+  assert.ifError(ok.error)
+  assert.equal(ok.data.customer_email, 'mueller@example.de')
+  const { data: q } = await qm.c.from('tickets').insert({ title: 'QM mit Mail', customer_email: 'a@b.de', report_by_email: true }).select().single()
+  assert.equal(q.customer_email, '')
+  assert.equal(q.report_by_email, false)
+})
+
 await check('Erledigt nur mit Arbeitsbericht', async () => {
   const { error } = await m1.c.from('tickets').update({ status: 'abgeschlossen' }).eq('id', jobId)
   assert.ok(error)

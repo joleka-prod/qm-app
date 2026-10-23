@@ -15,6 +15,7 @@ import {
   TYPE_LABEL,
   displayName,
   formatDate,
+  isEmail,
   formatDay,
   formatTime,
   isEinsatz,
@@ -77,6 +78,9 @@ export function TicketDetail() {
   const [orderNumber, setOrderNumber] = useState('')
   const [positionNumber, setPositionNumber] = useState('')
   const [customer, setCustomer] = useState('')
+  const [customerEmail, setCustomerEmail] = useState('')
+  const [wantsEmail, setWantsEmail] = useState(false)
+  const [signEmail, setSignEmail] = useState('')
   const [address, setAddress] = useState('')
   const [installer, setInstaller] = useState('')
   const [montageDate, setMontageDate] = useState('')
@@ -115,6 +119,7 @@ export function TicketDetail() {
     setOrderNumber(tk.order_number)
     setPositionNumber(tk.position_number)
     setCustomer(tk.customer_name)
+    setCustomerEmail(tk.customer_email)
     setAddress(tk.site_address)
     setInstaller(tk.installer_id ?? '')
     setMontageDate(tk.montage_date ?? '')
@@ -224,6 +229,8 @@ export function TicketDetail() {
         .update({
           signature_path: path,
           signer_name: signerName.trim(),
+          report_by_email: wantsEmail,
+          ...(wantsEmail ? { customer_email: signEmail.trim() } : {}),
           // noch nicht gespeicherten Arbeitsbericht nicht verlieren
           ...(isInstaller && report !== ticket?.work_report ? { work_report: report } : {}),
         })
@@ -345,6 +352,17 @@ export function TicketDetail() {
                   <input value={customer} maxLength={150} onChange={(e) => setCustomer(e.target.value)} />
                 </label>
                 <label>
+                  E-Mail des Kunden
+                  <input
+                    type="email"
+                    inputMode="email"
+                    value={customerEmail}
+                    maxLength={200}
+                    onChange={(e) => setCustomerEmail(e.target.value)}
+                    placeholder="name@beispiel.de"
+                  />
+                </label>
+                <label>
                   Einsatzort / Adresse
                   <textarea rows={2} value={address} onChange={(e) => setAddress(e.target.value)} />
                 </label>
@@ -365,6 +383,7 @@ export function TicketDetail() {
                   setOrderNumber(ticket.order_number)
                   setPositionNumber(ticket.position_number)
                   setCustomer(ticket.customer_name)
+                  setCustomerEmail(ticket.customer_email)
                   setAddress(ticket.site_address)
                 }}
               >
@@ -372,11 +391,11 @@ export function TicketDetail() {
               </button>
               <button
                 className="primary"
-                disabled={busy || !title.trim()}
+                disabled={busy || !title.trim() || (einsatz && !!customerEmail.trim() && !isEmail(customerEmail))}
                 onClick={async () => {
                   const ref = { order_number: orderNumber.trim(), position_number: positionNumber.trim() }
                   const base = { ...ref, title: title.trim(), description: description.trim() }
-                  const site = einsatz ? { customer_name: customer.trim(), site_address: address.trim() } : {}
+                  const site = einsatz ? { customer_name: customer.trim(), customer_email: customerEmail.trim(), site_address: address.trim() } : {}
                   const patch = canEditBase ? { ...base, ...site } : ref
                   if (await update(patch)) setEditing(false)
                 }}
@@ -389,12 +408,18 @@ export function TicketDetail() {
           <>
             <h1 className="ticket-heading">{ticket.title}</h1>
             {orderRef(ticket) && <p className="order-ref">{orderRef(ticket)}</p>}
-            {einsatz && (ticket.customer_name || ticket.site_address) && (
+            {einsatz && (ticket.customer_name || ticket.site_address || ticket.customer_email) && (
               <p className="site">
                 {ticket.customer_name && <strong>{ticket.customer_name}</strong>}
-                {ticket.site_address && (
+                {ticket.customer_email && (
                   <>
                     {ticket.customer_name && <br />}
+                    <a href={`mailto:${ticket.customer_email}`}>{ticket.customer_email}</a>
+                  </>
+                )}
+                {ticket.site_address && (
+                  <>
+                    {(ticket.customer_name || ticket.customer_email) && <br />}
                     <a
                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.site_address)}`}
                       target="_blank"
@@ -704,6 +729,11 @@ export function TicketDetail() {
                 {ticket.signer_name}
                 {ticket.signed_at && <span className="muted"> · {formatDate(ticket.signed_at)}</span>}
               </p>
+              <p className="small">
+                {ticket.report_by_email
+                  ? <>✉ Bericht per E-Mail gewünscht an <a href={`mailto:${ticket.customer_email}`}>{ticket.customer_email}</a></>
+                  : <span className="muted">Kein Bericht per E-Mail gewünscht.</span>}
+              </p>
               {isAdmin && (
                 <button className="link" disabled={busy} onClick={() => update({ signature_path: null })}>
                   Unterschrift entfernen
@@ -718,15 +748,43 @@ export function TicketDetail() {
                 Name des Kunden *
                 <input value={signerName} maxLength={100} onChange={(e) => setSignerName(e.target.value)} placeholder="Vorname Nachname" />
               </label>
+              <label className="checkbox-row">
+                <input type="checkbox" checked={wantsEmail} onChange={(e) => setWantsEmail(e.target.checked)} />
+                Ich möchte den Bericht per E-Mail erhalten
+              </label>
+              {wantsEmail && (
+                <label>
+                  E-Mail-Adresse *
+                  <input
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    value={signEmail}
+                    maxLength={200}
+                    onChange={(e) => setSignEmail(e.target.value)}
+                    placeholder="name@beispiel.de"
+                  />
+                </label>
+              )}
               <div className="actions">
                 <button disabled={busy} onClick={() => setSigning(false)}>Abbrechen</button>
-                <button className="primary" disabled={busy || !hasInk || !signerName.trim()} onClick={saveSignature}>
+                <button className="primary" disabled={busy || !hasInk || !signerName.trim() || (wantsEmail && !isEmail(signEmail))}
+                  onClick={saveSignature}
+                >
                   Unterschrift speichern
                 </button>
               </div>
             </div>
           ) : canSign ? (
-            <button className="primary" onClick={() => { setSigning(true); setSignerName(ticket.customer_name) }}>
+            <button
+              className="primary"
+              onClick={() => {
+                setSigning(true)
+                setSignerName(ticket.customer_name)
+                setSignEmail(ticket.customer_email)
+                setWantsEmail(false)
+              }}
+            >
               Kunde unterschreiben lassen
             </button>
           ) : (

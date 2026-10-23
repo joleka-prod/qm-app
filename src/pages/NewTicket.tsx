@@ -36,6 +36,7 @@ export function NewTicket() {
   )
   const [positions, setPositions] = useState<PositionDraft[]>(() => [newPositionDraft()])
   const [customer, setCustomer] = useState('')
+  const [customerEmail, setCustomerEmail] = useState('')
   const [address, setAddress] = useState('')
   const [assignedTo, setAssignedTo] = useState('')
   const [installer, setInstaller] = useState(params.get('monteur') ?? '')
@@ -61,6 +62,7 @@ export function NewTicket() {
         order_number: orderNumber.trim(),
         position_number: einsatz ? '' : positionNumber.trim(),
         customer_name: einsatz ? customer.trim() : '',
+        customer_email: einsatz ? customerEmail.trim() : '',
         site_address: einsatz ? address.trim() : '',
         assigned_to: !einsatz && assignedTo ? assignedTo : null,
         installer_id: einsatz && canPlan && installer ? installer : null,
@@ -161,6 +163,18 @@ export function NewTicket() {
           <label>
             Kunde
             <input value={customer} maxLength={150} onChange={(e) => setCustomer(e.target.value)} />
+          </label>
+          <label>
+            E-Mail des Kunden
+            <input
+              type="email"
+              inputMode="email"
+              autoComplete="off"
+              value={customerEmail}
+              maxLength={200}
+              onChange={(e) => setCustomerEmail(e.target.value)}
+              placeholder="name@beispiel.de"
+            />
           </label>
           <label>
             Einsatzort / Adresse
