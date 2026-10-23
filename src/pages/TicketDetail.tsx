@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { PhotoGallery } from '../components/PhotoGallery'
 import { PhotoPicker } from '../components/PhotoPicker'
-import { StatusBadge, TypeBadge } from '../components/StatusBadge'
-import { deletePhoto, uploadPhotos } from '../lib/photos'
+import { SignaturePad, canvasToBlob } from '../components/SignaturePad'
+import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
+import { deletePhoto, signedUrls, uploadPhotos, uploadSignature } from '../lib/photos'
 import { supabase } from '../lib/supabase'
 import {
+  AREA_LABEL,
+  SERVICE_AREAS,
   TYPE_LABEL,
   displayName,
   formatDate,
@@ -17,6 +20,7 @@ import {
   statusLabel,
   ticketNo,
   type DeletionRequest,
+  type ServiceArea,
   type Ticket,
   type TicketEvent,
   type TicketPhoto,
@@ -28,6 +32,9 @@ const EVENT_LABEL: Record<string, string> = {
   erstellt: 'Erstellt',
   eingeplant: 'Eingeplant:',
   bericht: 'Arbeitsbericht bearbeitet',
+  unterschrift: 'Kunde hat unterschrieben:',
+  unterschrift_entfernt: 'Unterschrift entfernt',
+  bereich: 'Bereich geändert auf',
   zugewiesen: 'Zugewiesen an',
   ursache: 'Ursache bearbeitet',
   massnahme: 'Maßnahme bearbeitet',
@@ -71,6 +78,12 @@ export function TicketDetail() {
   const [montageDate, setMontageDate] = useState('')
   const [montageTime, setMontageTime] = useState('')
   const [report, setReport] = useState('')
+  const [area, setArea] = useState<ServiceArea | ''>('')
+  const [signerName, setSignerName] = useState('')
+  const [hasInk, setHasInk] = useState(false)
+  const [signing, setSigning] = useState(false)
+  const [signatureUrl, setSignatureUrl] = useState('')
+  const signatureCanvas = useRef<HTMLCanvasElement>(null)
 
   const load = useCallback(async () => {
     const [t, p, e, d] = await Promise.all([
@@ -97,6 +110,10 @@ export function TicketDetail() {
     setMontageDate(tk.montage_date ?? '')
     setMontageTime(formatTime(tk.montage_time))
     setReport(tk.work_report)
+    setArea(tk.service_area ?? '')
+    setSignatureUrl(
+      tk.signature_path ? ((await signedUrls([tk.signature_path]).catch(() => ({}) as Record<string, string>))[tk.signature_path] ?? '') : '',
+    )
     setPhotos((p.data ?? []) as TicketPhoto[])
     setEvents((e.data ?? []) as TicketEvent[])
     setDeletion(d.data as DeletionRequest | null)
@@ -106,7 +123,7 @@ export function TicketDetail() {
     load()
   }, [load])
 
-  if (notFound) return <p>Ticket nicht gefunden. <Link to="/">Zur Übersicht</Link></p>
+  if (notFound) return <p>Service-Auftrag nicht gefunden. <Link to="/">Zur Übersicht</Link></p>
   if (!ticket || !profile) return <p className="muted">Lädt…</p>
 
   const isAdmin = profile.role === 'admin'
@@ -124,7 +141,9 @@ export function TicketDetail() {
   const planDirty =
     installer !== (ticket.installer_id ?? '') ||
     montageDate !== (ticket.montage_date ?? '') ||
-    montageTime !== formatTime(ticket.montage_time)
+    montageTime !== formatTime(ticket.montage_time) ||
+    area !== (ticket.service_area ?? '')
+  const canSign = einsatz && (isAdmin || (!closed && (isInstaller || isPlanner)))
   const dirty = cause !== ticket.cause || action !== ticket.corrective_action
 
   async function update(patch: Partial<Ticket>) {
@@ -135,6 +154,32 @@ export function TicketDetail() {
     await load()
     setBusy(false)
     return !error
+  }
+
+  async function saveSignature() {
+    const canvas = signatureCanvas.current
+    if (!canvas) return
+    setBusy(true)
+    setError('')
+    try {
+      const path = await uploadSignature(ticketId, await canvasToBlob(canvas))
+      const { error } = await supabase
+        .from('tickets')
+        .update({
+          signature_path: path,
+          signer_name: signerName.trim(),
+          // noch nicht gespeicherten Arbeitsbericht nicht verlieren
+          ...(isInstaller && report !== ticket?.work_report ? { work_report: report } : {}),
+        })
+        .eq('id', ticketId)
+      if (error) throw error
+      setSigning(false)
+      setHasInk(false)
+    } catch (err) {
+      setError((err as Error).message)
+    }
+    await load()
+    setBusy(false)
   }
 
   async function addPhotos() {
@@ -184,7 +229,7 @@ export function TicketDetail() {
   }
 
   async function removeTicket() {
-    if (!confirm('Ticket mit allen Fotos endgültig löschen? Das kann nicht rückgängig gemacht werden.')) return
+    if (!confirm('Service-Auftrag mit allen Fotos endgültig löschen? Das kann nicht rückgängig gemacht werden.')) return
     if (photos.length > 0) {
       await supabase.storage.from('ticket-photos').remove(photos.map((p) => p.storage_path))
     }
@@ -200,7 +245,8 @@ export function TicketDetail() {
       <section className="card">
         <div className="ticket-row-top">
           <span className="ticket-no">
-            {ticketNo(ticket.id, ticket.ticket_type)} <TypeBadge type={ticket.ticket_type} />
+            {ticketNo(ticket.id, ticket.ticket_type)} <TypeBadge type={ticket.ticket_type} />{' '}
+            <AreaBadge area={ticket.service_area} />
           </span>
           <StatusBadge status={ticket.status} type={ticket.ticket_type} />
         </div>
@@ -329,6 +375,16 @@ export function TicketDetail() {
           <h2>Einsatzplanung</h2>
           {canPlan ? (
             <div className="form">
+              <div className="field">
+                <span>Bereich</span>
+                <div className="segmented two">
+                  {SERVICE_AREAS.map((a) => (
+                    <button type="button" key={a} className={area === a ? 'active' : ''} onClick={() => setArea(a)}>
+                      {AREA_LABEL[a]}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <label>
                 Monteur
                 <select value={installer} onChange={(e) => setInstaller(e.target.value)}>
@@ -357,6 +413,7 @@ export function TicketDetail() {
                       installer_id: installer || null,
                       montage_date: montageDate || null,
                       montage_time: montageTime || null,
+                      ...(area ? { service_area: area } : {}),
                     })
                   }
                 >
@@ -366,6 +423,7 @@ export function TicketDetail() {
             </div>
           ) : ticket.installer_id || ticket.montage_date ? (
             <p>
+              <AreaBadge area={ticket.service_area} />{' '}
               {displayName(byId[ticket.installer_id ?? ''])}
               {ticket.montage_date && <> · {formatDay(ticket.montage_date)}</>}
               {ticket.montage_time && <> · {formatTime(ticket.montage_time)} Uhr</>}
@@ -392,7 +450,10 @@ export function TicketDetail() {
                 <button
                   className="primary"
                   disabled={busy || !report.trim()}
-                  onClick={() => update({ work_report: report, status: 'abgeschlossen' })}
+                  onClick={() => {
+                    if (!ticket.signature_path && !confirm('Es gibt noch keine Kundenunterschrift. Trotzdem als erledigt melden?')) return
+                    update({ work_report: report, status: 'abgeschlossen' })
+                  }}
                 >
                   Erledigt melden
                 </button>
@@ -402,6 +463,47 @@ export function TicketDetail() {
             <p className="pre">{ticket.work_report}</p>
           ) : (
             <p className="muted">Noch kein Bericht.</p>
+          )}
+        </section>
+      )}
+
+      {einsatz && (
+        <section className="card">
+          <h2>Kundenunterschrift</h2>
+          {ticket.signature_path ? (
+            <>
+              {signatureUrl && <img className="signature-img" src={signatureUrl} alt="Unterschrift des Kunden" />}
+              <p className="small">
+                {ticket.signer_name}
+                {ticket.signed_at && <span className="muted"> · {formatDate(ticket.signed_at)}</span>}
+              </p>
+              {isAdmin && (
+                <button className="link" disabled={busy} onClick={() => update({ signature_path: null })}>
+                  Unterschrift entfernen
+                </button>
+              )}
+            </>
+          ) : canSign && signing ? (
+            <div className="form">
+              <p className="muted small">Bitte das Handy dem Kunden geben und mit dem Finger unterschreiben lassen.</p>
+              <SignaturePad canvasRef={signatureCanvas} onChange={setHasInk} />
+              <label>
+                Name des Kunden *
+                <input value={signerName} maxLength={100} onChange={(e) => setSignerName(e.target.value)} placeholder="Vorname Nachname" />
+              </label>
+              <div className="actions">
+                <button disabled={busy} onClick={() => setSigning(false)}>Abbrechen</button>
+                <button className="primary" disabled={busy || !hasInk || !signerName.trim()} onClick={saveSignature}>
+                  Unterschrift speichern
+                </button>
+              </div>
+            </div>
+          ) : canSign ? (
+            <button className="primary" onClick={() => { setSigning(true); setSignerName(ticket.customer_name) }}>
+              Kunde unterschreiben lassen
+            </button>
+          ) : (
+            <p className="muted">Noch nicht unterschrieben.</p>
           )}
         </section>
       )}
@@ -516,6 +618,8 @@ export function TicketDetail() {
                 {(ev.kind === 'pruefhinweis' || ev.kind === 'loeschantrag') && <> {ev.details}</>}
                 {(ev.kind === 'auftrag' || ev.kind === 'eingeplant') && <> {ev.details || '–'}</>}
                 {ev.kind === 'erstellt' && <> ({TYPE_LABEL[ticket.ticket_type]})</>}
+                {ev.kind === 'unterschrift' && <> {ev.details}</>}
+                {ev.kind === 'bereich' && <> „{AREA_LABEL[ev.details as ServiceArea] ?? ev.details}"</>}
                 {ev.actor && <span className="muted"> · {displayName(byId[ev.actor])}</span>}
               </span>
             </li>
@@ -547,7 +651,7 @@ export function TicketDetail() {
         </section>
       ) : isAdmin ? (
         <div className="actions danger-zone">
-          <button className="danger" onClick={removeTicket}>Ticket löschen</button>
+          <button className="danger" onClick={removeTicket}>Service-Auftrag löschen</button>
         </div>
       ) : canRequestDeletion && requestingDeletion ? (
         <section className="card danger-card">

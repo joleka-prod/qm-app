@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { formatTime, ticketNo, type Ticket } from '../lib/types'
-import { TypeBadge } from './StatusBadge'
+import { AreaBadge, TypeBadge } from './StatusBadge'
 
 interface Props {
   ticket: Ticket
@@ -14,7 +14,7 @@ export function JobCard({ ticket: t, draggable, showAddress }: Props) {
   return (
     <Link
       to={`/ticket/${t.id}`}
-      className={`job job-${t.ticket_type} ${done ? 'job-done' : ''}`}
+      className={`job job-${t.ticket_type} job-area-${t.service_area} ${done ? 'job-done' : ''}`}
       draggable={draggable}
       onDragStart={(e) => {
         e.dataTransfer.setData('text/ticket-id', String(t.id))
@@ -22,7 +22,10 @@ export function JobCard({ ticket: t, draggable, showAddress }: Props) {
       }}
     >
       <div className="job-top">
-        <TypeBadge type={t.ticket_type} />
+        <span className="job-tags">
+          <AreaBadge area={t.service_area} />
+          <TypeBadge type={t.ticket_type} />
+        </span>
         <span className="job-meta">
           {done && '✓ '}
           {formatTime(t.montage_time) || ticketNo(t.id, t.ticket_type)}

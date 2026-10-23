@@ -4,7 +4,16 @@ import { useAuth } from '../auth'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { uploadPhotos } from '../lib/photos'
 import { supabase } from '../lib/supabase'
-import { TICKET_TYPES, TYPE_LABEL, displayName, type TicketType } from '../lib/types'
+import {
+  AREA_LABEL,
+  SERVICE_AREAS,
+  TICKET_TYPES,
+  TYPE_LABEL,
+  defaultArea,
+  displayName,
+  type ServiceArea,
+  type TicketType,
+} from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 
 export function NewTicket() {
@@ -21,6 +30,9 @@ export function NewTicket() {
   const [description, setDescription] = useState('')
   const [orderNumber, setOrderNumber] = useState('')
   const [positionNumber, setPositionNumber] = useState('')
+  const [area, setArea] = useState<ServiceArea | null>(
+    SERVICE_AREAS.includes(params.get('bereich') as ServiceArea) ? (params.get('bereich') as ServiceArea) : null,
+  )
   const [customer, setCustomer] = useState('')
   const [address, setAddress] = useState('')
   const [assignedTo, setAssignedTo] = useState('')
@@ -41,6 +53,7 @@ export function NewTicket() {
       .from('tickets')
       .insert({
         ticket_type: type,
+        service_area: einsatz ? (area ?? defaultArea(type)) : null,
         title: title.trim(),
         description: description.trim(),
         order_number: orderNumber.trim(),
@@ -55,14 +68,14 @@ export function NewTicket() {
       .select('id')
       .single()
     if (error || !data) {
-      setError(error?.message ?? 'Ticket konnte nicht angelegt werden.')
+      setError(error?.message ?? 'Service-Auftrag konnte nicht angelegt werden.')
       setBusy(false)
       return
     }
     try {
       await uploadPhotos(data.id, files)
     } catch (err) {
-      alert(`Ticket wurde angelegt, aber nicht alle Fotos konnten hochgeladen werden: ${(err as Error).message}`)
+      alert(`Service-Auftrag wurde angelegt, aber nicht alle Fotos konnten hochgeladen werden: ${(err as Error).message}`)
     }
     navigate(`/ticket/${data.id}`, { replace: true })
   }
@@ -106,6 +119,21 @@ export function NewTicket() {
       </div>
       {einsatz && (
         <>
+          <div className="field">
+            <span>Bereich</span>
+            <div className="segmented two">
+              {SERVICE_AREAS.map((a) => (
+                <button
+                  type="button"
+                  key={a}
+                  className={(area ?? defaultArea(type)) === a ? 'active' : ''}
+                  onClick={() => setArea(a)}
+                >
+                  {AREA_LABEL[a]}
+                </button>
+              ))}
+            </div>
+          </div>
           <label>
             Kunde
             <input value={customer} maxLength={150} onChange={(e) => setCustomer(e.target.value)} />

@@ -1,5 +1,6 @@
 export type Role = 'mitarbeiter' | 'teamleiter' | 'monteur' | 'admin'
 export type TicketType = 'qm' | 'restarbeit' | 'beanstandung' | 'reparatur'
+export type ServiceArea = 'kundendienst' | 'montage'
 export type TicketStatus = 'neu' | 'zugewiesen' | 'in_bearbeitung' | 'zur_pruefung' | 'abgeschlossen'
 
 export interface Profile {
@@ -24,6 +25,10 @@ export interface Ticket {
   customer_name: string
   site_address: string
   work_report: string
+  service_area: ServiceArea | null
+  signature_path: string | null
+  signer_name: string
+  signed_at: string | null
   status: TicketStatus
   created_by: string
   assigned_to: string | null
@@ -90,6 +95,17 @@ const TYPE_PREFIX: Record<TicketType, string> = {
   restarbeit: 'RA',
   beanstandung: 'BE',
   reparatur: 'RP',
+}
+
+export const AREA_LABEL: Record<ServiceArea, string> = {
+  kundendienst: 'Kundendienst',
+  montage: 'Montage',
+}
+
+export const SERVICE_AREAS = Object.keys(AREA_LABEL) as ServiceArea[]
+
+export function defaultArea(type: TicketType): ServiceArea {
+  return type === 'restarbeit' ? 'montage' : 'kundendienst'
 }
 
 export const TICKET_TYPES = Object.keys(TYPE_LABEL) as TicketType[]

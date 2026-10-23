@@ -2,7 +2,18 @@ import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react
 import { Link } from 'react-router-dom'
 import { JobCard } from '../components/JobCard'
 import { supabase } from '../lib/supabase'
-import { addDays, displayName, formatDay, isoDate, startOfWeek, weekNumber, type Ticket } from '../lib/types'
+import {
+  AREA_LABEL,
+  SERVICE_AREAS,
+  addDays,
+  displayName,
+  formatDay,
+  isoDate,
+  startOfWeek,
+  weekNumber,
+  type ServiceArea,
+  type Ticket,
+} from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 
 const DAYS = 6 // Montag bis Samstag
@@ -19,6 +30,7 @@ export function PlanningCalendar() {
   const [unplanned, setUnplanned] = useState<Ticket[]>([])
   const [error, setError] = useState('')
   const [dropTarget, setDropTarget] = useState('')
+  const [areaFilter, setAreaFilter] = useState<ServiceArea | ''>('')
 
   const days = useMemo(() => Array.from({ length: DAYS }, (_, i) => isoDate(addDays(weekStart, i))), [weekStart])
   const today = isoDate(new Date())
@@ -68,7 +80,10 @@ export function PlanningCalendar() {
   }
 
   const cell = (installerId: string, date: string) =>
-    planned.filter((t) => t.installer_id === installerId && t.montage_date === date).sort(byTime)
+    planned
+      .filter((t) => t.installer_id === installerId && t.montage_date === date)
+      .filter((t) => !areaFilter || t.service_area === areaFilter)
+      .sort(byTime)
 
   return (
     <div className="calendar-page">
@@ -79,6 +94,19 @@ export function PlanningCalendar() {
           <button onClick={() => setWeekStart(startOfWeek(new Date()))}>KW {weekNumber(weekStart)}</button>
           <button onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Nächste Woche">→</button>
         </div>
+      </div>
+      <div className="segmented three area-filter" role="radiogroup" aria-label="Bereich">
+        {(['', ...SERVICE_AREAS] as const).map((a) => (
+          <button
+            key={a || 'alle'}
+            role="radio"
+            aria-checked={areaFilter === a}
+            className={`${areaFilter === a ? 'active' : ''} ${a ? `area-btn-${a}` : ''}`}
+            onClick={() => setAreaFilter(a)}
+          >
+            {a ? AREA_LABEL[a] : 'Alle'}
+          </button>
+        ))}
       </div>
       {error && <p className="error">{error}</p>}
       {installers.length === 0 && (
@@ -118,7 +146,7 @@ export function PlanningCalendar() {
                       ))}
                       <Link
                         className="cal-add"
-                        to={`/neu?art=restarbeit&monteur=${m.id}&datum=${d}`}
+                        to={`/neu?art=${areaFilter === 'kundendienst' ? 'reparatur' : 'restarbeit'}&monteur=${m.id}&datum=${d}${areaFilter ? `&bereich=${areaFilter}` : ''}`}
                         aria-label={`Neuer Einsatz für ${displayName(m)} am ${d}`}
                       >
                         +
@@ -141,7 +169,7 @@ export function PlanningCalendar() {
           Am PC: Einsatz in den Kalender ziehen. Am Handy: Einsatz öffnen und unter „Einsatzplanung“ Monteur und Datum wählen.
         </p>
         <div className="unplanned-list">
-          {unplanned.map((t) => (
+          {unplanned.filter((t) => !areaFilter || t.service_area === areaFilter).map((t) => (
             <div key={t.id}>
               <JobCard ticket={t} draggable />
               {t.installer_id && <div className="muted small">nur Monteur: {displayName(byId[t.installer_id])}</div>}

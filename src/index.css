@@ -237,3 +237,28 @@ fieldset.plan label { display: flex; flex-direction: column; gap: 0.3rem; font-w
 .agenda-jobs { display: flex; flex-direction: column; gap: 0.4rem; }
 .agenda-jobs .job { font-size: 0.95rem; padding: 0.6rem 0.7rem; margin: 0; }
 .content.wide { max-width: 1240px; }
+
+/* --- Bereich Kundendienst / Montage --- */
+.segmented.two { grid-template-columns: repeat(2, 1fr); }
+.segmented.three { grid-template-columns: repeat(3, 1fr); }
+@media (min-width: 700px) { .segmented.two { grid-template-columns: repeat(2, minmax(0, 12rem)); } .segmented.three { grid-template-columns: repeat(3, minmax(0, 10rem)); } }
+.area-filter { margin-bottom: 0.75rem; }
+.area-tag { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 0.05rem 0.4rem; border-radius: 4px; vertical-align: middle; }
+.area-kundendienst { background: #d1e9ff; color: #175cd3; }
+.area-montage { background: #ebe9fe; color: #5925dc; }
+.segmented button.active.area-btn-kundendienst { background: #175cd3; border-color: #175cd3; }
+.segmented button.active.area-btn-montage { background: #5925dc; border-color: #5925dc; }
+.job-area-kundendienst { background: #f5faff; }
+.job-area-montage { background: #f8f7ff; }
+@media (prefers-color-scheme: dark) {
+  .job-area-kundendienst { background: #16243a; }
+  .job-area-montage { background: #221d3a; }
+}
+.job-tags { display: inline-flex; gap: 0.2rem; flex-wrap: wrap; }
+
+/* --- Unterschrift --- */
+.signature-pad { position: relative; }
+.signature-pad canvas { display: block; width: 100%; height: 200px; border: 1px solid var(--border); border-radius: 8px; background: #fff; touch-action: none; }
+.signature-line { position: absolute; left: 1rem; right: 1rem; top: 150px; border-top: 1px solid #98a2b3; font-size: 0.7rem; color: #98a2b3; padding-top: 0.15rem; pointer-events: none; }
+.signature-pad .link { margin-top: 0.3rem; }
+.signature-img { display: block; max-width: 100%; width: 360px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }

@@ -28,6 +28,13 @@ export async function uploadPhotos(ticketId: number, files: File[]) {
   }
 }
 
+export async function uploadSignature(ticketId: number, png: Blob) {
+  const path = `${ticketId}/unterschrift-${crypto.randomUUID()}.png`
+  const { error } = await supabase.storage.from(BUCKET).upload(path, png, { contentType: 'image/png' })
+  if (error) throw error
+  return path
+}
+
 export async function signedUrls(paths: string[]) {
   if (paths.length === 0) return {}
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrls(paths, 60 * 60)

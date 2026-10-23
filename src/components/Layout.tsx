@@ -9,15 +9,15 @@ export function Layout() {
   return (
     <div className="app">
       <header className="topbar">
-        <NavLink to="/" className="brand">QM-Tickets</NavLink>
+        <NavLink to="/" className="brand">JOLEKA Service Dashboard</NavLink>
         <nav>
           {profile?.role === 'monteur' ? (
             <>
               <NavLink to="/" end>Mein Kalender</NavLink>
-              <NavLink to="/tickets">Tickets</NavLink>
+              <NavLink to="/tickets">Service-Aufträge</NavLink>
             </>
           ) : (
-            <NavLink to="/" end>Tickets</NavLink>
+            <NavLink to="/" end>Service-Aufträge</NavLink>
           )}
           {(profile?.role === 'admin' || profile?.role === 'teamleiter') && <NavLink to="/kalender">Kalender</NavLink>}
           {profile?.role === 'admin' && <NavLink to="/benutzer">Benutzer</NavLink>}

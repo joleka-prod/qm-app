@@ -201,6 +201,37 @@ await check('Monteur kann Termin nicht verschieben', async () => {
   assert.ok(error)
 })
 
+await check('Bereich: Restarbeit ist standardmäßig Montage, Monteur kann ihn nicht ändern', async () => {
+  const { data } = await qm.c.from('tickets').select('service_area').eq('id', jobId).single()
+  assert.equal(data.service_area, 'montage')
+  await m1.c.from('tickets').update({ service_area: 'kundendienst' }).eq('id', jobId)
+  const { data: after } = await qm.c.from('tickets').select('service_area').eq('id', jobId).single()
+  assert.equal(after.service_area, 'montage')
+  const r = await lead2.c.from('tickets').update({ service_area: 'kundendienst' }).eq('id', jobId).select().single()
+  assert.ifError(r.error)
+  assert.equal(r.data.service_area, 'kundendienst')
+})
+
+await check('Unterschrift braucht Namen und richtigen Ablageort', async () => {
+  let r = await m1.c.from('tickets').update({ signature_path: `${jobId}/unterschrift-a.png` }).eq('id', jobId)
+  assert.ok(r.error)
+  r = await m1.c.from('tickets').update({ signature_path: `999999/unterschrift-a.png`, signer_name: 'Herr Müller' }).eq('id', jobId)
+  assert.ok(r.error)
+})
+
+await check('Monteur speichert Kundenunterschrift', async () => {
+  const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082', 'hex')
+  const path = `${jobId}/unterschrift-test.png`
+  const up = await m1.c.storage.from('ticket-photos').upload(path, png, { contentType: 'image/png' })
+  assert.ifError(up.error)
+  const { data, error } = await m1.c.from('tickets').update({ signature_path: path, signer_name: ' Herr Müller ' }).eq('id', jobId).select().single()
+  assert.ifError(error)
+  assert.equal(data.signer_name, 'Herr Müller')
+  assert.ok(data.signed_at)
+  const { data: photos } = await m1.c.from('ticket_photos').select('id').eq('ticket_id', jobId)
+  assert.equal(photos.length, 0)
+})
+
 await check('Erledigt nur mit Arbeitsbericht', async () => {
   const { error } = await m1.c.from('tickets').update({ status: 'abgeschlossen' }).eq('id', jobId)
   assert.ok(error)
@@ -221,6 +252,11 @@ await check('Monteur lädt Foto hoch und meldet erledigt', async () => {
   assert.ok(data.closed_at)
 })
 
+await check('Unterschrift nach Erledigt für Monteur gesperrt', async () => {
+  const { error } = await m1.c.from('tickets').update({ signature_path: null }).eq('id', jobId)
+  assert.ok(error)
+})
+
 await check('Erledigter Einsatz ist für Monteur gesperrt, Admin öffnet wieder', async () => {
   const { error } = await m1.c.from('tickets').update({ work_report: 'y' }).eq('id', jobId)
   assert.ok(error)
@@ -238,7 +274,7 @@ await check('Planung entfernen setzt Einsatz auf ungeplant', async () => {
 await check('Einsatz-Verlauf enthält Planung und Bericht', async () => {
   const { data } = await qm.c.from('ticket_events').select('kind').eq('ticket_id', jobId)
   const kinds = data.map((e) => e.kind)
-  for (const k of ['erstellt', 'eingeplant', 'bericht', 'status']) assert.ok(kinds.includes(k), k)
+  for (const k of ['erstellt', 'eingeplant', 'bericht', 'status', 'unterschrift', 'bereich']) assert.ok(kinds.includes(k), k)
 })
 
 await check('QM-Ticket ignoriert Monteur-Felder', async () => {

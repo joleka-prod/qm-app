@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth'
-import { StatusBadge, TypeBadge } from '../components/StatusBadge'
+import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { supabase } from '../lib/supabase'
 import {
   STATUS_LABEL,
@@ -69,7 +69,7 @@ export function TicketList() {
   return (
     <div>
       <div className="page-head">
-        <h1>Tickets</h1>
+        <h1>Service-Aufträge</h1>
         <Link to="/neu" className="button primary">+ Neu</Link>
       </div>
       <div className="filters">
@@ -93,7 +93,7 @@ export function TicketList() {
       {loading ? (
         <p className="muted">Lädt…</p>
       ) : visible.length === 0 ? (
-        <p className="muted">Keine Tickets gefunden.</p>
+        <p className="muted">Keine Service-Aufträge gefunden.</p>
       ) : (
         <ul className="ticket-list">
           {visible.map((t) => (
@@ -101,7 +101,7 @@ export function TicketList() {
               <Link to={`/ticket/${t.id}`} className="card ticket-row">
                 <div className="ticket-row-top">
                   <span className="ticket-no">
-                    {ticketNo(t.id, t.ticket_type)} <TypeBadge type={t.ticket_type} />
+                    {ticketNo(t.id, t.ticket_type)} <TypeBadge type={t.ticket_type} /> <AreaBadge area={t.service_area} />
                   </span>
                   <span className="badges">
                     {deletionIds.has(t.id) && <span className="badge badge-loeschung">Löschung beantragt</span>}

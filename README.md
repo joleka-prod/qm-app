@@ -1,4 +1,4 @@
-# QM-Tickets
+# JOLEKA Service Dashboard
 
 Web-App für das Qualitätsmanagement. Läuft im Browser auf PC und Handy und lässt sich auf dem Handy wie eine App auf den Startbildschirm legen.
 

@@ -33,7 +33,7 @@ export function Login() {
   return (
     <div className="auth-page">
       <form className="card auth-card" onSubmit={submit}>
-        <h1>QM-Tickets</h1>
+        <h1>JOLEKA Service Dashboard</h1>
         <label>
           E-Mail
           <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -52,7 +52,7 @@ export function Login() {
         {info && <p className="info">{info}</p>}
         <button className="primary" disabled={busy}>Anmelden</button>
         <button type="button" className="link" onClick={forgot}>Passwort vergessen?</button>
-        <p className="muted small">Zugang erhältst du per Einladung von der QM-Abteilung.</p>
+        <p className="muted small">Zugangsdaten erhältst du von der Verwaltung.</p>
       </form>
     </div>
   )

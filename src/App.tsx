@@ -19,7 +19,7 @@ function Routed() {
   if (!session) return <Login />
   if (needsPassword) return <SetPassword />
   if (!profile) return <p className="center muted">Profil wird geladen…</p>
-  if (!profile.active) return <p className="center">Dein Zugang ist deaktiviert. Bitte wende dich an die QM-Abteilung.</p>
+  if (!profile.active) return <p className="center">Dein Zugang ist deaktiviert. Bitte wende dich an die Verwaltung.</p>
 
   const isPlanner = profile.role === 'admin' || profile.role === 'teamleiter'
 

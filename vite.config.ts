@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'QM-Tickets',
-        short_name: 'QM',
-        description: 'Qualitätsmeldungen erfassen und bearbeiten',
+        name: 'JOLEKA Service Dashboard',
+        short_name: 'JOLEKA Service',
+        description: 'Service-Aufträge, QM und Monteurplanung',
         lang: 'de',
         theme_color: '#1d4ed8',
         background_color: '#f4f6f9',
