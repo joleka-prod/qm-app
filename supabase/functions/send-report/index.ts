@@ -159,11 +159,12 @@ Deno.serve(async (req) => {
   }
   if (!apiKey || !from) return fail('E-Mail-Versand ist noch nicht eingerichtet (RESEND_API_KEY / MAIL_FROM fehlen).')
 
-  const [{ data: positions }, { data: photos }, { data: profiles }, { data: team }] = await Promise.all([
+  const [{ data: positions }, { data: photos }, { data: profiles }, { data: team }, { data: times }] = await Promise.all([
     admin.from('ticket_positions').select('*').eq('ticket_id', t.id).order('sort').order('id'),
     admin.from('ticket_photos').select('*').eq('ticket_id', t.id).order('created_at'),
     admin.from('profiles').select('id, full_name, email'),
     admin.from('teams').select('name').eq('id', t.team_id ?? 0).maybeSingle(),
+    admin.from('time_entries').select('installer_id, started_at, ended_at').eq('ticket_id', t.id).order('started_at'),
   ])
   const name = (id: string | null) => {
     const p = profiles?.find((x) => x.id === id)
@@ -226,6 +227,24 @@ Deno.serve(async (req) => {
       if (p.state === 'nicht_erledigt' && p.reason) w.text(`Begründung: ${p.reason}`, { size: 10, indent: 12 })
       await drawPhotos((photos ?? []).filter((f) => f.position_id === p.id), 12)
       w.y -= 4
+    }
+  }
+
+  // Arbeitszeit am Auftrag: erster Beginn, letztes Ende, Summe und die einzelnen Zeiten
+  if (times?.length) {
+    const end = (e: { started_at: string; ended_at: string | null }) => e.ended_at ?? t.closed_at ?? new Date().toISOString()
+    const minutes = (e: { started_at: string; ended_at: string | null }) =>
+      Math.max(0, Math.round((new Date(end(e)).getTime() - new Date(e.started_at).getTime()) / 60000))
+    const hours = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')} h`
+    const clock = (iso: string) => new Date(iso).toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' })
+    const total = times.reduce((a, e) => a + minutes(e), 0)
+    const last = times.map(end).sort().at(-1)!
+    w.heading('Arbeitszeit')
+    w.text(`Arbeitsbeginn: ${fmtDate(times[0].started_at)}`, { size: 10 })
+    w.text(`Arbeitsende: ${fmtDate(last)}`, { size: 10 })
+    w.text(`Gesamtarbeitszeit: ${hours(total)}`, { size: 10, bold: true, gap: 6 })
+    for (const e of times) {
+      w.text(`${fmtDate(e.started_at)} – ${clock(end(e))}  ${name(e.installer_id)}  (${hours(minutes(e))})`, { size: 9, indent: 12, color: grey })
     }
   }
 

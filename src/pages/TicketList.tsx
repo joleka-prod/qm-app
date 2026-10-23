@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
+import { minutesOf } from '../components/TimeCard'
+import { formatMinutes } from '../lib/clock'
 import { supabase } from '../lib/supabase'
 import { useTeams } from '../lib/teams'
 import {
@@ -42,7 +44,7 @@ export function TicketList() {
       .then(({ data }) => setDeletionIds(new Set((data ?? []).map((d) => d.ticket_id as number))))
     supabase
       .from('tickets')
-      .select('*, ticket_positions(count)')
+      .select('*, ticket_positions(count), time_entries(started_at, ended_at)')
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         setTickets((data ?? []) as Ticket[])
@@ -180,6 +182,12 @@ export function TicketList() {
                 )}
                 {!!t.ticket_positions?.[0]?.count && (
                   <div className="small muted">{t.ticket_positions[0].count} Position(en)</div>
+                )}
+                {!!t.time_entries?.length && (
+                  <div className="small">
+                    Arbeitszeit {formatMinutes(t.time_entries.reduce((a, e) => a + minutesOf(e), 0))}
+                    {t.time_entries.some((e) => !e.ended_at) && <span className="time-running"> · läuft</span>}
+                  </div>
                 )}
                 {t.team_id && t.montage_date && (
                   <div className="small plan-line">

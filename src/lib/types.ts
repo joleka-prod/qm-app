@@ -50,6 +50,7 @@ export interface Ticket {
   appointment_confirmed_at: string | null
   // nur gefüllt, wenn mit select('*, ticket_positions(count)') geladen
   ticket_positions?: { count: number }[]
+  time_entries?: { started_at: string; ended_at: string | null }[]
   status: TicketStatus
   created_by: string
   assigned_to: string | null

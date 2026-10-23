@@ -24,6 +24,18 @@ export function minutesOf(e: Pick<TimeEntry, 'started_at' | 'ended_at'>, now = D
   return Math.max(0, Math.round((end - new Date(e.started_at).getTime()) / 60000))
 }
 
+// Erster Beginn und letztes Ende aller Zeiten eines Auftrags
+export function workSpan(list: Pick<TimeEntry, 'started_at' | 'ended_at'>[]) {
+  let start: string | null = null
+  let end: string | null = null
+  let running = false
+  for (const e of list) {
+    if (!start || e.started_at < start) start = e.started_at
+    if (!e.ended_at) running = true
+    else if (!end || e.ended_at > end) end = e.ended_at
+  }
+  return { start, end, running }
+}
 
 function clockAt(iso: string) {
   return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
@@ -109,6 +121,7 @@ export function TimeCard({ ticket, me, isInstaller, isPlanner, isAdmin, byId }: 
   const runningHere = running?.ticket_id === ticket.id
   const totals = { fahrt: 0, arbeit: 0 } as Record<TimeKind, number>
   for (const e of entries) totals[e.kind] += minutesOf(e, now)
+  const span = workSpan(entries)
 
   if (!isInstaller && !isPlanner && entries.length === 0) return null
 
@@ -150,6 +163,11 @@ export function TimeCard({ ticket, me, isInstaller, isPlanner, isAdmin, byId }: 
         <p className="muted small">Noch keine Zeiten erfasst.</p>
       ) : (
         <>
+          <dl className="time-summary">
+            <div><dt>Arbeitsbeginn</dt><dd>{span.start ? formatDate(span.start) : '–'}</dd></div>
+            <div><dt>Arbeitsende</dt><dd>{span.running ? 'läuft noch' : span.end ? formatDate(span.end) : '–'}</dd></div>
+            <div><dt>Gesamtarbeitszeit</dt><dd>{formatMinutes(totals.fahrt + totals.arbeit)}</dd></div>
+          </dl>
           <ul className="time-list">
             {entries.map((e) =>
               edit?.id === e.id ? (

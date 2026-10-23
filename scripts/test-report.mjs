@@ -72,6 +72,10 @@ await check('Monteur erledigt Auftrag mit Unterschrift und E-Mail-Wunsch', async
   assert.equal(r.data.report_sent_at, null)
   await m1.c.from('ticket_positions').update({ state: 'erledigt' }).eq('id', pos[0].id)
   await m1.c.from('ticket_positions').update({ state: 'nicht_erledigt', reason: 'Griff nicht lieferbar' }).eq('id', pos[1].id)
+  await admin.from('time_entries').insert([
+    { ticket_id: job.id, installer_id: m1.id, kind: 'arbeit', started_at: '2026-11-02T07:30:00Z', ended_at: '2026-11-02T09:15:00Z' },
+    { ticket_id: job.id, installer_id: m1.id, kind: 'arbeit', started_at: '2026-11-02T09:45:00Z', ended_at: '2026-11-02T11:00:00Z' },
+  ])
   r = await m1.c.from('tickets').update({ work_report: 'Dichtung getauscht.\nGriff folgt.', status: 'abgeschlossen' }).eq('id', job.id).select().single()
   assert.ifError(r.error)
 })
