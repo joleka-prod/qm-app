@@ -39,7 +39,7 @@ export function DistanceLine({ ticket, onChanged }: { ticket: Ticket; onChanged:
 
   return (
     <p className="distance small">
-      <span>Fahrstrecke ab Hauptstandort (hin und zurück): </span>
+      <span>Fahrstrecke ab Kalenborn-Scheuern (hin und zurück): </span>
       {busy || (stale && !error) ? (
         <span className="muted">wird berechnet…</span>
       ) : ticket.distance_km != null ? (
