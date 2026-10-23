@@ -1,7 +1,7 @@
 // Berechnet bei Beanstandungen die Fahrstrecke vom Hauptstandort zur Kundenadresse (Hin- und Rückweg)
-// und speichert sie am Auftrag. Adressen werden über OpenStreetMap (Nominatim) gefunden, die Strecke
-// über OSRM berechnet; beides ist kostenlos und braucht keinen Schlüssel.
-// Optional: ORIGIN_ADDRESS (Standard: Hauptstandort), NOMINATIM_URL und OSRM_URL (nur für Tests).
+// und speichert sie am Auftrag. Adressen werden über OpenStreetMap-Daten gefunden (Photon, ersatzweise
+// Nominatim), die Strecke über OSRM (ersatzweise der OSRM-Server der FOSSGIS). Alles kostenlos, ohne Schlüssel.
+// Optional: ORIGIN_ADDRESS (Standard: Hauptstandort), PHOTON_URL, NOMINATIM_URL, OSRM_URL, OSRM_URL_2 (Tests).
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const cors = {
@@ -11,8 +11,12 @@ const cors = {
 }
 
 const ORIGIN = Deno.env.get('ORIGIN_ADDRESS') ?? 'Hauptstraße 2, 54570 Kalenborn-Scheuern'
+const PHOTON = Deno.env.get('PHOTON_URL') ?? 'https://photon.komoot.io'
 const NOMINATIM = Deno.env.get('NOMINATIM_URL') ?? 'https://nominatim.openstreetmap.org'
-const OSRM = Deno.env.get('OSRM_URL') ?? 'https://router.project-osrm.org'
+const OSRM = [
+  Deno.env.get('OSRM_URL') ?? 'https://router.project-osrm.org/route/v1/driving',
+  Deno.env.get('OSRM_URL_2') ?? 'https://routing.openstreetmap.de/routed-car/route/v1/driving',
+]
 const AGENT = 'JOLEKA-Service-Dashboard/1.0'
 
 function reply(status: number, body: Record<string, unknown>) {
@@ -24,23 +28,45 @@ function reply(status: number, body: Record<string, unknown>) {
 
 type Point = { lat: string; lon: string }
 
+// Erst Photon (bevorzugt Treffer rund um die Eifel), sonst Nominatim. null = Adresse nicht gefunden
 async function geocode(address: string): Promise<Point | null> {
-  const url = `${NOMINATIM}/search?format=json&limit=1&countrycodes=de,lu,be,nl,fr&q=${encodeURIComponent(address)}`
-  const res = await fetch(url, { headers: { 'User-Agent': AGENT, 'Accept-Language': 'de' } })
-  if (!res.ok) throw new Error(`Adresssuche nicht erreichbar (${res.status})`)
-  const list = (await res.json()) as Point[]
-  return list[0] ?? null
+  const headers = { 'User-Agent': AGENT, 'Accept-Language': 'de' }
+  let status = 0
+  try {
+    const res = await fetch(`${PHOTON}/api/?limit=1&lang=de&lat=50.2&lon=6.8&q=${encodeURIComponent(address)}`, { headers })
+    status = res.status
+    if (res.ok) {
+      const data = await res.json()
+      const c = data.features?.[0]?.geometry?.coordinates
+      if (c) return { lon: String(c[0]), lat: String(c[1]) }
+    }
+  } catch {
+    // weiter mit Nominatim
+  }
+  const res = await fetch(`${NOMINATIM}/search?format=json&limit=1&countrycodes=de,lu,be,nl,fr&q=${encodeURIComponent(address)}`, { headers })
+  if (res.ok) return ((await res.json()) as Point[])[0] ?? null
+  if (status === 200) return null
+  throw new Error(`Adresssuche nicht erreichbar (${status || '-'} / ${res.status})`)
 }
 
 // Einfache Strecke in Metern
 async function route(a: Point, b: Point) {
-  const res = await fetch(`${OSRM}/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=false`, {
-    headers: { 'User-Agent': AGENT },
-  })
-  if (!res.ok) throw new Error(`Routenberechnung nicht erreichbar (${res.status})`)
-  const data = await res.json()
-  if (data.code !== 'Ok' || !data.routes?.length) throw new Error('Keine Route zur Kundenadresse gefunden.')
-  return data.routes[0].distance as number
+  let last = ''
+  for (const base of OSRM) {
+    try {
+      const res = await fetch(`${base}/${a.lon},${a.lat};${b.lon},${b.lat}?overview=false`, { headers: { 'User-Agent': AGENT } })
+      if (!res.ok) {
+        last = String(res.status)
+        continue
+      }
+      const data = await res.json()
+      if (data.code === 'Ok' && data.routes?.length) return data.routes[0].distance as number
+      last = data.code
+    } catch (e) {
+      last = e instanceof Error ? e.message : 'Fehler'
+    }
+  }
+  throw new Error(`Keine Route zur Kundenadresse gefunden (${last}).`)
 }
 
 Deno.serve(async (req) => {
