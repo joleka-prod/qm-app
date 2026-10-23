@@ -36,6 +36,13 @@ export function Timesheet() {
   const isPlanner = profile?.role === 'admin' || profile?.role === 'teamleiter'
   const isAdmin = profile?.role === 'admin'
   const today = isoDate(new Date())
+  // Vorgesetzte sehen die Zeiten ihrer Mitarbeiter (auch über mehrere Ebenen)
+  const isAbove = (id: string) => {
+    let up = byId[id]?.supervisor_id
+    for (let i = 0; up && i < 10; i++, up = byId[up]?.supervisor_id) if (up === profile?.id) return true
+    return false
+  }
+  const choices = isPlanner ? staff : staff.filter((p) => p.id === profile?.id || isAbove(p.id))
 
   const [installerId, setInstallerId] = useState(profile?.id ?? '')
   const [month, setMonth] = useState(today.slice(0, 7))
@@ -162,16 +169,19 @@ export function Timesheet() {
         </div>
       </div>
 
-      {isPlanner && (
+      {choices.length > 1 && (
         <div className="filters">
           <select value={installerId} onChange={(e) => { setEdit(null); setInstallerId(e.target.value) }} aria-label="Mitarbeiter">
-            {staff.map((p) => (
+            {choices.map((p) => (
               <option key={p.id} value={p.id}>{displayName(p)}</option>
             ))}
           </select>
         </div>
       )}
 
+      {byId[installerId]?.supervisor_id && (
+        <p className="small">Vorgesetzte(r): {displayName(byId[byId[installerId].supervisor_id!])}</p>
+      )}
       <p className="muted small">
         Die Arbeitszeit kommt aus Start und Stopp der Zeiterfassung oben. „Aufträge“ zeigt die Zeit, die auf
         Aufträge gebucht wurde.{canCorrect && ' Fehlende oder falsche Zeiten kannst du hier korrigieren oder nachtragen.'}

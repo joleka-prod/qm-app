@@ -2,14 +2,14 @@ import { useState, type FormEvent } from 'react'
 import { useAuth } from '../auth'
 import { createUser, generatePassword, setPassword, updateEmail } from '../lib/adminUsers'
 import { supabase } from '../lib/supabase'
-import { ROLE_LABEL, type Profile, type Role } from '../lib/types'
+import { ROLE_LABEL, displayName, type Profile, type Role } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 
 const ROLES = Object.keys(ROLE_LABEL) as Role[]
 
 export function Users() {
   const { profile: me } = useAuth()
-  const { profiles, reload } = useProfiles()
+  const { profiles, byId, reload } = useProfiles()
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -20,12 +20,12 @@ export function Users() {
   const [password, setPw] = useState(generatePassword)
   const [busy, setBusy] = useState(false)
 
-  const [edit, setEdit] = useState<{ id: string; full_name: string; email: string; role: Role; active: boolean } | null>(null)
+  const [edit, setEdit] = useState<{ id: string; full_name: string; email: string; role: Role; active: boolean; supervisor_id: string } | null>(null)
 
   function startEdit(p: Profile) {
     setError('')
     setNotice('')
-    setEdit({ id: p.id, full_name: p.full_name, email: p.email, role: p.role, active: p.active })
+    setEdit({ id: p.id, full_name: p.full_name, email: p.email, role: p.role, active: p.active, supervisor_id: p.supervisor_id ?? '' })
   }
 
   async function saveEdit(e: FormEvent, p: Profile) {
@@ -39,6 +39,7 @@ export function Users() {
       if (edit.full_name.trim() !== p.full_name) change.full_name = edit.full_name.trim()
       if (edit.role !== p.role) change.role = edit.role
       if (edit.active !== p.active) change.active = edit.active
+      if ((edit.supervisor_id || null) !== p.supervisor_id) change.supervisor_id = edit.supervisor_id || null
       if (Object.keys(change).length > 0) {
         const { error } = await supabase.from('profiles').update(change).eq('id', p.id)
         if (error) throw error
@@ -158,6 +159,17 @@ export function Users() {
                     ))}
                   </select>
                 </label>
+                <label>
+                  Verantwortliche(r) Vorgesetzte(r)
+                  <select value={edit.supervisor_id} onChange={(e) => setEdit({ ...edit, supervisor_id: e.target.value })}>
+                    <option value="">– keine(r) –</option>
+                    {profiles
+                      .filter((o) => o.id !== p.id && (o.active || o.id === p.supervisor_id))
+                      .map((o) => (
+                        <option key={o.id} value={o.id}>{displayName(o)}</option>
+                      ))}
+                  </select>
+                </label>
                 <label className="checkbox-row">
                   <input
                     type="checkbox"
@@ -185,6 +197,9 @@ export function Users() {
                 <div className="small">
                   {ROLE_LABEL[p.role]}
                   {!p.active && <span className="muted"> · deaktiviert</span>}
+                </div>
+                <div className="small muted">
+                  Vorgesetzte(r): {p.supervisor_id ? displayName(byId[p.supervisor_id]) : '–'}
                 </div>
               </div>
               <div className="user-controls">

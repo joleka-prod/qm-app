@@ -829,6 +829,27 @@ await check('Fahrstrecke: nur über den Service-Schlüssel, Adressänderung lös
   assert.equal(r.data.distance_address, '')
 })
 
+await check('Vorgesetzter: nur Admin setzt ihn, keine Kreise, Vorgesetzter sieht Zeiten', async () => {
+  let r = await worker.c.from('profiles').update({ supervisor_id: lead.id }).eq('id', worker.id)
+  assert.match(r.error?.message ?? '', /Nur Admins/)
+  r = await qm.c.from('profiles').update({ supervisor_id: lead.id }).eq('id', worker.id)
+  assert.ifError(r.error)
+  r = await qm.c.from('profiles').update({ supervisor_id: worker.id }).eq('id', lead.id)
+  assert.match(r.error?.message ?? '', /Kreis/)
+  r = await qm.c.from('profiles').update({ supervisor_id: other.id }).eq('id', other.id)
+  assert.ok(r.error)
+  // other ist Vorgesetzter von m4 und sieht dessen Stempelzeiten, worker nicht
+  await qm.c.from('profiles').update({ supervisor_id: other.id }).eq('id', m4.id)
+  await admin.from('attendance').insert({ installer_id: m4.id, started_at: '2026-10-01T06:00:00Z', ended_at: '2026-10-01T14:00:00Z' })
+  const seen = await other.c.from('attendance').select('id').eq('installer_id', m4.id)
+  assert.ok(seen.data.length >= 1)
+  const hidden = await worker.c.from('attendance').select('id').eq('installer_id', m4.id)
+  assert.equal(hidden.data.length, 0)
+  const { data: up } = await other.c.rpc('is_supervisor_of', { p_user: m4.id })
+  assert.equal(up, true)
+  await qm.c.from('profiles').update({ supervisor_id: null }).in('id', [worker.id, m4.id])
+})
+
 // Testteams wieder entfernen, damit sie nicht im Kalender auftauchen
 await admin.from('tickets').update({ team_id: null }).in('team_id', [T1, T2])
 await admin.from('teams').delete().in('id', [T1, T2])

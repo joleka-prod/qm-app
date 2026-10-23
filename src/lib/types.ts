@@ -11,6 +11,7 @@ export interface Profile {
   full_name: string
   role: Role
   active: boolean
+  supervisor_id: string | null
   created_at: string
 }
 
