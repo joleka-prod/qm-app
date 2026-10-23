@@ -373,6 +373,16 @@ await check('Nicht erledigt nur mit Begründung', async () => {
   assert.equal(back.data.reason, '')
 })
 
+await check('Monteur kann Position nicht zurück auf offen setzen, Teamleiter schon', async () => {
+  const r = await m1.c.from('ticket_positions').update({ state: 'offen' }).eq('id', posIds[2])
+  assert.ok(r.error)
+  const t = await lead.c.from('ticket_positions').update({ state: 'offen' }).eq('id', posIds[2]).select().single()
+  assert.ifError(t.error)
+  assert.equal(t.data.done_by, null)
+  const again = await m1.c.from('ticket_positions').update({ state: 'erledigt' }).eq('id', posIds[2]).select().single()
+  assert.ifError(again.error)
+})
+
 await check('Nach Erledigt sind Positionen für Monteur und Teamleiter gesperrt', async () => {
   const r = await m1.c.from('tickets').update({ work_report: 'fertig', status: 'abgeschlossen' }).eq('id', posJob).select().single()
   assert.ifError(r.error)

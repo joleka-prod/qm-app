@@ -464,7 +464,12 @@ export function TicketDetail() {
                             disabled={busy}
                             onClick={() => {
                               if (reasonFor === p.id) setReasonFor(null)
-                              setPositionState(p, p.state === 'erledigt' && reasonFor !== p.id ? 'offen' : 'erledigt')
+                              if (p.state === 'erledigt' && reasonFor !== p.id) {
+                                // Nur Planer dürfen eine Position wieder auf offen setzen
+                                if (canEditPositions) setPositionState(p, 'offen')
+                                return
+                              }
+                              setPositionState(p, 'erledigt')
                             }}
                           >
                             ✓ Erledigt
@@ -504,7 +509,7 @@ export function TicketDetail() {
                             />
                           </label>
                           <div className="actions">
-                            {p.state === 'nicht_erledigt' && (
+                            {p.state === 'nicht_erledigt' && canEditPositions && (
                               <button className="link" disabled={busy} onClick={() => setPositionState(p, 'offen')}>
                                 Zurück auf offen
                               </button>
@@ -657,7 +662,10 @@ export function TicketDetail() {
                 <textarea rows={4} value={report} onChange={(e) => setReport(e.target.value)} placeholder="z. B. Griff getauscht, Fenster neu eingestellt" />
               </label>
               <div className="actions">
-                <button disabled={busy || report === ticket.work_report} onClick={() => update({ work_report: report })}>
+                <button
+                  disabled={busy || report === ticket.work_report || openPositions > 0}
+                  onClick={() => update({ work_report: report })}
+                >
                   Speichern
                 </button>
                 <button
@@ -673,7 +681,8 @@ export function TicketDetail() {
               </div>
               {openPositions > 0 && (
                 <p className="muted small">
-                  Erst möglich, wenn alle Positionen als erledigt oder nicht erledigt abgehakt sind ({openPositions} offen).
+                  Speichern und Erledigt melden erst möglich, wenn alle Positionen als erledigt oder nicht erledigt
+                  abgehakt sind ({openPositions} offen).
                 </p>
               )}
             </div>
