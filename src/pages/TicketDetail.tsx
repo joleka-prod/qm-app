@@ -444,7 +444,7 @@ export function TicketDetail() {
                         <span>
                           {p.position_number && <strong>Pos. {p.position_number}</strong>}
                           {p.position_number && p.description && ' – '}
-                          {p.description}
+                          <span className="pre">{p.description}</span>
                           {p.done && p.done_by && (
                             <span className="muted small"> · erledigt von {displayName(byId[p.done_by])}</span>
                           )}

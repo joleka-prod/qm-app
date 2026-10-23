@@ -41,11 +41,12 @@ export function PositionsEditor({ positions, onChange, withPhotos }: Props) {
             value={p.position_number}
             onChange={(e) => patch(p.key, { position_number: e.target.value })}
           />
-          <input
+          <textarea
             className="pos-desc"
+            rows={Math.max(2, p.description.split('\n').length)}
             aria-label={`Beschreibung Position ${i + 1}`}
             placeholder="Was ist zu tun?"
-            maxLength={300}
+            maxLength={2000}
             value={p.description}
             onChange={(e) => patch(p.key, { description: e.target.value })}
           />

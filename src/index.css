@@ -283,3 +283,5 @@ fieldset.plan label { display: flex; flex-direction: column; gap: 0.3rem; font-w
 .position-photos .thumb-add span { font-size: 0.8rem; }
 .add-position-photo { display: inline-block; cursor: pointer; }
 fieldset.plan input, fieldset.plan select { width: 100%; min-width: 0; }
+.position-row { align-items: start; }
+.position-row .pos-desc { resize: vertical; field-sizing: content; min-height: 2.75rem; }
