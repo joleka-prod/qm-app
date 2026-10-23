@@ -51,13 +51,16 @@ export interface TicketPhoto {
   created_at: string
 }
 
+export type PositionState = 'offen' | 'erledigt' | 'nicht_erledigt'
+
 export interface TicketPosition {
   id: number
   ticket_id: number
   sort: number
   position_number: string
   description: string
-  done: boolean
+  state: PositionState
+  reason: string
   done_by: string | null
   done_at: string | null
 }

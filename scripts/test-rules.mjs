@@ -290,12 +290,12 @@ await check('Ersteller legt Positionen an, solange ungeplant', async () => {
   const { data: job } = await worker.c.from('tickets').insert({ ticket_type: 'beanstandung', title: 'Mehrere Mängel' }).select().single()
   posJob = job.id
   const { data, error } = await worker.c.from('ticket_positions').insert([
-    { ticket_id: posJob, sort: 0, position_number: ' 10 ', description: 'Tür einstellen', done: true },
+    { ticket_id: posJob, sort: 0, position_number: ' 10 ', description: 'Tür einstellen', state: 'erledigt' },
     { ticket_id: posJob, sort: 1, position_number: '20', description: 'Dichtung tauschen' },
   ]).select().order('sort')
   assert.ifError(error)
   assert.equal(data[0].position_number, '10')
-  assert.equal(data[0].done, false)
+  assert.equal(data[0].state, 'offen')
   posIds = data.map((p) => p.id)
   const empty = await worker.c.from('ticket_positions').insert({ ticket_id: posJob, position_number: ' ', description: '' })
   assert.ok(empty.error)
@@ -313,14 +313,14 @@ await check('Nach Planung kann Ersteller keine Positionen mehr ändern, Teamleit
 await check('Fremder Monteur sieht Positionen nicht', async () => {
   const { data } = await m2.c.from('ticket_positions').select('id').eq('ticket_id', posJob)
   assert.equal(data.length, 0)
-  const r = await m2.c.from('ticket_positions').update({ done: true }).eq('id', posIds[0]).select()
+  const r = await m2.c.from('ticket_positions').update({ state: 'erledigt' }).eq('id', posIds[0]).select()
   assert.ok(r.error || r.data.length === 0)
 })
 
 await check('Monteur hakt ab, Erledigt-Vermerk wird gesetzt', async () => {
-  const { data, error } = await m1.c.from('ticket_positions').update({ done: true, done_by: lead.id }).eq('id', posIds[0]).select().single()
+  const { data, error } = await m1.c.from('ticket_positions').update({ state: 'erledigt', done_by: lead.id }).eq('id', posIds[0]).select().single()
   assert.ifError(error)
-  assert.equal(data.done, true)
+  assert.equal(data.state, 'erledigt')
   assert.equal(data.done_by, m1.id)
   assert.ok(data.done_at)
 })
@@ -354,14 +354,33 @@ await check('Position löschen: Fotos bleiben am Auftrag', async () => {
   assert.equal(data.position_id, null)
 })
 
+await check('Erledigt melden erst, wenn keine Position mehr offen ist', async () => {
+  const r = await m1.c.from('tickets').update({ work_report: 'fertig', status: 'abgeschlossen' }).eq('id', posJob)
+  assert.ok(r.error)
+  const a = await qm.c.from('tickets').update({ status: 'abgeschlossen' }).eq('id', posJob)
+  assert.ok(a.error)
+})
+
+await check('Nicht erledigt nur mit Begründung', async () => {
+  const r = await m1.c.from('ticket_positions').update({ state: 'nicht_erledigt', reason: '  ' }).eq('id', posIds[1])
+  assert.ok(r.error)
+  const ok = await m1.c.from('ticket_positions').update({ state: 'nicht_erledigt', reason: ' Ersatzteil fehlt ' }).eq('id', posIds[1]).select().single()
+  assert.ifError(ok.error)
+  assert.equal(ok.data.reason, 'Ersatzteil fehlt')
+  assert.equal(ok.data.done_by, m1.id)
+  const back = await m1.c.from('ticket_positions').update({ state: 'erledigt', reason: 'x' }).eq('id', posIds[2]).select().single()
+  assert.ifError(back.error)
+  assert.equal(back.data.reason, '')
+})
+
 await check('Nach Erledigt sind Positionen für Monteur und Teamleiter gesperrt', async () => {
   const r = await m1.c.from('tickets').update({ work_report: 'fertig', status: 'abgeschlossen' }).eq('id', posJob).select().single()
   assert.ifError(r.error)
-  const a = await m1.c.from('ticket_positions').update({ done: true }).eq('id', posIds[1]).select()
+  const a = await m1.c.from('ticket_positions').update({ state: 'erledigt' }).eq('id', posIds[1]).select()
   assert.ok(a.error || a.data.length === 0)
   const b = await lead.c.from('ticket_positions').update({ description: 'neu' }).eq('id', posIds[1]).select()
   assert.ok(b.error || b.data.length === 0)
-  const c = await qm.c.from('ticket_positions').update({ done: true }).eq('id', posIds[1]).select().single()
+  const c = await qm.c.from('ticket_positions').update({ state: 'erledigt' }).eq('id', posIds[1]).select().single()
   assert.ifError(c.error)
   assert.equal(c.data.done_by, qm.id)
 })

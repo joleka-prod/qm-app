@@ -272,12 +272,9 @@ fieldset.plan label { display: flex; flex-direction: column; gap: 0.3rem; font-w
 .position-list { list-style: none; margin: 0 0 0.5rem; padding: 0; }
 .position-list li { border-bottom: 1px solid var(--border); }
 .position-list li:last-child { border-bottom: none; }
-.position-check { display: flex; gap: 0.65rem; align-items: flex-start; padding: 0.55rem 0; cursor: pointer; }
-.position-check input { width: 22px; height: 22px; flex: 0 0 auto; margin-top: 0.05rem; }
-.position-list li.done .position-check > span { text-decoration: line-through; color: var(--muted); }
 .position-item { display: flex; flex-direction: column; gap: 0.3rem; }
 .position-item + .position-item { border-top: 1px dashed var(--border); padding-top: 0.4rem; }
-.position-photos { padding: 0 0 0.55rem 2.2rem; }
+.position-photos { padding: 0; }
 .positions-editor .position-photos { padding: 0; }
 .position-photos .thumbs { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 0.4rem; margin-bottom: 0.3rem; }
 .position-photos .thumb-add span { font-size: 0.8rem; }
@@ -285,3 +282,20 @@ fieldset.plan label { display: flex; flex-direction: column; gap: 0.3rem; font-w
 fieldset.plan input, fieldset.plan select { width: 100%; min-width: 0; }
 .position-row { align-items: start; }
 .position-row .pos-desc { resize: vertical; field-sizing: content; min-height: 2.75rem; }
+.position-list li { padding: 0.6rem 0; display: flex; flex-direction: column; gap: 0.45rem; }
+.position-state { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+.position-state button { min-height: 44px; font-weight: 600; }
+.position-state button.active.state-ok { background: #dcfce7; border-color: #16a34a; color: #166534; }
+.position-state button.active.state-no { background: #fee2e2; border-color: #dc2626; color: #991b1b; }
+.position-result { font-weight: 600; font-size: 0.9rem; }
+.position-result.state-ok { color: #166534; }
+.position-result.state-no { color: #991b1b; }
+.position-reason { margin: 0; padding: 0.4rem 0.6rem; background: #fef2f2; border-left: 3px solid #dc2626; border-radius: 4px; }
+.position-list li.pos-erledigt .position-text { color: var(--muted); }
+@media (prefers-color-scheme: dark) {
+  .position-state button.active.state-ok { background: #14361f; border-color: #22c55e; color: #86efac; }
+  .position-state button.active.state-no { background: #3a1d1b; border-color: #f97066; color: #fca5a5; }
+  .position-result.state-ok { color: #86efac; }
+  .position-result.state-no { color: #fca5a5; }
+  .position-reason { background: #3a1d1b; border-left-color: #f97066; }
+}

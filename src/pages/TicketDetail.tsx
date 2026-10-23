@@ -26,6 +26,7 @@ import {
   type Ticket,
   type TicketEvent,
   type TicketPhoto,
+  type PositionState,
   type TicketPosition,
   type TicketStatus,
 } from '../lib/types'
@@ -81,6 +82,7 @@ export function TicketDetail() {
   const [montageDate, setMontageDate] = useState('')
   const [montageTime, setMontageTime] = useState('')
   const [report, setReport] = useState('')
+  const loadedReport = useRef('')
   const [area, setArea] = useState<ServiceArea | ''>('')
   const [signerName, setSignerName] = useState('')
   const [hasInk, setHasInk] = useState(false)
@@ -89,6 +91,8 @@ export function TicketDetail() {
   const signatureCanvas = useRef<HTMLCanvasElement>(null)
   const [positions, setPositions] = useState<TicketPosition[]>([])
   const [positionDrafts, setPositionDrafts] = useState<PositionDraft[] | null>(null)
+  const [reasonFor, setReasonFor] = useState<number | null>(null)
+  const [reasonText, setReasonText] = useState('')
 
   const load = useCallback(async () => {
     const [t, p, e, d, pos] = await Promise.all([
@@ -115,7 +119,9 @@ export function TicketDetail() {
     setInstaller(tk.installer_id ?? '')
     setMontageDate(tk.montage_date ?? '')
     setMontageTime(formatTime(tk.montage_time))
-    setReport(tk.work_report)
+    // Ungespeicherten Bericht nicht überschreiben, wenn z. B. nur eine Position abgehakt wurde
+    setReport((cur) => (cur === loadedReport.current ? tk.work_report : cur))
+    loadedReport.current = tk.work_report
     setArea(tk.service_area ?? '')
     setSignatureUrl(
       tk.signature_path ? ((await signedUrls([tk.signature_path]).catch(() => ({}) as Record<string, string>))[tk.signature_path] ?? '') : '',
@@ -154,7 +160,9 @@ export function TicketDetail() {
     einsatz && (isAdmin || (profile.role === 'teamleiter' && !closed) || (ticket.created_by === profile.id && ticket.status === 'neu'))
   const canCheckPositions = einsatz && !closed && (isInstaller || canEditPositions)
   const canDeletePhoto = (p: TicketPhoto) => isAdmin || (p.uploaded_by === profile.id && !closed)
-  const openPositions = positions.filter((p) => !p.done).length
+  const openPositions = positions.filter((p) => p.state === 'offen').length
+  const donePositions = positions.filter((p) => p.state === 'erledigt').length
+  const notDonePositions = positions.filter((p) => p.state === 'nicht_erledigt').length
   const canSign = einsatz && (isAdmin || (!closed && (isInstaller || isPlanner)))
   const dirty = cause !== ticket.cause || action !== ticket.corrective_action
 
@@ -168,11 +176,14 @@ export function TicketDetail() {
     return !error
   }
 
-  async function toggleDone(p: TicketPosition) {
+  async function setPositionState(p: TicketPosition, state: PositionState, reason = '') {
+    setBusy(true)
     setError('')
-    const { error } = await supabase.from('ticket_positions').update({ done: !p.done }).eq('id', p.id)
+    const { error } = await supabase.from('ticket_positions').update({ state, reason }).eq('id', p.id)
     if (error) setError(error.message)
+    else setReasonFor(null)
     await load()
+    setBusy(false)
   }
 
   async function savePositions() {
@@ -415,7 +426,12 @@ export function TicketDetail() {
           <h2>
             Positionen
             {positions.length > 0 && (
-              <span className="muted small"> · {positions.length - openPositions} von {positions.length} erledigt</span>
+              <span className="muted small">
+                {' · '}
+                {donePositions} erledigt
+                {notDonePositions > 0 && ` · ${notDonePositions} nicht erledigt`}
+                {openPositions > 0 && ` · ${openPositions} offen`}
+              </span>
             )}
           </h2>
           {positionDrafts ? (
@@ -433,23 +449,82 @@ export function TicketDetail() {
               ) : (
                 <ul className="position-list">
                   {positions.map((p) => (
-                    <li key={p.id} className={p.done ? 'done' : ''}>
-                      <label className="position-check">
-                        <input
-                          type="checkbox"
-                          checked={p.done}
-                          disabled={!canCheckPositions}
-                          onChange={() => toggleDone(p)}
-                        />
-                        <span>
-                          {p.position_number && <strong>Pos. {p.position_number}</strong>}
-                          {p.position_number && p.description && ' – '}
-                          <span className="pre">{p.description}</span>
-                          {p.done && p.done_by && (
-                            <span className="muted small"> · erledigt von {displayName(byId[p.done_by])}</span>
-                          )}
-                        </span>
-                      </label>
+                    <li key={p.id} className={`pos-${p.state}`}>
+                      <div className="position-text">
+                        {p.position_number && <strong>Pos. {p.position_number}</strong>}
+                        {p.position_number && p.description && ' – '}
+                        <span className="pre">{p.description}</span>
+                      </div>
+                      {canCheckPositions ? (
+                        <div className="position-state" role="group" aria-label={`Status Position ${p.position_number || p.sort + 1}`}>
+                          <button
+                            type="button"
+                            className={p.state === 'erledigt' ? 'active state-ok' : ''}
+                            aria-pressed={p.state === 'erledigt'}
+                            disabled={busy}
+                            onClick={() => setPositionState(p, p.state === 'erledigt' ? 'offen' : 'erledigt')}
+                          >
+                            ✓ Erledigt
+                          </button>
+                          <button
+                            type="button"
+                            className={p.state === 'nicht_erledigt' || reasonFor === p.id ? 'active state-no' : ''}
+                            aria-pressed={p.state === 'nicht_erledigt'}
+                            disabled={busy}
+                            onClick={() => {
+                              if (reasonFor === p.id) return setReasonFor(null)
+                              setReasonText(p.reason)
+                              setReasonFor(p.id)
+                            }}
+                          >
+                            ✗ Nicht erledigt
+                          </button>
+                        </div>
+                      ) : (
+                        p.state !== 'offen' && (
+                          <div className={`position-result ${p.state === 'erledigt' ? 'state-ok' : 'state-no'}`}>
+                            {p.state === 'erledigt' ? '✓ Erledigt' : '✗ Nicht erledigt'}
+                          </div>
+                        )
+                      )}
+                      {reasonFor === p.id ? (
+                        <div className="form position-reason-form">
+                          <label>
+                            Begründung *
+                            <textarea
+                              rows={2}
+                              autoFocus
+                              value={reasonText}
+                              maxLength={1000}
+                              placeholder="Warum wurde die Position nicht erledigt?"
+                              onChange={(e) => setReasonText(e.target.value)}
+                            />
+                          </label>
+                          <div className="actions">
+                            {p.state === 'nicht_erledigt' && (
+                              <button className="link" disabled={busy} onClick={() => setPositionState(p, 'offen')}>
+                                Zurück auf offen
+                              </button>
+                            )}
+                            <button disabled={busy} onClick={() => setReasonFor(null)}>Abbrechen</button>
+                            <button
+                              className="primary"
+                              disabled={busy || !reasonText.trim()}
+                              onClick={() => setPositionState(p, 'nicht_erledigt', reasonText)}
+                            >
+                              Speichern
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        p.state === 'nicht_erledigt' && <p className="position-reason pre">Begründung: {p.reason}</p>
+                      )}
+                      {p.state !== 'offen' && p.done_by && (
+                        <div className="muted small">
+                          {p.state === 'erledigt' ? 'Erledigt' : 'Nicht erledigt'} von {displayName(byId[p.done_by])}
+                          {p.done_at && `, ${formatDate(p.done_at)}`}
+                        </div>
+                      )}
                       <PositionPhotos
                         photos={photos.filter((f) => f.position_id === p.id)}
                         canAdd={!closed}
@@ -584,9 +659,8 @@ export function TicketDetail() {
                 </button>
                 <button
                   className="primary"
-                  disabled={busy || !report.trim()}
+                  disabled={busy || !report.trim() || openPositions > 0}
                   onClick={() => {
-                    if (openPositions > 0 && !confirm(`${openPositions} Position(en) sind noch nicht abgehakt. Trotzdem als erledigt melden?`)) return
                     if (!ticket.signature_path && !confirm('Es gibt noch keine Kundenunterschrift. Trotzdem als erledigt melden?')) return
                     update({ work_report: report, status: 'abgeschlossen' })
                   }}
@@ -594,6 +668,11 @@ export function TicketDetail() {
                   Erledigt melden
                 </button>
               </div>
+              {openPositions > 0 && (
+                <p className="muted small">
+                  Erst möglich, wenn alle Positionen als erledigt oder nicht erledigt abgehakt sind ({openPositions} offen).
+                </p>
+              )}
             </div>
           ) : ticket.work_report ? (
             <p className="pre">{ticket.work_report}</p>

@@ -100,7 +100,7 @@ begin
 
         -- Ein Einsatz pro Art ist bereits erledigt
         if i = 4 and cardinality(v_fitters) > 0 then
-          update public.ticket_positions set done = true where ticket_id = v_id;
+          update public.ticket_positions set state = 'erledigt' where ticket_id = v_id;
           update public.tickets
              set work_report = 'Testbericht: Alle Positionen erledigt, Kunde zufrieden.',
                  status = 'abgeschlossen'
