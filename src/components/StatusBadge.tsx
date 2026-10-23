@@ -1,7 +1,16 @@
-import { AREA_LABEL, statusLabel, type ServiceArea, type TicketStatus, type TicketType } from '../lib/types'
+import { AREA_LABEL, statusLabel, type AppointmentState, type ServiceArea, type TicketStatus, type TicketType } from '../lib/types'
 
-export function StatusBadge({ status, type = 'qm' }: { status: TicketStatus; type?: TicketType }) {
-  return <span className={`badge badge-${status}`}>{statusLabel(type, status)}</span>
+export function StatusBadge({
+  status,
+  type = 'qm',
+  appointment = 'offen',
+}: {
+  status: TicketStatus
+  type?: TicketType
+  appointment?: AppointmentState
+}) {
+  const termin = type !== 'qm' && status === 'zugewiesen' && appointment !== 'offen'
+  return <span className={`badge badge-${termin ? `termin-${appointment}` : status}`}>{statusLabel(type, status, appointment)}</span>
 }
 
 export function TypeBadge({ type }: { type: TicketType }) {

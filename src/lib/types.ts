@@ -2,6 +2,7 @@ export type Role = 'mitarbeiter' | 'teamleiter' | 'monteur' | 'admin'
 export type TicketType = 'qm' | 'restarbeit' | 'beanstandung' | 'reparatur'
 export type ServiceArea = 'kundendienst' | 'montage'
 export type TicketStatus = 'neu' | 'zugewiesen' | 'in_bearbeitung' | 'zur_pruefung' | 'abgeschlossen'
+export type AppointmentState = 'offen' | 'angemeldet' | 'bestaetigt'
 
 export interface Profile {
   id: string
@@ -34,6 +35,15 @@ export interface Ticket {
   signature_path: string | null
   signer_name: string
   signed_at: string | null
+  appointment_state: AppointmentState
+  appointment_date: string | null
+  appointment_time: string | null
+  appointment_told_by: string | null
+  appointment_announced_by: string | null
+  appointment_announced_at: string | null
+  appointment_note: string
+  appointment_confirmed_by: string | null
+  appointment_confirmed_at: string | null
   // nur gefüllt, wenn mit select('*, ticket_positions(count)') geladen
   ticket_positions?: { count: number }[]
   status: TicketStatus
@@ -101,7 +111,14 @@ const EINSATZ_STATUS_LABEL: Partial<Record<TicketStatus, string>> = {
   abgeschlossen: 'Erledigt',
 }
 
-export function statusLabel(type: TicketType, status: TicketStatus) {
+export const APPOINTMENT_LABEL: Record<Exclude<AppointmentState, 'offen'>, string> = {
+  angemeldet: 'Termin bei Kunde angemeldet',
+  bestaetigt: 'Termin von Kunde bestätigt',
+}
+
+// Ein geplanter Einsatz zeigt, wie weit der Termin mit dem Kunden abgestimmt ist
+export function statusLabel(type: TicketType, status: TicketStatus, appointment: AppointmentState = 'offen') {
+  if (type !== 'qm' && status === 'zugewiesen' && appointment !== 'offen') return APPOINTMENT_LABEL[appointment]
   return (type !== 'qm' && EINSATZ_STATUS_LABEL[status]) || STATUS_LABEL[status]
 }
 

@@ -32,6 +32,11 @@ export function JobCard({ ticket: t, draggable, showAddress }: Props) {
         </span>
       </div>
       <div className="job-title">{t.title}</div>
+      {!done && t.appointment_state !== 'offen' && (
+        <div className={`job-termin job-termin-${t.appointment_state}`}>
+          {t.appointment_state === 'bestaetigt' ? '✓ Kunde hat bestätigt' : '☎ beim Kunden angemeldet'}
+        </div>
+      )}
       {t.customer_name && <div className="job-sub">{t.customer_name}</div>}
       {!!t.ticket_positions?.[0]?.count && <div className="job-sub">{t.ticket_positions[0].count} Pos.</div>}
       {showAddress && t.site_address && <div className="job-sub pre">{t.site_address}</div>}

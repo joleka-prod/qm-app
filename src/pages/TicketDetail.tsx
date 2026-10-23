@@ -7,6 +7,7 @@ import { PositionPhotos } from '../components/PositionPhotos'
 import { PositionsEditor, isEmptyPosition, newPositionDraft, type PositionDraft } from '../components/PositionsEditor'
 import { SignaturePad, canvasToBlob } from '../components/SignaturePad'
 import { TeamSelect } from '../components/TeamSelect'
+import { AppointmentCard } from '../components/AppointmentCard'
 import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { deletePhoto, signedUrls, uploadPhotos, uploadSignature } from '../lib/photos'
 import { sendReport } from '../lib/reportMail'
@@ -39,6 +40,9 @@ import { useProfiles } from '../lib/useProfiles'
 const EVENT_LABEL: Record<string, string> = {
   erstellt: 'Erstellt',
   eingeplant: 'Eingeplant:',
+  termin_angemeldet: 'Termin bei Kunde angemeldet:',
+  termin_bestaetigt: 'Termin von Kunde bestätigt:',
+  termin_zurueckgesetzt: 'Termin-Anmeldung aufgehoben:',
   bericht: 'Arbeitsbericht bearbeitet',
   unterschrift: 'Kunde hat unterschrieben:',
   unterschrift_entfernt: 'Unterschrift entfernt',
@@ -60,7 +64,7 @@ export function TicketDetail() {
   const ticketId = Number(id)
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const { byId, leads } = useProfiles()
+  const { byId, leads, profiles } = useProfiles()
   const { teams, teamById } = useTeams()
   const [crew, setCrew] = useState<string[]>([])
   const [crewLead, setCrewLead] = useState('')
@@ -363,7 +367,7 @@ export function TicketDetail() {
             {ticketNo(ticket.id, ticket.ticket_type)} <TypeBadge type={ticket.ticket_type} />{' '}
             <AreaBadge area={ticket.service_area} />
           </span>
-          <StatusBadge status={ticket.status} type={ticket.ticket_type} />
+          <StatusBadge status={ticket.status} type={ticket.ticket_type} appointment={ticket.appointment_state} />
         </div>
         {editing ? (
           <div className="form">
@@ -733,6 +737,17 @@ export function TicketDetail() {
       )}
 
       {einsatz && (
+        <AppointmentCard
+          ticket={ticket}
+          profiles={profiles}
+          byId={byId}
+          me={profile.id}
+          canEdit={isPlanner}
+          onChanged={load}
+        />
+      )}
+
+      {einsatz && (
         <section className="card">
           <h2>Arbeitsbericht</h2>
           {isInstaller && !closed ? (
@@ -971,7 +986,7 @@ export function TicketDetail() {
                 {ev.kind === 'status' && <> „{statusLabel(ticket.ticket_type, ev.details as TicketStatus)}"</>}
                 {ev.kind === 'zugewiesen' && <> {ev.details || '–'}</>}
                 {(ev.kind === 'pruefhinweis' || ev.kind === 'loeschantrag') && <> {ev.details}</>}
-                {(ev.kind === 'auftrag' || ev.kind === 'eingeplant') && <> {ev.details || '–'}</>}
+                {(ev.kind === 'auftrag' || ev.kind === 'eingeplant' || ev.kind.startsWith('termin_')) && <> {ev.details || '–'}</>}
                 {ev.kind === 'erstellt' && <> ({TYPE_LABEL[ticket.ticket_type]})</>}
                 {ev.kind === 'unterschrift' && <> {ev.details}</>}
                 {ev.kind === 'bereich' && <> „{AREA_LABEL[ev.details as ServiceArea] ?? ev.details}"</>}

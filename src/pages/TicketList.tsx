@@ -20,7 +20,7 @@ import {
 } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 
-type Filter = 'offen' | 'meine' | 'alle' | 'loeschung' | TicketStatus
+type Filter = 'offen' | 'meine' | 'alle' | 'loeschung' | 'nicht_angemeldet' | 'termin_angemeldet' | 'termin_bestaetigt' | TicketStatus
 
 export function TicketList() {
   const { profile } = useAuth()
@@ -56,7 +56,14 @@ export function TicketList() {
       // Monteure sehen ohnehin nur die Einsätze ihrer Teams
       if (filter === 'meine' && profile?.role !== 'monteur' && t.assigned_to !== profile?.id && t.created_by !== profile?.id) return false
       if (filter === 'loeschung' && !deletionIds.has(t.id)) return false
-      if (filter !== 'offen' && filter !== 'meine' && filter !== 'alle' && filter !== 'loeschung' && t.status !== filter) return false
+      if (filter === 'nicht_angemeldet' && !(t.ticket_type !== 'qm' && t.status === 'zugewiesen' && t.appointment_state === 'offen')) return false
+      if (filter === 'termin_angemeldet' && !(t.status === 'zugewiesen' && t.appointment_state === 'angemeldet')) return false
+      if (filter === 'termin_bestaetigt' && !(t.status === 'zugewiesen' && t.appointment_state === 'bestaetigt')) return false
+      if (
+        !['offen', 'meine', 'alle', 'loeschung', 'nicht_angemeldet', 'termin_angemeldet', 'termin_bestaetigt'].includes(filter) &&
+        t.status !== filter
+      )
+        return false
       if (!q) return true
       return (
         t.title.toLowerCase().includes(q) ||
@@ -84,6 +91,9 @@ export function TicketList() {
           {(Object.keys(STATUS_LABEL) as TicketStatus[]).map((s) => (
             <option key={s} value={s}>{STATUS_LABEL[s]}</option>
           ))}
+          <option value="nicht_angemeldet">Geplant, Termin noch nicht angemeldet</option>
+          <option value="termin_angemeldet">Termin bei Kunde angemeldet</option>
+          <option value="termin_bestaetigt">Termin von Kunde bestätigt</option>
         </select>
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as TicketType | '')} aria-label="Art">
           <option value="">Alle Arten</option>
@@ -108,7 +118,7 @@ export function TicketList() {
                   </span>
                   <span className="badges">
                     {deletionIds.has(t.id) && <span className="badge badge-loeschung">Löschung beantragt</span>}
-                    <StatusBadge status={t.status} type={t.ticket_type} />
+                    <StatusBadge status={t.status} type={t.ticket_type} appointment={t.appointment_state} />
                   </span>
                 </div>
                 <div className="ticket-title">{t.title}</div>

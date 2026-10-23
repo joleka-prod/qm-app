@@ -131,6 +131,8 @@ button.link { border: none; background: none; color: var(--primary); padding: 0.
 .badge { font-size: 0.75rem; font-weight: 600; padding: 0.15rem 0.55rem; border-radius: 999px; white-space: nowrap; }
 .badge-neu { background: #fef0c7; color: #93370d; }
 .badge-zugewiesen { background: #e0eaff; color: #2d31a6; }
+.badge-termin-angemeldet { background: #fef0c7; color: #93370d; }
+.badge-termin-bestaetigt { background: #d1fadf; color: #05603a; }
 .badge-in_bearbeitung { background: #d1e9ff; color: #175cd3; }
 .badge-zur_pruefung { background: #f4ebff; color: #6941c6; }
 .badge-abgeschlossen { background: #dcfae6; color: #067647; }
@@ -230,6 +232,9 @@ fieldset.plan label { display: flex; flex-direction: column; gap: 0.3rem; font-w
 .job-meta { white-space: nowrap; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
 .job-title { font-weight: 600; margin-top: 0.15rem; }
 .job-sub { color: var(--muted); }
+.job-termin { font-size: 0.75rem; font-weight: 600; margin-top: 0.15rem; }
+.job-termin-angemeldet { color: #93370d; }
+.job-termin-bestaetigt { color: #05603a; }
 .unplanned-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem; }
 
 .agenda-day h2 { display: flex; align-items: center; gap: 0.5rem; }
@@ -334,3 +339,7 @@ button.crew-star:hover { color: #f79009; }
 @media (prefers-color-scheme: dark) { .crew-lead { background: #3a2a10; } }
 .lead-tag { display: inline-block; margin-left: 0.5rem; font-size: 0.8rem; font-weight: 600; color: #b54708; }
 @media (prefers-color-scheme: dark) { .lead-tag { color: #fdb022; } }
+
+/* Termin mit dem Kunden */
+.appointment-line { margin: 0.25rem 0; }
+.appointment-warn { color: #93370d; }
