@@ -98,6 +98,7 @@ export function TicketDetail() {
   const [positions, setPositions] = useState<TicketPosition[]>([])
   const [positionDrafts, setPositionDrafts] = useState<PositionDraft[] | null>(null)
   const [reasonFor, setReasonFor] = useState<number | null>(null)
+  const [mailStatus, setMailStatus] = useState('')
   const [reasonText, setReasonText] = useState('')
 
   const load = useCallback(async () => {
@@ -222,10 +223,12 @@ export function TicketDetail() {
   async function mailReport(force: boolean) {
     setBusy(true)
     setError('')
+    setMailStatus('Bericht wird gesendet …')
     try {
       await sendReport(ticketId, force)
+      setMailStatus('')
     } catch (err) {
-      setError((err as Error).message)
+      setMailStatus(`Versand fehlgeschlagen: ${(err as Error).message}`)
     }
     await load()
     setBusy(false)
@@ -756,8 +759,12 @@ export function TicketDetail() {
               {ticket.report_by_email && ticket.report_sent_at && (
                 <p className="small mail-ok">✓ Bericht gesendet am {formatDate(ticket.report_sent_at)}</p>
               )}
-              {ticket.report_by_email && !ticket.report_sent_at && ticket.report_send_error && (
+              {mailStatus && <p className={`small ${mailStatus.startsWith('Versand') ? 'mail-error' : 'muted'}`}>{mailStatus}</p>}
+              {!mailStatus && ticket.report_by_email && !ticket.report_sent_at && ticket.report_send_error && (
                 <p className="small mail-error">Versand fehlgeschlagen: {ticket.report_send_error}</p>
+              )}
+              {ticket.report_by_email && !closed && (
+                <p className="small muted">Der Bericht wird automatisch verschickt, sobald der Auftrag als erledigt gemeldet ist.</p>
               )}
               {ticket.report_by_email && closed && (isPlanner || (isInstaller && !ticket.report_sent_at)) && (
                 <button className="link" disabled={busy} onClick={() => mailReport(!!ticket.report_sent_at)}>
