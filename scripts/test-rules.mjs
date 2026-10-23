@@ -593,6 +593,62 @@ await check('QM gibt Löschung frei', async () => {
   assert.equal(r.data.length, 1)
 })
 
+// --- Berechnung Reparaturauftrag ---
+let repId, repPos
+await check('Erledigter Reparaturauftrag geht automatisch zur Berechnung', async () => {
+  const { data: rep } = await lead2.c.from('tickets')
+    .insert({ ticket_type: 'reparatur', title: 'Motor tauschen', team_id: T1, montage_date: '2026-11-03' }).select().single()
+  repId = rep.id
+  assert.equal(rep.billing_state, 'keine')
+  const { data: pos } = await lead2.c.from('ticket_positions')
+    .insert([{ ticket_id: repId, sort: 0, description: 'Motor', price: 99 }, { ticket_id: repId, sort: 1, description: 'Anfahrt' }]).select().order('sort')
+  repPos = pos.map((p) => p.id)
+  assert.equal(pos[0].price, null)
+  const early = await lead2.c.rpc('set_position_price', { p_position_id: repPos[0], p_price: 10 })
+  assert.match(early.error.message, /zur Berechnung/)
+  await m1.c.from('ticket_positions').update({ state: 'erledigt' }).in('id', repPos)
+  const r = await m1.c.from('tickets').update({ work_report: 'getauscht', status: 'abgeschlossen' }).eq('id', repId).select().single()
+  assert.ifError(r.error)
+  assert.equal(r.data.billing_state, 'zur_berechnung')
+  const direct = await qm.c.from('tickets').update({ billing_state: 'berechnet' }).eq('id', repId).select().single()
+  assert.equal(direct.data.billing_state, 'zur_berechnung')
+})
+
+await check('Preise nur durch Planer, Abschluss erst mit allen Preisen', async () => {
+  const byInstaller = await m1.c.rpc('set_position_price', { p_position_id: repPos[0], p_price: 10 })
+  assert.ok(byInstaller.error)
+  const directPrice = await qm.c.from('ticket_positions').update({ price: 5 }).eq('id', repPos[0]).select().single()
+  assert.equal(directPrice.data.price, null)
+  assert.ifError((await lead2.c.rpc('set_position_price', { p_position_id: repPos[0], p_price: 189.999 })).error)
+  const neg = await lead2.c.rpc('set_position_price', { p_position_id: repPos[1], p_price: -1 })
+  assert.ok(neg.error)
+  const notYet = await lead2.c.rpc('finish_billing', { p_ticket_id: repId })
+  assert.match(notYet.error.message, /allen Positionen einen Preis/)
+  assert.ifError((await lead2.c.rpc('set_position_price', { p_position_id: repPos[1], p_price: 0 })).error)
+  assert.ifError((await lead2.c.rpc('finish_billing', { p_ticket_id: repId })).error)
+  const { data } = await qm.c.from('tickets').select('billing_state, billed_by').eq('id', repId).single()
+  assert.equal(data.billing_state, 'berechnet')
+  assert.equal(data.billed_by, lead2.id)
+  const { data: p0 } = await qm.c.from('ticket_positions').select('price').eq('id', repPos[0]).single()
+  assert.equal(p0.price, 190)
+  const ev = await qm.c.from('ticket_events').select('details').eq('ticket_id', repId).eq('kind', 'berechnet').single()
+  assert.equal(ev.data.details, 'Summe 190,00 €')
+  const locked = await lead2.c.rpc('set_position_price', { p_position_id: repPos[0], p_price: 1 })
+  assert.ok(locked.error)
+})
+
+await check('Nur Admin öffnet Berechnung wieder, andere Einsätze haben keine Berechnung', async () => {
+  assert.ok((await lead2.c.rpc('reopen_billing', { p_ticket_id: repId })).error)
+  assert.ifError((await qm.c.rpc('reopen_billing', { p_ticket_id: repId })).error)
+  let { data } = await qm.c.from('tickets').select('billing_state').eq('id', repId).single()
+  assert.equal(data.billing_state, 'zur_berechnung')
+  await qm.c.from('tickets').update({ status: 'zugewiesen' }).eq('id', repId)
+  ;({ data } = await qm.c.from('tickets').select('billing_state').eq('id', repId).single())
+  assert.equal(data.billing_state, 'keine')
+  const { data: closedOther } = await qm.c.from('tickets').select('billing_state').neq('ticket_type', 'reparatur').eq('status', 'abgeschlossen')
+  assert.ok(closedOther.every((t) => t.billing_state === 'keine'))
+})
+
 // --- Benutzerverwaltung (Edge Function admin-users) ---
 if (process.env.SKIP_FUNCTIONS !== '1') {
   const newMail = `neu-${run}@test.local`

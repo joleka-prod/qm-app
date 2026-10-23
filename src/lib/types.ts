@@ -3,6 +3,7 @@ export type TicketType = 'qm' | 'restarbeit' | 'beanstandung' | 'reparatur'
 export type ServiceArea = 'kundendienst' | 'montage'
 export type TicketStatus = 'neu' | 'zugewiesen' | 'in_bearbeitung' | 'zur_pruefung' | 'abgeschlossen'
 export type AppointmentState = 'offen' | 'angemeldet' | 'bestaetigt'
+export type BillingState = 'keine' | 'zur_berechnung' | 'berechnet'
 
 export interface Profile {
   id: string
@@ -36,6 +37,9 @@ export interface Ticket {
   signer_name: string
   signed_at: string | null
   appointment_state: AppointmentState
+  billing_state: BillingState
+  billed_at: string | null
+  billed_by: string | null
   appointment_date: string | null
   appointment_time: string | null
   appointment_told_by: string | null
@@ -76,6 +80,7 @@ export interface TicketPosition {
   description: string
   state: PositionState
   reason: string
+  price: number | null
   done_by: string | null
   done_at: string | null
 }
@@ -116,9 +121,21 @@ export const APPOINTMENT_LABEL: Record<Exclude<AppointmentState, 'offen'>, strin
   bestaetigt: 'Termin von Kunde bestätigt',
 }
 
-// Ein geplanter Einsatz zeigt, wie weit der Termin mit dem Kunden abgestimmt ist
-export function statusLabel(type: TicketType, status: TicketStatus, appointment: AppointmentState = 'offen') {
+export const BILLING_LABEL: Record<Exclude<BillingState, 'keine'>, string> = {
+  zur_berechnung: 'Zur Berechnung',
+  berechnet: 'Berechnet',
+}
+
+// Ein geplanter Einsatz zeigt, wie weit der Termin mit dem Kunden abgestimmt ist,
+// ein erledigter Reparaturauftrag den Stand der Berechnung
+export function statusLabel(
+  type: TicketType,
+  status: TicketStatus,
+  appointment: AppointmentState = 'offen',
+  billing: BillingState = 'keine',
+) {
   if (type !== 'qm' && status === 'zugewiesen' && appointment !== 'offen') return APPOINTMENT_LABEL[appointment]
+  if (status === 'abgeschlossen' && billing !== 'keine') return BILLING_LABEL[billing]
   return (type !== 'qm' && EINSATZ_STATUS_LABEL[status]) || STATUS_LABEL[status]
 }
 
@@ -239,4 +256,8 @@ export function appointmentMoveWarning(
     `Achtung: Dem Kunden wurde bereits der Termin ${when} ${was}${toldBy ? ` (durch ${toldBy})` : ''}.\n\n` +
     `Wenn du den Termin änderst, wird die Anmeldung aufgehoben und der Kunde muss über den neuen Termin informiert werden.\n\nTrotzdem ändern?`
   )
+}
+
+export function formatEuro(n: number | null | undefined) {
+  return n == null ? '–' : n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
 }

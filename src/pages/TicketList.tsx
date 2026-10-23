@@ -22,7 +22,7 @@ import {
 } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 
-type Filter = 'offen' | 'meine' | 'alle' | 'loeschung' | 'nicht_angemeldet' | 'termin_angemeldet' | 'termin_bestaetigt' | TicketStatus
+type Filter = 'offen' | 'meine' | 'alle' | 'loeschung' | 'nicht_angemeldet' | 'termin_angemeldet' | 'termin_bestaetigt' | 'zur_berechnung' | TicketStatus
 
 export function TicketList() {
   const { profile } = useAuth()
@@ -70,7 +70,9 @@ export function TicketList() {
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
     return tickets.filter((t) => {
-      if (filter === 'offen' && t.status === 'abgeschlossen') return false
+      // Zur Berechnung zählt noch als offen
+      if (filter === 'offen' && t.status === 'abgeschlossen' && t.billing_state !== 'zur_berechnung') return false
+      if (filter === 'zur_berechnung' && t.billing_state !== 'zur_berechnung') return false
       if (typeFilter && t.ticket_type !== typeFilter) return false
       // Monteure sehen ohnehin nur die Einsätze ihrer Teams
       if (filter === 'meine' && profile?.role !== 'monteur' && t.assigned_to !== profile?.id && t.created_by !== profile?.id) return false
@@ -79,7 +81,7 @@ export function TicketList() {
       if (filter === 'termin_angemeldet' && !(t.status === 'zugewiesen' && t.appointment_state === 'angemeldet')) return false
       if (filter === 'termin_bestaetigt' && !(t.status === 'zugewiesen' && t.appointment_state === 'bestaetigt')) return false
       if (
-        !['offen', 'meine', 'alle', 'loeschung', 'nicht_angemeldet', 'termin_angemeldet', 'termin_bestaetigt'].includes(filter) &&
+        !['offen', 'meine', 'alle', 'loeschung', 'nicht_angemeldet', 'termin_angemeldet', 'termin_bestaetigt', 'zur_berechnung'].includes(filter) &&
         t.status !== filter
       )
         return false
@@ -144,6 +146,7 @@ export function TicketList() {
           <option value="nicht_angemeldet">Geplant, Termin noch nicht angemeldet</option>
           <option value="termin_angemeldet">Termin bei Kunde angemeldet</option>
           <option value="termin_bestaetigt">Termin von Kunde bestätigt</option>
+          <option value="zur_berechnung">Zur Berechnung</option>
         </select>
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as TicketType | '')} aria-label="Art">
           <option value="">Alle Arten</option>
@@ -168,7 +171,7 @@ export function TicketList() {
                   </span>
                   <span className="badges">
                     {deletionIds.has(t.id) && <span className="badge badge-loeschung">Löschung beantragt</span>}
-                    <StatusBadge status={t.status} type={t.ticket_type} appointment={t.appointment_state} />
+                    <StatusBadge status={t.status} type={t.ticket_type} appointment={t.appointment_state} billing={t.billing_state} />
                   </span>
                 </div>
                 <div className="ticket-title">{t.title}</div>

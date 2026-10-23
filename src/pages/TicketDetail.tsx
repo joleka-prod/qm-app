@@ -8,6 +8,7 @@ import { PositionsEditor, isEmptyPosition, newPositionDraft, type PositionDraft 
 import { SignaturePad, canvasToBlob } from '../components/SignaturePad'
 import { TeamSelect } from '../components/TeamSelect'
 import { AppointmentCard } from '../components/AppointmentCard'
+import { BillingCard } from '../components/BillingCard'
 import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { deletePhoto, signedUrls, uploadPhotos, uploadSignature } from '../lib/photos'
 import { sendReport } from '../lib/reportMail'
@@ -41,6 +42,9 @@ import { useProfiles } from '../lib/useProfiles'
 const EVENT_LABEL: Record<string, string> = {
   erstellt: 'Erstellt',
   eingeplant: 'Eingeplant:',
+  zur_berechnung: 'Zur Berechnung weitergeleitet',
+  berechnet: 'Berechnet:',
+  berechnung_geoeffnet: 'Berechnung wieder geöffnet',
   termin_angemeldet: 'Termin bei Kunde angemeldet:',
   termin_bestaetigt: 'Termin von Kunde bestätigt:',
   termin_zurueckgesetzt: 'Termin-Anmeldung aufgehoben:',
@@ -368,7 +372,7 @@ export function TicketDetail() {
             {ticketNo(ticket.id, ticket.ticket_type)} <TypeBadge type={ticket.ticket_type} />{' '}
             <AreaBadge area={ticket.service_area} />
           </span>
-          <StatusBadge status={ticket.status} type={ticket.ticket_type} appointment={ticket.appointment_state} />
+          <StatusBadge status={ticket.status} type={ticket.ticket_type} appointment={ticket.appointment_state} billing={ticket.billing_state} />
         </div>
         {editing ? (
           <div className="form">
@@ -637,6 +641,10 @@ export function TicketDetail() {
             </>
           )}
         </section>
+      )}
+
+      {ticket.billing_state !== 'keine' && isPlanner && (
+        <BillingCard ticket={ticket} positions={positions} byId={byId} canEdit={isPlanner} isAdmin={isAdmin} onChanged={load} />
       )}
 
       <section className="card">
@@ -996,6 +1004,7 @@ export function TicketDetail() {
                 {ev.kind === 'zugewiesen' && <> {ev.details || '–'}</>}
                 {(ev.kind === 'pruefhinweis' || ev.kind === 'loeschantrag') && <> {ev.details}</>}
                 {(ev.kind === 'auftrag' || ev.kind === 'eingeplant' || ev.kind.startsWith('termin_')) && <> {ev.details || '–'}</>}
+                {ev.kind === 'berechnet' && <> {ev.details}</>}
                 {ev.kind === 'erstellt' && <> ({TYPE_LABEL[ticket.ticket_type]})</>}
                 {ev.kind === 'unterschrift' && <> {ev.details}</>}
                 {ev.kind === 'bereich' && <> „{AREA_LABEL[ev.details as ServiceArea] ?? ev.details}"</>}
