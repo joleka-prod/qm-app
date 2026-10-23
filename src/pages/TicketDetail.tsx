@@ -459,17 +459,20 @@ export function TicketDetail() {
                         <div className="position-state" role="group" aria-label={`Status Position ${p.position_number || p.sort + 1}`}>
                           <button
                             type="button"
-                            className={p.state === 'erledigt' ? 'active state-ok' : ''}
-                            aria-pressed={p.state === 'erledigt'}
+                            className={p.state === 'erledigt' && reasonFor !== p.id ? 'active state-ok' : ''}
+                            aria-pressed={p.state === 'erledigt' && reasonFor !== p.id}
                             disabled={busy}
-                            onClick={() => setPositionState(p, p.state === 'erledigt' ? 'offen' : 'erledigt')}
+                            onClick={() => {
+                              if (reasonFor === p.id) setReasonFor(null)
+                              setPositionState(p, p.state === 'erledigt' && reasonFor !== p.id ? 'offen' : 'erledigt')
+                            }}
                           >
                             ✓ Erledigt
                           </button>
                           <button
                             type="button"
                             className={p.state === 'nicht_erledigt' || reasonFor === p.id ? 'active state-no' : ''}
-                            aria-pressed={p.state === 'nicht_erledigt'}
+                            aria-pressed={p.state === 'nicht_erledigt' || reasonFor === p.id}
                             disabled={busy}
                             onClick={() => {
                               if (reasonFor === p.id) return setReasonFor(null)
