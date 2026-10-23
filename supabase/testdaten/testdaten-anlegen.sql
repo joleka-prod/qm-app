@@ -3,6 +3,7 @@
 -- Alle Testaufträge beginnen mit "[TEST]" und lassen sich mit testdaten-loeschen.sql wieder entfernen.
 -- Voraussetzung: Mindestens ein Admin existiert. Einsätze werden auf die Teams verteilt; vorhandene Monteure
 -- werden an den Einsatztagen in diese Teams eingeteilt (höchstens 2 pro Team, jeder Monteur nur in einem Team pro Tag).
+-- Gibt es an einem Tag keinen freien Monteur mehr, bleibt der Einsatz ungeplant.
 
 do $$
 declare
@@ -12,7 +13,7 @@ declare
   v_mteams smallint[];
   v_kteams smallint[];
   v_area public.service_area;
-  r record;
+  v_team smallint;
   v_id bigint;
   v_type public.ticket_type;
   v_day date;
@@ -85,6 +86,22 @@ begin
           end loop;
         end loop;
         v_area := case when v_type = 'restarbeit' or i % 3 = 0 then 'montage'::public.service_area else 'kundendienst'::public.service_area end;
+        -- Team wählen und für den Tag besetzen (der erste Monteur wird verantwortlich); ohne Monteure bleibt der Einsatz ungeplant
+        v_team := null;
+        if i > 3 then
+          v_team := case when v_area = 'montage' then v_mteams[1 + (i + t) % cardinality(v_mteams)]
+                         else v_kteams[1 + (i + t) % cardinality(v_kteams)] end;
+          if not exists (select 1 from public.team_members m where m.team_id = v_team and m.day = v_day) then
+            insert into public.team_members (team_id, day, installer_id)
+            select v_team, v_day, f.id
+              from unnest(v_fitters) as f(id)
+             where not exists (select 1 from public.team_members m where m.day = v_day and m.installer_id = f.id)
+             limit 2;
+          end if;
+          if not exists (select 1 from public.team_members m where m.team_id = v_team and m.day = v_day) then
+            v_team := null;
+          end if;
+        end if;
         insert into public.tickets (ticket_type, service_area, title, description, order_number, customer_name, site_address,
                                     created_by, team_id, montage_date, montage_time)
         values (
@@ -96,10 +113,9 @@ begin
           customers[i],
           streets[1 + (i + t) % 10] || chr(10) || places[1 + i % 5],
           v_admin,
-          case when i > 3 then (case when v_area = 'montage' then v_mteams[1 + (i + t) % cardinality(v_mteams)]
-                                     else v_kteams[1 + (i + t) % cardinality(v_kteams)] end) end,
-          case when i > 3 then v_day end,
-          case when i > 3 then (time '07:30' + ((i % 4) * interval '2 hours')) end
+          v_team,
+          case when v_team is not null then v_day end,
+          case when v_team is not null then (time '07:30' + ((i % 4) * interval '2 hours')) end
         )
         returning id into v_id;
 
@@ -108,7 +124,7 @@ begin
           from generate_series(1, 2 + (i + t) % 3) k;
 
         -- Ein Einsatz pro Art ist bereits erledigt
-        if i = 4 then
+        if i = 4 and v_team is not null then
           update public.ticket_positions set state = 'erledigt' where ticket_id = v_id;
           update public.tickets
              set work_report = 'Testbericht: Alle Positionen erledigt, Kunde zufrieden.',
@@ -117,20 +133,6 @@ begin
         end if;
       end if;
     end loop;
-  end loop;
-
-  -- Monteure an den Einsatztagen in die Teams einteilen
-  for r in
-    select distinct t.team_id, t.montage_date from public.tickets t
-    where t.title like '[TEST]%' and t.team_id is not null
-    order by t.montage_date, t.team_id
-  loop
-    insert into public.team_members (team_id, day, installer_id)
-    select r.team_id, r.montage_date, f.id
-      from unnest(v_fitters) as f(id)
-     where not exists (select 1 from public.team_members m where m.day = r.montage_date and m.installer_id = f.id)
-       and (select count(*) from public.team_members m where m.team_id = r.team_id and m.day = r.montage_date) = 0
-     limit 2;
   end loop;
 
   raise notice '% Testaufträge angelegt (Teamleiter: %, Monteure: %)', n, cardinality(v_leads), cardinality(v_fitters);

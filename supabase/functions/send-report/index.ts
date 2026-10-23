@@ -140,10 +140,11 @@ Deno.serve(async (req) => {
   const planner = me.role === 'admin' || me.role === 'teamleiter'
   const { data: crew } = await admin
     .from('team_members')
-    .select('installer_id')
+    .select('installer_id, lead')
     .eq('team_id', t.team_id ?? 0)
     .eq('day', t.montage_date ?? '1900-01-01')
   const crewIds = (crew ?? []).map((m) => m.installer_id as string)
+  const leadId = (crew ?? []).find((m) => m.lead)?.installer_id as string | undefined
   if (!planner && !crewIds.includes(caller.user.id)) return reply(403, { error: 'Kein Zugriff' })
   if (t.status !== 'abgeschlossen') return reply(400, { error: 'Der Auftrag ist noch nicht erledigt.' })
   if (!t.report_by_email || !t.customer_email) return reply(400, { error: 'Der Kunde hat keinen Bericht per E-Mail gewünscht.' })
@@ -185,7 +186,8 @@ Deno.serve(async (req) => {
     ['Einsatzort', (t.site_address ?? '').replace(/\n/g, ', ')],
     ['Auftragsnummer', t.order_number],
     ['Team', team?.name ?? ''],
-    ['Monteure', crewIds.map(name).filter(Boolean).join(', ')],
+    ['Verantwortlich', leadId ? name(leadId) : ''],
+    ['Monteure', crewIds.filter((id) => id !== leadId).map(name).filter(Boolean).join(', ')],
     ['Montagedatum', fmtDate(t.montage_date, false)],
     ['Erledigt am', fmtDate(t.closed_at)],
   ]

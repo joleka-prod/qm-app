@@ -40,6 +40,7 @@ export function PlanningCalendar() {
   const [unplanned, setUnplanned] = useState<Ticket[]>([])
   const [members, setMembers] = useState<TeamMember[]>([])
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   const [dropTarget, setDropTarget] = useState('')
   const [areaFilter, setAreaFilter] = useState<ServiceArea | ''>('')
 
@@ -71,6 +72,10 @@ export function PlanningCalendar() {
 
   async function plan(ticketId: number, team: Team | null, date: string | null) {
     setError('')
+    if (team && date && !leadOf(team.id, date)) {
+      setError(`Für ${team.name} ist am ${formatDay(date)} noch kein verantwortlicher Monteur eingeteilt.`)
+      return
+    }
     const { error } = await supabase
       .from('tickets')
       .update({ team_id: team?.id ?? null, montage_date: date, ...(team ? { service_area: team.area } : {}) })
@@ -79,9 +84,31 @@ export function PlanningCalendar() {
     load()
   }
 
-  async function addMember(teamId: number, day: string, installerId: string) {
+  async function addMember(team: Team, day: string, installerId: string) {
     setError('')
-    const { error } = await supabase.from('team_members').insert({ team_id: teamId, day, installer_id: installerId })
+    setInfo('')
+    const { error } = await supabase.from('team_members').insert({ team_id: team.id, day, installer_id: installerId })
+    if (error) {
+      setError(error.message)
+      return load()
+    }
+    // Am Montag eingeteilt: auf Wunsch für die restliche Woche übernehmen
+    const name = displayName(byId[installerId])
+    if (new Date(day + 'T00:00').getDay() === 1 && confirm(`${name} auch von Dienstag bis Freitag in ${team.name} einplanen?`)) {
+      const skipped: string[] = []
+      for (let i = 1; i <= 4; i++) {
+        const d = isoDate(addDays(new Date(day + 'T00:00'), i))
+        const { error } = await supabase.from('team_members').insert({ team_id: team.id, day: d, installer_id: installerId })
+        if (error) skipped.push(formatDay(d))
+      }
+      if (skipped.length) setInfo(`${name} konnte nicht eingeplant werden am ${skipped.join(', ')} (schon in einem anderen Team oder Team voll).`)
+    }
+    load()
+  }
+
+  async function makeLead(m: TeamMember) {
+    setError('')
+    const { error } = await supabase.rpc('set_team_lead', { p_team_id: m.team_id, p_day: m.day, p_installer_id: m.installer_id })
     if (error) setError(error.message)
     load()
   }
@@ -99,9 +126,11 @@ export function PlanningCalendar() {
     const prev = previousDay(day)
     const taken = new Set(members.filter((m) => m.day === day).map((m) => m.installer_id))
     const filled = new Set(members.filter((m) => m.day === day).map((m) => m.team_id))
+    // Verantwortliche zuerst eintragen, damit sie es auch am neuen Tag sind
     const rows = members
       .filter((m) => m.day === prev && !taken.has(m.installer_id) && !filled.has(m.team_id))
       .filter((m) => installers.some((i) => i.id === m.installer_id))
+      .sort((a, b) => Number(b.lead) - Number(a.lead))
       .map((m) => ({ team_id: m.team_id, day, installer_id: m.installer_id }))
     if (rows.length === 0) {
       setError(`Am ${formatDay(prev)} gibt es keine Besetzung, die übernommen werden kann.`)
@@ -131,7 +160,9 @@ export function PlanningCalendar() {
   const visibleTeams = teams.filter((t) => !areaFilter || t.area === areaFilter)
   const jobsIn = (teamId: number, date: string) =>
     planned.filter((t) => t.team_id === teamId && t.montage_date === date).sort(byTime)
-  const membersIn = (teamId: number, date: string) => members.filter((m) => m.team_id === teamId && m.day === date)
+  const membersIn = (teamId: number, date: string) =>
+    members.filter((m) => m.team_id === teamId && m.day === date).sort((a, b) => Number(b.lead) - Number(a.lead))
+  const leadOf = (teamId: number, date: string) => members.find((m) => m.team_id === teamId && m.day === date && m.lead)
   const freeInstallers = (date: string) => {
     const busy = new Set(members.filter((m) => m.day === date).map((m) => m.installer_id))
     return installers.filter((i) => !busy.has(i.id))
@@ -161,6 +192,7 @@ export function PlanningCalendar() {
         ))}
       </div>
       {error && <p className="error">{error}</p>}
+      {info && <p className="info">{info}</p>}
       {installers.length === 0 && (
         <p className="info">
           Noch keine Monteure angelegt. Lege unter „Benutzer“ Personen mit der Rolle „Monteur“ an.
@@ -175,7 +207,7 @@ export function PlanningCalendar() {
           <h2>Ungeplant ({unplanned.length})</h2>
           <p className="muted small">
             Am PC: Einsatz auf ein Team und einen Tag ziehen. Am Handy: Einsatz öffnen und unter „Einsatzplanung“ Team und
-            Datum wählen.
+            Datum wählen. Ein Team braucht dafür an dem Tag einen verantwortlichen Monteur (★).
           </p>
           <div className="unplanned-list">
             {unplanned.filter((t) => !areaFilter || t.service_area === areaFilter).map((t) => (
@@ -229,7 +261,19 @@ export function PlanningCalendar() {
                         >
                           <div className="crew">
                             {crew.map((m) => (
-                              <span key={m.installer_id} className="crew-chip">
+                              <span key={m.installer_id} className={`crew-chip ${m.lead ? 'crew-lead' : ''}`}>
+                                {m.lead ? (
+                                  <span className="crew-star" title="Verantwortlich">★</span>
+                                ) : (
+                                  <button
+                                    className="crew-star"
+                                    title="Als verantwortlich festlegen"
+                                    aria-label={`${displayName(byId[m.installer_id])} als verantwortlich festlegen`}
+                                    onClick={() => makeLead(m)}
+                                  >
+                                    ☆
+                                  </button>
+                                )}
                                 <Link to={`/monteur/${m.installer_id}`}>{displayName(byId[m.installer_id])}</Link>
                                 <button
                                   aria-label={`${displayName(byId[m.installer_id])} aus ${team.name} entfernen`}
@@ -244,7 +288,7 @@ export function PlanningCalendar() {
                                 className="crew-add"
                                 aria-label={`Monteur zu ${team.name} am ${d} hinzufügen`}
                                 value=""
-                                onChange={(e) => e.target.value && addMember(team.id, d, e.target.value)}
+                                onChange={(e) => e.target.value && addMember(team, d, e.target.value)}
                               >
                                 <option value="">+ Monteur</option>
                                 {free.map((p) => (
@@ -253,19 +297,21 @@ export function PlanningCalendar() {
                               </select>
                             )}
                             {crew.length === 0 && jobsIn(team.id, d).length > 0 && (
-                              <span className="crew-missing">Kein Monteur eingeteilt</span>
+                              <span className="crew-missing">Kein verantwortlicher Monteur</span>
                             )}
                           </div>
                           {jobsIn(team.id, d).map((t) => (
                             <JobCard key={t.id} ticket={t} draggable={t.status !== 'abgeschlossen'} />
                           ))}
-                          <Link
-                            className="cal-add"
-                            to={`/neu?art=${team.area === 'kundendienst' ? 'reparatur' : 'restarbeit'}&team=${team.id}&datum=${d}&bereich=${team.area}`}
-                            aria-label={`Neuer Einsatz für ${team.name} am ${d}`}
-                          >
-                            +
-                          </Link>
+                          {crew.length > 0 && (
+                            <Link
+                              className="cal-add"
+                              to={`/neu?art=${team.area === 'kundendienst' ? 'reparatur' : 'restarbeit'}&team=${team.id}&datum=${d}&bereich=${team.area}`}
+                              aria-label={`Neuer Einsatz für ${team.name} am ${d}`}
+                            >
+                              +
+                            </Link>
+                          )}
                         </td>
                       )
                     })}

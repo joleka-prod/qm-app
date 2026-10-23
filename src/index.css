@@ -327,3 +327,10 @@ fieldset.plan input, fieldset.plan select { width: 100%; min-width: 0; }
   .calendar-layout .unplanned-list { display: flex; flex-direction: column; }
   .calendar-layout .cal-scroll { grid-column: 1; grid-row: 1; margin: 0; padding: 0; }
 }
+.crew-lead { border-color: #f79009; background: #fffaeb; }
+.crew-star { color: #f79009; font-size: 0.85rem; padding: 0 0.1rem 0 0 !important; }
+button.crew-star { color: var(--muted); }
+button.crew-star:hover { color: #f79009; }
+@media (prefers-color-scheme: dark) { .crew-lead { background: #3a2a10; } }
+.lead-tag { display: inline-block; margin-left: 0.5rem; font-size: 0.8rem; font-weight: 600; color: #b54708; }
+@media (prefers-color-scheme: dark) { .lead-tag { color: #fdb022; } }

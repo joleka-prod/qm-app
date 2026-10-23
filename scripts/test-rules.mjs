@@ -216,6 +216,30 @@ await check('Nur aktive Teams können eingeplant werden', async () => {
   await admin.from('teams').update({ active: true }).eq('id', T2)
 })
 
+await check('Ohne verantwortlichen Monteur kein Einsatz im Team', async () => {
+  const { error } = await lead2.c.from('tickets').update({ team_id: T2, montage_date: '2026-11-09' }).eq('id', jobId)
+  assert.match(error?.message ?? '', /kein verantwortlicher Monteur/)
+})
+
+await check('Erster Monteur ist verantwortlich, Wechsel und Nachrücken', async () => {
+  await lead2.c.from('team_members').insert([
+    { team_id: T2, day: '2026-11-10', installer_id: m3.id },
+    { team_id: T2, day: '2026-11-10', installer_id: m4.id, lead: true },
+  ])
+  const crew = async () => (await admin.from('team_members').select('installer_id, lead').eq('team_id', T2).eq('day', '2026-11-10')).data
+  let c = await crew()
+  assert.deepEqual(c.filter((x) => x.lead).map((x) => x.installer_id), [m3.id])
+  let r = await m3.c.rpc('set_team_lead', { p_team_id: T2, p_day: '2026-11-10', p_installer_id: m3.id })
+  assert.ok(r.error, 'Monteur darf nicht wechseln')
+  r = await lead2.c.rpc('set_team_lead', { p_team_id: T2, p_day: '2026-11-10', p_installer_id: m4.id })
+  assert.ifError(r.error)
+  c = await crew()
+  assert.deepEqual(c.filter((x) => x.lead).map((x) => x.installer_id), [m4.id])
+  await lead2.c.from('team_members').delete().match({ team_id: T2, day: '2026-11-10', installer_id: m4.id })
+  c = await crew()
+  assert.deepEqual(c.filter((x) => x.lead).map((x) => x.installer_id), [m3.id])
+})
+
 await check('Teamleiter plant Team und Datum, Status geplant', async () => {
   const { data, error } = await lead2.c.from('tickets').update({ team_id: T1, montage_date: '2026-11-02', montage_time: '08:30' }).eq('id', jobId).select().single()
   assert.ifError(error)
@@ -246,6 +270,13 @@ await check('Monteur sieht nur eigene Einsätze', async () => {
   assert.equal(foreign.data.length, 0)
   const qmTicket = await m1.c.from('tickets').select('id').eq('ticket_type', 'qm')
   assert.equal(qmTicket.data.length, 0)
+})
+
+await check('Letzten Monteur nicht austragen, solange das Team Einsätze hat', async () => {
+  const { error } = await lead2.c.from('team_members').delete().match({ team_id: T1, day: '2026-11-02', installer_id: m1.id })
+  assert.ok(error)
+  const { data } = await admin.from('team_members').select('installer_id').eq('team_id', T1).eq('day', '2026-11-02')
+  assert.equal(data.length, 1)
 })
 
 await check('Monteur kann Termin nicht verschieben', async () => {

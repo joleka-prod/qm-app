@@ -63,6 +63,7 @@ export function TicketDetail() {
   const { byId, leads } = useProfiles()
   const { teams, teamById } = useTeams()
   const [crew, setCrew] = useState<string[]>([])
+  const [crewLead, setCrewLead] = useState('')
 
   const [ticket, setTicket] = useState<Ticket | null>(null)
   const [photos, setPhotos] = useState<TicketPhoto[]>([])
@@ -132,11 +133,15 @@ export function TicketDetail() {
     if (tk.team_id && tk.montage_date) {
       const { data: m } = await supabase
         .from('team_members')
-        .select('installer_id')
+        .select('installer_id, lead')
         .eq('team_id', tk.team_id)
         .eq('day', tk.montage_date)
       setCrew((m ?? []).map((x) => x.installer_id as string))
-    } else setCrew([])
+      setCrewLead((m ?? []).find((x) => x.lead)?.installer_id ?? '')
+    } else {
+      setCrew([])
+      setCrewLead('')
+    }
     setMontageDate(tk.montage_date ?? '')
     setMontageTime(formatTime(tk.montage_time))
     // Ungespeicherten Bericht nicht überschreiben, wenn z. B. nur eine Position abgehakt wurde
@@ -715,7 +720,10 @@ export function TicketDetail() {
           {ticket.team_id && ticket.montage_date && (
             <p className="small">
               {crew.length > 0 ? (
-                <>Monteure an dem Tag: {crew.map((id) => displayName(byId[id])).join(', ')}</>
+                <>
+                  Monteure an dem Tag:{' '}
+                  {crew.map((id) => displayName(byId[id]) + (id === crewLead ? ' (verantwortlich)' : '')).join(', ')}
+                </>
               ) : (
                 <span className="crew-missing">Für diesen Tag ist noch kein Monteur im Team eingeteilt (im Kalender zuordnen).</span>
               )}

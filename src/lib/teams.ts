@@ -14,6 +14,7 @@ export interface TeamMember {
   team_id: number
   day: string
   installer_id: string
+  lead: boolean
 }
 
 export function useTeams() {
@@ -31,7 +32,7 @@ export function useTeams() {
 
 // Besetzung der Teams in einem Zeitraum
 export async function loadMembers(from: string, to: string, installerId?: string) {
-  let q = supabase.from('team_members').select('team_id, day, installer_id').gte('day', from).lte('day', to)
+  let q = supabase.from('team_members').select('team_id, day, installer_id, lead').gte('day', from).lte('day', to)
   if (installerId) q = q.eq('installer_id', installerId)
   const { data } = await q
   return (data ?? []) as TeamMember[]

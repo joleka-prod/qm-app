@@ -76,7 +76,12 @@ export function InstallerCalendar() {
     const mine = members.find((m) => m.day === d && m.installer_id === installerId)
     if (!mine) return null
     const others = members.filter((m) => m.day === d && m.team_id === mine.team_id && m.installer_id !== installerId)
-    return { team: teamById[mine.team_id]?.name ?? 'Team', others: others.map((m) => displayName(byId[m.installer_id])) }
+    const lead = members.find((m) => m.day === d && m.team_id === mine.team_id && m.lead)
+    return {
+      team: teamById[mine.team_id]?.name ?? 'Team',
+      others: others.map((m) => displayName(byId[m.installer_id]) + (m.lead ? ' (verantwortlich)' : '')),
+      isLead: lead?.installer_id === installerId,
+    }
   }
 
   return (
@@ -119,6 +124,7 @@ export function InstallerCalendar() {
               <p className="crew-line">
                 <strong>{crewOf(d)!.team}</strong>
                 {crewOf(d)!.others.length > 0 && <> · mit {crewOf(d)!.others.join(', ')}</>}
+                {crewOf(d)!.isLead && <span className="lead-tag">★ {own ? 'Du bist' : 'ist'} verantwortlich</span>}
               </p>
             ) : (
               <p className="muted small">Keinem Team zugeteilt.</p>
