@@ -81,6 +81,8 @@ export interface TicketPosition {
   state: PositionState
   reason: string
   price: number | null
+  quantity: number
+  unit: string
   done_by: string | null
   done_at: string | null
 }

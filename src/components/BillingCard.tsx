@@ -15,6 +15,14 @@ function toText(n: number | null) {
   return n == null ? '' : n.toFixed(2).replace('.', ',')
 }
 
+function qtyText(n: number) {
+  return String(n).replace('.', ',')
+}
+
+const UNITS = ['Stk', 'Std', 'm', 'm²', 'lfm', 'km', 'pauschal']
+
+type Row = { quantity: string; unit: string; price: string }
+
 // "12,50" / "1.234,5" / "12.5" -> 12.5; leer -> null; ungültig -> NaN
 function parsePrice(s: string) {
   const v = s.trim().replace(/\s|€/g, '')
@@ -25,29 +33,38 @@ function parsePrice(s: string) {
 
 // Preise je Position eintragen, solange ein Reparaturauftrag zur Berechnung steht
 export function BillingCard({ ticket: t, positions, byId, canEdit, isAdmin, onChanged }: Props) {
-  const [texts, setTexts] = useState<Record<number, string>>({})
+  const [rows, setRows] = useState<Record<number, Row>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    setTexts(Object.fromEntries(positions.map((p) => [p.id, toText(p.price)])))
+    setRows(Object.fromEntries(positions.map((p) => [p.id, { quantity: qtyText(p.quantity), unit: p.unit, price: toText(p.price) }])))
   }, [positions])
 
   const open = t.billing_state === 'zur_berechnung'
   const editable = open && canEdit
-  const total = positions.reduce((sum, p) => sum + (p.price ?? 0), 0)
+  const amount = (p: TicketPosition) => (p.price == null ? null : Math.round(p.quantity * p.price * 100) / 100)
+  const total = positions.reduce((sum, p) => sum + (amount(p) ?? 0), 0)
   const missing = positions.filter((p) => p.price == null).length
 
-  async function savePrice(p: TicketPosition) {
-    const price = parsePrice(texts[p.id] ?? '')
-    if (Number.isNaN(price)) {
-      setError('Bitte den Preis als Zahl eingeben, z. B. 49,90')
-      return
-    }
-    if (price === p.price) return
+  async function saveRow(p: TicketPosition) {
+    const row = rows[p.id]
+    if (!row) return
+    const price = parsePrice(row.price)
+    const quantity = parsePrice(row.quantity)
+    const unit = row.unit.trim()
+    if (Number.isNaN(price)) return setError('Bitte den Einzelpreis als Zahl eingeben, z. B. 49,90')
+    if (quantity == null || Number.isNaN(quantity) || quantity <= 0) return setError('Bitte eine Menge größer als 0 eingeben, z. B. 1 oder 2,5')
+    if (!unit) return setError('Bitte eine Einheit angeben, z. B. Stk oder Std')
+    if (price === p.price && quantity === p.quantity && unit === p.unit) return
     setBusy(true)
     setError('')
-    const { error } = await supabase.rpc('set_position_price', { p_position_id: p.id, p_price: price })
+    const { error } = await supabase.rpc('set_position_billing', {
+      p_position_id: p.id,
+      p_quantity: quantity,
+      p_unit: unit,
+      p_price: price,
+    })
     if (error) setError(error.message)
     await onChanged()
     setBusy(false)
@@ -71,6 +88,11 @@ export function BillingCard({ ticket: t, positions, byId, canEdit, isAdmin, onCh
         <p className="muted">Der Auftrag hat keine Positionen, deshalb können keine Preise eingetragen werden.</p>
       ) : (
         <>
+          <datalist id="billing-units">
+            {UNITS.map((u) => (
+              <option key={u} value={u} />
+            ))}
+          </datalist>
           <ul className="billing-list">
             {positions.map((p) => (
               <li key={p.id}>
@@ -83,19 +105,53 @@ export function BillingCard({ ticket: t, positions, byId, canEdit, isAdmin, onCh
                   </div>
                 </div>
                 {editable ? (
-                  <input
-                    className="billing-price"
-                    inputMode="decimal"
-                    placeholder="0,00 €"
-                    aria-label={`Preis Position ${p.position_number || p.sort + 1}`}
-                    value={texts[p.id] ?? ''}
-                    disabled={busy}
-                    onChange={(e) => setTexts({ ...texts, [p.id]: e.target.value })}
-                    onBlur={() => savePrice(p)}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-                  />
+                  <div className="billing-inputs">
+                    <label>
+                      Menge
+                      <input
+                        inputMode="decimal"
+                        value={rows[p.id]?.quantity ?? ''}
+                        disabled={busy}
+                        onChange={(e) => setRows({ ...rows, [p.id]: { ...rows[p.id], quantity: e.target.value } })}
+                        onBlur={() => saveRow(p)}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                      />
+                    </label>
+                    <label>
+                      Einheit
+                      <input
+                        list="billing-units"
+                        maxLength={20}
+                        value={rows[p.id]?.unit ?? ''}
+                        disabled={busy}
+                        onChange={(e) => setRows({ ...rows, [p.id]: { ...rows[p.id], unit: e.target.value } })}
+                        onBlur={() => saveRow(p)}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                      />
+                    </label>
+                    <label>
+                      Einzelpreis €
+                      <input
+                        className="billing-price"
+                        inputMode="decimal"
+                        placeholder="0,00"
+                        aria-label={`Einzelpreis Position ${p.position_number || p.sort + 1}`}
+                        value={rows[p.id]?.price ?? ''}
+                        disabled={busy}
+                        onChange={(e) => setRows({ ...rows, [p.id]: { ...rows[p.id], price: e.target.value } })}
+                        onBlur={() => saveRow(p)}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                      />
+                    </label>
+                    <span className="billing-amount">{formatEuro(amount(p))}</span>
+                  </div>
                 ) : (
-                  <span className="billing-amount">{formatEuro(p.price)}</span>
+                  <div className="billing-readonly">
+                    <span className="small muted">
+                      {qtyText(p.quantity)} {p.unit} × {formatEuro(p.price)}
+                    </span>
+                    <span className="billing-amount">{formatEuro(amount(p))}</span>
+                  </div>
                 )}
               </li>
             ))}
