@@ -17,5 +17,7 @@ export function useProfiles() {
   const byId = Object.fromEntries(profiles.map((p) => [p.id, p])) as Record<string, Profile>
   const leads = profiles.filter((p) => p.active && (p.role === 'teamleiter' || p.role === 'admin'))
 
-  return { profiles, byId, leads, reload }
+  const installers = profiles.filter((p) => p.active && p.role === 'monteur')
+
+  return { profiles, byId, leads, installers, reload }
 }

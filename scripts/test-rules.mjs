@@ -159,6 +159,95 @@ await check('Verlauf ist vollständig und für Ersteller sichtbar', async () => 
   for (const k of ['auftrag', 'erstellt', 'zugewiesen', 'ursache', 'massnahme', 'status', 'pruefhinweis']) assert.ok(kinds.includes(k), k)
 })
 
+// --- Einsätze (Restarbeit, Beanstandung, Reparatur) ---
+const m1 = await user('monteur1', 'monteur')
+const m2 = await user('monteur2', 'monteur')
+let jobId
+
+await check('Mitarbeiter legt Restarbeit an, Planung wird ignoriert', async () => {
+  const { data, error } = await worker.c.from('tickets').insert({
+    ticket_type: 'restarbeit', title: 'Griff tauschen', customer_name: 'Müller', site_address: 'Hauptstr. 1',
+    installer_id: m1.id, montage_date: '2026-11-02', assigned_to: lead.id,
+  }).select().single()
+  assert.ifError(error)
+  assert.equal(data.status, 'neu')
+  assert.equal(data.installer_id, null)
+  assert.equal(data.assigned_to, null)
+  jobId = data.id
+})
+
+await check('Nur Monteure können eingeplant werden', async () => {
+  const { error } = await lead2.c.from('tickets').update({ installer_id: worker.id, montage_date: '2026-11-02' }).eq('id', jobId)
+  assert.ok(error)
+})
+
+await check('Teamleiter plant Monteur und Datum, Status geplant', async () => {
+  const { data, error } = await lead2.c.from('tickets').update({ installer_id: m1.id, montage_date: '2026-11-02', montage_time: '08:30' }).eq('id', jobId).select().single()
+  assert.ifError(error)
+  assert.equal(data.status, 'zugewiesen')
+})
+
+await check('Monteur sieht nur eigene Einsätze', async () => {
+  const own = await m1.c.from('tickets').select('id').eq('id', jobId)
+  assert.equal(own.data.length, 1)
+  const foreign = await m2.c.from('tickets').select('id').eq('id', jobId)
+  assert.equal(foreign.data.length, 0)
+  const qmTicket = await m1.c.from('tickets').select('id').eq('ticket_type', 'qm')
+  assert.equal(qmTicket.data.length, 0)
+})
+
+await check('Monteur kann Termin nicht verschieben', async () => {
+  const { error } = await m1.c.from('tickets').update({ montage_date: '2026-11-09' }).eq('id', jobId)
+  assert.ok(error)
+})
+
+await check('Erledigt nur mit Arbeitsbericht', async () => {
+  const { error } = await m1.c.from('tickets').update({ status: 'abgeschlossen' }).eq('id', jobId)
+  assert.ok(error)
+})
+
+await check('Teamleiter kann Einsatz nicht als erledigt melden', async () => {
+  const { error } = await lead2.c.from('tickets').update({ work_report: 'x', status: 'abgeschlossen' }).eq('id', jobId)
+  assert.ok(error)
+})
+
+await check('Monteur lädt Foto hoch und meldet erledigt', async () => {
+  const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082', 'hex')
+  const up = await m1.c.storage.from('ticket-photos').upload(`${jobId}/m.png`, png, { contentType: 'image/png' })
+  assert.ifError(up.error)
+  const { data, error } = await m1.c.from('tickets').update({ work_report: 'Griff getauscht', status: 'abgeschlossen' }).eq('id', jobId).select().single()
+  assert.ifError(error)
+  assert.equal(data.status, 'abgeschlossen')
+  assert.ok(data.closed_at)
+})
+
+await check('Erledigter Einsatz ist für Monteur gesperrt, Admin öffnet wieder', async () => {
+  const { error } = await m1.c.from('tickets').update({ work_report: 'y' }).eq('id', jobId)
+  assert.ok(error)
+  const r = await qm.c.from('tickets').update({ status: 'zugewiesen' }).eq('id', jobId).select().single()
+  assert.ifError(r.error)
+  assert.equal(r.data.status, 'zugewiesen')
+})
+
+await check('Planung entfernen setzt Einsatz auf ungeplant', async () => {
+  const { data, error } = await qm.c.from('tickets').update({ installer_id: null, montage_date: null }).eq('id', jobId).select().single()
+  assert.ifError(error)
+  assert.equal(data.status, 'neu')
+})
+
+await check('Einsatz-Verlauf enthält Planung und Bericht', async () => {
+  const { data } = await qm.c.from('ticket_events').select('kind').eq('ticket_id', jobId)
+  const kinds = data.map((e) => e.kind)
+  for (const k of ['erstellt', 'eingeplant', 'bericht', 'status']) assert.ok(kinds.includes(k), k)
+})
+
+await check('QM-Ticket ignoriert Monteur-Felder', async () => {
+  const { data, error } = await qm.c.from('tickets').insert({ title: 'QM', installer_id: m1.id, montage_date: '2026-11-02' }).select().single()
+  assert.ifError(error)
+  assert.equal(data.installer_id, null)
+  assert.equal(data.montage_date, null)
+})
+
 // --- Löschanträge ---
 let delId
 await check('Mitarbeiter kann Ticket nicht direkt löschen', async () => {

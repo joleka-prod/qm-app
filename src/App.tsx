@@ -2,8 +2,10 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth'
 import { Layout } from './components/Layout'
 import { configMissing } from './lib/supabase'
+import { InstallerCalendar } from './pages/InstallerCalendar'
 import { Login } from './pages/Login'
 import { NewTicket } from './pages/NewTicket'
+import { PlanningCalendar } from './pages/PlanningCalendar'
 import { ProfilePage } from './pages/ProfilePage'
 import { SetPassword } from './pages/SetPassword'
 import { TicketDetail } from './pages/TicketDetail'
@@ -19,10 +21,15 @@ function Routed() {
   if (!profile) return <p className="center muted">Profil wird geladen…</p>
   if (!profile.active) return <p className="center">Dein Zugang ist deaktiviert. Bitte wende dich an die QM-Abteilung.</p>
 
+  const isPlanner = profile.role === 'admin' || profile.role === 'teamleiter'
+
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<TicketList />} />
+        <Route index element={profile.role === 'monteur' ? <InstallerCalendar /> : <TicketList />} />
+        <Route path="tickets" element={<TicketList />} />
+        {isPlanner && <Route path="kalender" element={<PlanningCalendar />} />}
+        {isPlanner && <Route path="monteur/:id" element={<InstallerCalendar />} />}
         <Route path="neu" element={<NewTicket />} />
         <Route path="ticket/:id" element={<TicketDetail />} />
         <Route path="profil" element={<ProfilePage />} />

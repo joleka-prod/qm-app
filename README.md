@@ -45,6 +45,13 @@ Die erste Person, die angelegt wird, wird automatisch **QM / Admin**
 (*Authentication → Users → Add user → Create new user*, „Auto Confirm User“ aktiviert).
 Alle weiteren Benutzer legt QM/Admin direkt in der App unter **Benutzer** an.
 
+### Ticketarten und Monteure
+
+Neben QM-Tickets gibt es Restarbeiten, Beanstandungen und Reparaturaufträge („Einsätze“).
+QM/Admin und Teamleiter planen Einsätze (Monteur, Montagedatum, optional Uhrzeit) im Ticket oder im
+**Kalender** (Wochenansicht aller Monteure, Einplanen per Ziehen). Monteure (Rolle „Monteur“) sehen nach
+dem Login ihren persönlichen Kalender, schreiben den Arbeitsbericht und melden den Einsatz erledigt.
+
 ### Tickets löschen
 
 Nur QM/Admin löscht Tickets. Alle anderen können die Löschung mit Begründung beantragen;

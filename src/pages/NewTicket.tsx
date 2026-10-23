@@ -1,22 +1,37 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useAuth } from '../auth'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { uploadPhotos } from '../lib/photos'
 import { supabase } from '../lib/supabase'
-import { displayName } from '../lib/types'
+import { TICKET_TYPES, TYPE_LABEL, displayName, type TicketType } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 
 export function NewTicket() {
   const navigate = useNavigate()
-  const { leads } = useProfiles()
+  const [params] = useSearchParams()
+  const { profile } = useAuth()
+  const { leads, installers } = useProfiles()
+  const canPlan = profile?.role === 'admin' || profile?.role === 'teamleiter'
+
+  const [type, setType] = useState<TicketType>(
+    TICKET_TYPES.includes(params.get('art') as TicketType) ? (params.get('art') as TicketType) : 'qm',
+  )
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [orderNumber, setOrderNumber] = useState('')
   const [positionNumber, setPositionNumber] = useState('')
+  const [customer, setCustomer] = useState('')
+  const [address, setAddress] = useState('')
   const [assignedTo, setAssignedTo] = useState('')
+  const [installer, setInstaller] = useState(params.get('monteur') ?? '')
+  const [montageDate, setMontageDate] = useState(params.get('datum') ?? '')
+  const [montageTime, setMontageTime] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  const einsatz = type !== 'qm'
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -25,11 +40,17 @@ export function NewTicket() {
     const { data, error } = await supabase
       .from('tickets')
       .insert({
+        ticket_type: type,
         title: title.trim(),
         description: description.trim(),
         order_number: orderNumber.trim(),
         position_number: positionNumber.trim(),
-        assigned_to: assignedTo || null,
+        customer_name: einsatz ? customer.trim() : '',
+        site_address: einsatz ? address.trim() : '',
+        assigned_to: !einsatz && assignedTo ? assignedTo : null,
+        installer_id: einsatz && canPlan && installer ? installer : null,
+        montage_date: einsatz && canPlan && montageDate ? montageDate : null,
+        montage_time: einsatz && canPlan && montageTime ? montageTime : null,
       })
       .select('id')
       .single()
@@ -48,10 +69,30 @@ export function NewTicket() {
 
   return (
     <form className="card form" onSubmit={submit}>
-      <h1>Neues QM-Ticket</h1>
+      <h1>Neu anlegen</h1>
+      <div className="segmented" role="radiogroup" aria-label="Art">
+        {TICKET_TYPES.map((t) => (
+          <button
+            type="button"
+            key={t}
+            role="radio"
+            aria-checked={type === t}
+            className={type === t ? 'active' : ''}
+            onClick={() => setType(t)}
+          >
+            {TYPE_LABEL[t]}
+          </button>
+        ))}
+      </div>
       <label>
         Kurzbeschreibung *
-        <input required maxLength={150} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="z. B. Kratzer an Gehäuse Charge 4711" />
+        <input
+          required
+          maxLength={150}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder={einsatz ? 'z. B. Fenster schließt nicht, Griff tauschen' : 'z. B. Kratzer an Gehäuse Charge 4711'}
+        />
       </label>
       <div className="row">
         <label>
@@ -63,27 +104,73 @@ export function NewTicket() {
           <input value={positionNumber} maxLength={20} onChange={(e) => setPositionNumber(e.target.value)} />
         </label>
       </div>
+      {einsatz && (
+        <>
+          <label>
+            Kunde
+            <input value={customer} maxLength={150} onChange={(e) => setCustomer(e.target.value)} />
+          </label>
+          <label>
+            Einsatzort / Adresse
+            <textarea rows={2} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Straße, PLZ Ort" />
+          </label>
+        </>
+      )}
       <label>
         Beschreibung
-        <textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Was ist passiert? Wo? Wann?" />
+        <textarea
+          rows={5}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder={einsatz ? 'Was ist zu tun?' : 'Was ist passiert? Wo? Wann?'}
+        />
       </label>
       <div className="field">
         <span>Fotos</span>
         <PhotoPicker files={files} onChange={setFiles} />
       </div>
-      <label>
-        Verantwortlicher Teamleiter
-        <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}>
-          <option value="">– später durch QM zuweisen –</option>
-          {leads.map((p) => (
-            <option key={p.id} value={p.id}>{displayName(p)}</option>
-          ))}
-        </select>
-      </label>
+      {einsatz ? (
+        canPlan ? (
+          <fieldset className="plan">
+            <legend>Einplanen</legend>
+            <label>
+              Monteur
+              <select value={installer} onChange={(e) => setInstaller(e.target.value)}>
+                <option value="">– noch nicht eingeplant –</option>
+                {installers.map((p) => (
+                  <option key={p.id} value={p.id}>{displayName(p)}</option>
+                ))}
+              </select>
+            </label>
+            <div className="row">
+              <label>
+                Montagedatum
+                <input type="date" value={montageDate} onChange={(e) => setMontageDate(e.target.value)} />
+              </label>
+              <label>
+                Uhrzeit (optional)
+                <input type="time" value={montageTime} onChange={(e) => setMontageTime(e.target.value)} />
+              </label>
+            </div>
+          </fieldset>
+        ) : (
+          <p className="muted small">Monteur und Termin werden von QM oder einem Teamleiter eingeplant.</p>
+        )
+      ) : (
+        <label>
+          Verantwortlicher Teamleiter
+          <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}>
+            <option value="">– später durch QM zuweisen –</option>
+            {leads.map((p) => (
+              <option key={p.id} value={p.id}>{displayName(p)}</option>
+            ))}
+          </select>
+        </label>
+      )}
       {error && <p className="error">{error}</p>}
       <div className="actions">
         <button type="button" onClick={() => navigate(-1)} disabled={busy}>Abbrechen</button>
-        <button className="primary" disabled={busy}>{busy ? 'Speichert…' : 'Ticket anlegen'}</button>
+        <button className="primary" disabled={busy}>{busy ? 'Speichert…' : `${TYPE_LABEL[type]} anlegen`}</button>
       </div>
     </form>
   )

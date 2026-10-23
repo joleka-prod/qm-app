@@ -9,7 +9,7 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const ROLES = ['mitarbeiter', 'teamleiter', 'admin']
+const ROLES = ['mitarbeiter', 'teamleiter', 'monteur', 'admin']
 
 function reply(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), {
