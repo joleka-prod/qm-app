@@ -245,6 +245,8 @@ fieldset.plan label { display: flex; flex-direction: column; gap: 0.3rem; font-w
 .agenda-jobs { display: flex; flex-direction: column; gap: 0.4rem; }
 .agenda-jobs .job { font-size: 0.95rem; padding: 0.6rem 0.7rem; margin: 0; }
 .content.wide { max-width: 1240px; }
+.content.full { max-width: none; }
+@media (min-width: 900px) { .calendar-layout { grid-template-columns: minmax(0, 1fr) 280px; } }
 
 /* --- Bereich Kundendienst / Montage --- */
 .segmented.two { grid-template-columns: repeat(2, 1fr); }

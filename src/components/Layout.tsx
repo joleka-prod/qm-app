@@ -32,7 +32,7 @@ export function Layout() {
           <button className="link" onClick={() => supabase.auth.signOut()}>Abmelden</button>
         </nav>
       </header>
-      <main className={wide ? 'content wide' : 'content'}>
+      <main className={path === '/kalender' ? 'content full' : wide ? 'content wide' : 'content'}>
         <Outlet />
       </main>
       <footer className="app-version">Version {__BUILD__}</footer>
