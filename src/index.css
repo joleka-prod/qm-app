@@ -316,7 +316,6 @@ fieldset.plan input, fieldset.plan select { width: 100%; min-width: 0; }
 .app-version { text-align: center; font-size: 0.75rem; color: var(--muted); padding: 1rem 0 1.5rem; }
 
 /* --- Teams im Kalender --- */
-.cal-copy { display: block; margin: 0.15rem auto 0; font-weight: 500; font-size: 0.72rem; }
 .cal-group th { text-align: left; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 0.35rem 0.5rem; background: var(--bg); position: sticky; left: 0; }
 .cal-team-montage { border-left: 4px solid #7a5af8 !important; }
 .cal-team-kundendienst { border-left: 4px solid #2e90fa !important; }

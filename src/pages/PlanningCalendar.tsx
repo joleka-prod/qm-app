@@ -25,12 +25,6 @@ function byTime(a: Ticket, b: Ticket) {
   return (a.montage_time ?? '99').localeCompare(b.montage_time ?? '99') || a.id - b.id
 }
 
-// Vorheriger Arbeitstag (Montag → Samstag)
-function previousDay(d: string) {
-  const prev = addDays(new Date(d + 'T00:00'), -1)
-  return isoDate(prev.getDay() === 0 ? addDays(prev, -1) : prev)
-}
-
 // Gesamtkalender für QM/Admin und Teamleiter: Teams als Zeilen, pro Tag mit 1–3 Monteuren besetzt.
 // Einsätze werden per Ziehen einem Team und Tag zugeordnet.
 export function PlanningCalendar() {
@@ -77,8 +71,7 @@ export function PlanningCalendar() {
         .gte('montage_date', from)
         .lte('montage_date', to),
       supabase.from('tickets').select('*, ticket_positions(count)').neq('ticket_type', 'qm').eq('status', 'neu').order('created_at'),
-      // Vortag des Montags für „wie Vortag“ mitladen
-      loadMembers(previousDay(from), to),
+      loadMembers(from, to),
     ])
     setPlanned(((p.data ?? []) as Ticket[]).filter((t) => t.team_id))
     setUnplanned((u.data ?? []) as Ticket[])
@@ -139,27 +132,6 @@ export function PlanningCalendar() {
   async function removeMember(m: TeamMember) {
     setError('')
     const { error } = await supabase.from('team_members').delete().match(m)
-    if (error) setError(error.message)
-    load()
-  }
-
-  // Besetzung des vorherigen Arbeitstags übernehmen, soweit Teams und Monteure an dem Tag noch frei sind
-  async function copyPreviousDay(day: string) {
-    setError('')
-    const prev = previousDay(day)
-    const taken = new Set(members.filter((m) => m.day === day).map((m) => m.installer_id))
-    const filled = new Set(members.filter((m) => m.day === day).map((m) => m.team_id))
-    // Verantwortliche zuerst eintragen, damit sie es auch am neuen Tag sind
-    const rows = members
-      .filter((m) => m.day === prev && !taken.has(m.installer_id) && !filled.has(m.team_id))
-      .filter((m) => installers.some((i) => i.id === m.installer_id))
-      .sort((a, b) => Number(b.lead) - Number(a.lead))
-      .map((m) => ({ team_id: m.team_id, day, installer_id: m.installer_id }))
-    if (rows.length === 0) {
-      setError(`Am ${formatDay(prev)} gibt es keine Besetzung, die übernommen werden kann.`)
-      return
-    }
-    const { error } = await supabase.from('team_members').insert(rows)
     if (error) setError(error.message)
     load()
   }
@@ -262,9 +234,6 @@ export function PlanningCalendar() {
   const dayLabel = (d: string) => (
     <>
       {new Date(d + 'T00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}
-      <button className="link small cal-copy" title={`Besetzung vom ${formatDay(previousDay(d))} übernehmen`} onClick={() => copyPreviousDay(d)}>
-        wie Vortag
-      </button>
     </>
   )
   // Teams einer Spalte nach Bereich gruppiert (für die Kopfzeile in der gedrehten Ansicht)
