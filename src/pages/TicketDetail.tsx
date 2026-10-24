@@ -694,7 +694,7 @@ export function TicketDetail() {
         )}
       </section>
 
-      {einsatz && (
+      {einsatz && profile.role !== 'monteur' && (
         <section className="card">
           <h2>Einsatzplanung</h2>
           {canPlan ? (
@@ -780,7 +780,7 @@ export function TicketDetail() {
         </section>
       )}
 
-      {einsatz && (
+      {einsatz && profile.role !== 'monteur' && (
         <AppointmentCard
           ticket={ticket}
           profiles={profiles}
