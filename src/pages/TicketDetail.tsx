@@ -1037,14 +1037,6 @@ export function TicketDetail() {
         </>
       )}
 
-      {isAdmin && closed && (
-        <div className="actions">
-          <button disabled={busy} onClick={() => update({ status: einsatz ? 'zugewiesen' : 'in_bearbeitung' })}>
-            Wieder öffnen
-          </button>
-        </div>
-      )}
-
       {error && <p className="error">{error}</p>}
 
       {profile.role !== 'monteur' && (
@@ -1103,6 +1095,11 @@ export function TicketDetail() {
         </section>
       ) : isAdmin ? (
         <div className="actions danger-zone">
+          {closed && (
+            <button disabled={busy} onClick={() => update({ status: einsatz ? 'zugewiesen' : 'in_bearbeitung' })}>
+              Wieder öffnen
+            </button>
+          )}
           <button className="danger" onClick={removeTicket}>Auftrag löschen</button>
         </div>
       ) : canRequestDeletion && requestingDeletion ? (
