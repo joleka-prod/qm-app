@@ -28,7 +28,7 @@ function reply(status: number, body: Record<string, unknown>) {
 
 type Point = { lat: string; lon: string }
 // Treffer der Adresssuche; exact = Straße bzw. Hausnummer gefunden (nicht nur Ort)
-type Hit = Point & { exact: boolean; postcode: string; housenumber: string; label: string }
+type Hit = Point & { exact: boolean; postcode: string; housenumber: string; street: string; label: string }
 
 const COUNTRIES = 'de,at,ch,lu,be,nl,fr'
 
@@ -50,6 +50,7 @@ async function lookup(address: string): Promise<Hit | null> {
           exact: ['house', 'street'].includes(p.type) || !!p.housenumber,
           postcode: p.postcode ?? '',
           housenumber: p.housenumber ?? '',
+          street: street ?? '',
           label: [`${street ?? ''} ${p.housenumber ?? ''}`.trim(), `${p.postcode ?? ''} ${p.city ?? p.name ?? ''}`.trim()].filter(Boolean).join(', '),
         }
       }
@@ -67,11 +68,35 @@ async function lookup(address: string): Promise<Hit | null> {
       exact: !!(a.road || a.house_number),
       postcode: a.postcode ?? '',
       housenumber: a.house_number ?? '',
+      street: a.road ?? '',
       label: [`${a.road ?? ''} ${a.house_number ?? ''}`.trim(), `${a.postcode ?? ''} ${a.city ?? a.town ?? a.village ?? ''}`.trim()].filter(Boolean).join(', '),
     }
   }
   if (status === 200) return null
   throw new Error(`Adresssuche nicht erreichbar (${status || '-'} / ${res.status})`)
+}
+
+// Straßennamen vergleichbar machen: "Hauptstr." = "Hauptstraße" = "Haupt-Straße"
+function streetKey(x: string) {
+  return x
+    .toLowerCase()
+    .replace(/ß/g, 'ss').replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue')
+    .replace(/str\.?(\s|$)/g, 'strasse$1')
+    .replace(/[^a-z0-9]/g, '')
+}
+
+// Kleine Tippfehler (1 Zeichen je 8) gelten noch als gleiche Straße
+function sameStreet(a: string, b: string) {
+  const x = streetKey(a)
+  const y = streetKey(b)
+  if (!x || !y) return false
+  if (x === y) return true
+  const d: number[][] = Array.from({ length: x.length + 1 }, (_, i) => [i, ...Array(y.length).fill(0)])
+  for (let j = 1; j <= y.length; j++) d[0][j] = j
+  for (let i = 1; i <= x.length; i++)
+    for (let j = 1; j <= y.length; j++)
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1))
+  return d[x.length][y.length] <= Math.floor(Math.max(x.length, y.length) / 8)
 }
 
 async function geocode(address: string): Promise<Point | null> {
@@ -126,6 +151,9 @@ Deno.serve(async (req) => {
       const hit = await lookup(query)
       if (!hit || (v(body.street) && !hit.exact)) return reply(200, { found: false, reason: '', label: hit?.label ?? '' })
       const norm = (x: string) => x.toLowerCase().replace(/\s+/g, '')
+      if (v(body.street) && !sameStreet(hit.street, v(body.street))) {
+        return reply(200, { found: false, reason: 'Diese Straße wurde im Ort nicht gefunden.', label: hit.label })
+      }
       if (v(body.zip) && hit.postcode && norm(hit.postcode) !== norm(v(body.zip))) {
         return reply(200, { found: false, reason: 'Die PLZ passt nicht zur Straße.', label: hit.label })
       }
