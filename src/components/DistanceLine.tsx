@@ -51,6 +51,9 @@ export function DistanceLine({ ticket, onChanged }: { ticket: Ticket; onChanged:
       {!busy && (!stale || error) && (
         <button className="link" onClick={calc}>Neu berechnen</button>
       )}
+      <span className="distance-target muted">
+        zur {ticket.jobsite_address_different ? 'Baustellenadresse' : 'Kundenadresse'}: {address.replace(/\s*\n\s*/g, ', ')}
+      </span>
     </p>
   )
 }
