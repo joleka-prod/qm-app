@@ -154,7 +154,7 @@ export function VacationCard({ userId, me, byId, year, onChanged }: Props) {
           <div><span className="muted small">Beantragt</span><strong>{dayWord(requested)}</strong></div>
           <div><span className="muted small">Rest</span><strong className={rest < 0 ? 'appointment-warn' : ''}>{dayWord(rest)}</strong></div>
         </div>
-        {allowance === 0 && <p className="small muted">Der Urlaubsanspruch wird vom Admin in der Benutzerverwaltung eingetragen.</p>}
+        {allowance === 0 && <p className="small muted">Kein Urlaubsanspruch eingetragen. Der Admin kann ihn in der Benutzerverwaltung ändern.</p>}
 
         {own && !form && (
           <button className="primary" onClick={() => { setError(''); setForm({ start: '', end: '', note: '' }) }}>
