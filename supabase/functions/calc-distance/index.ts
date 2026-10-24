@@ -103,8 +103,8 @@ async function geocode(address: string): Promise<Point | null> {
   return await lookup(address)
 }
 
-// Einfache Strecke in Metern
-async function route(a: Point, b: Point) {
+// Einfache Strecke: Meter und Sekunden
+async function route(a: Point, b: Point): Promise<{ distance: number; duration: number }> {
   let last = ''
   for (const base of OSRM) {
     try {
@@ -114,7 +114,7 @@ async function route(a: Point, b: Point) {
         continue
       }
       const data = await res.json()
-      if (data.code === 'Ok' && data.routes?.length) return data.routes[0].distance as number
+      if (data.code === 'Ok' && data.routes?.length) return { distance: data.routes[0].distance, duration: data.routes[0].duration }
       last = data.code
     } catch (e) {
       last = e instanceof Error ? e.message : 'Fehler'
@@ -180,12 +180,12 @@ Deno.serve(async (req) => {
     ? [`${t.jobsite_street} ${t.jobsite_house_no}`.trim(), `${t.jobsite_zip} ${t.jobsite_city}`.trim(), t.jobsite_country === 'Deutschland' ? '' : t.jobsite_country]
       .filter(Boolean).join('\n')
     : (t.site_address ?? '').trim()
-  const save = async (km: number | null, error: string) => {
-    await admin.from('tickets').update({ distance_km: km, distance_address: address, distance_error: error }).eq('id', t.id)
+  const save = async (km: number | null, error: string, minutes: number | null = null) => {
+    await admin.from('tickets').update({ distance_km: km, distance_minutes: minutes, distance_address: address, distance_error: error }).eq('id', t.id)
       .eq('site_address', t.site_address).eq('jobsite_address_different', t.jobsite_address_different)
       .eq('jobsite_street', t.jobsite_street).eq('jobsite_house_no', t.jobsite_house_no)
       .eq('jobsite_zip', t.jobsite_zip).eq('jobsite_city', t.jobsite_city).eq('jobsite_country', t.jobsite_country)
-    return reply(200, { distance_km: km, distance_error: error })
+    return reply(200, { distance_km: km, distance_minutes: minutes, distance_error: error })
   }
   if (!address) return save(null, '')
 
@@ -194,8 +194,9 @@ Deno.serve(async (req) => {
     if (!from) throw new Error('Hauptstandort wurde nicht gefunden.')
     const to = await geocode(address.replace(/\s*\n\s*/g, ', '))
     if (!to) return save(null, 'Kundenadresse wurde nicht gefunden. Bitte Straße, PLZ und Ort prüfen.')
-    const meters = await route(from, to)
-    return save(Math.round((meters * 2) / 100) / 10, '')
+    const r = await route(from, to)
+    // hin und zurück
+    return save(Math.round((r.distance * 2) / 100) / 10, '', Math.round((r.duration * 2) / 60))
   } catch (e) {
     return save(null, e instanceof Error ? e.message : 'Fahrstrecke konnte nicht berechnet werden.')
   }

@@ -4,6 +4,9 @@ import { supabase } from '../lib/supabase'
 import type { Ticket } from '../lib/types'
 import { jobAddress } from './AddressFields'
 
+// Fahrzeit wie "1 Std. 25 Min."
+const duration = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} Std. ${m % 60} Min.` : `${m} Min.`)
+
 const km = (v: number) => v.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
 // Fahrstrecke bei Service-Aufträgen (Hauptstandort → Kunde → zurück). Wird automatisch berechnet,
@@ -13,7 +16,8 @@ export function DistanceLine({ ticket, onChanged }: { ticket: Ticket; onChanged:
   const [error, setError] = useState('')
   const asked = useRef('')
   const address = jobAddress(ticket)
-  const stale = !!address && ticket.distance_address !== address
+  // auch neu rechnen, wenn nur die Fahrzeit noch fehlt (ältere Berechnungen)
+  const stale = !!address && (ticket.distance_address !== address || (ticket.distance_km != null && ticket.distance_minutes == null))
 
   async function calc() {
     setBusy(true)
@@ -44,7 +48,10 @@ export function DistanceLine({ ticket, onChanged }: { ticket: Ticket; onChanged:
       {busy || (stale && !error) ? (
         <span className="muted">wird berechnet…</span>
       ) : ticket.distance_km != null ? (
-        <strong>{km(ticket.distance_km)} km</strong>
+        <>
+          <strong>{km(ticket.distance_km)} km</strong>
+          {ticket.distance_minutes != null && <> · Fahrzeit ca. <strong>{duration(ticket.distance_minutes)}</strong></>}
+        </>
       ) : (
         <span className="appointment-warn">{error || ticket.distance_error || 'nicht berechnet'}</span>
       )}
