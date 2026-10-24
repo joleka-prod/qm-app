@@ -6,6 +6,7 @@ import { OvertimeCard } from '../components/OvertimeCard'
 import { VacationCard, type VacationRequest } from '../components/VacationCard'
 import { minutesOf, toLocalInput, type TimeEntry } from '../components/TimeCard'
 import { clockTime, fixedBreakMinutes, formatMinutes, minutesBetween, useClockChanged, workMinutes, type Attendance } from '../lib/clock'
+import { holidayName } from '../lib/holidays'
 import { supabase } from '../lib/supabase'
 import { displayName, formatDay, isPlannerRole, isoDate, parseDate, weekNumber } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
@@ -257,14 +258,17 @@ export function Timesheet() {
               const work = workOf(d)
               const pause = breakOf(d)
               const weekday = parseDate(d).getDay()
-              const vac = weekday !== 0 && weekday !== 6 ? vacation.find((v) => v.start_date <= d && v.end_date >= d) : undefined
+              const vac = weekday !== 0 && weekday !== 6 && !holidayName(d) ? vacation.find((v) => v.start_date <= d && v.end_date >= d) : undefined
               const onVacation = !!vac
               if (list.length === 0 && !jobsByDay[d] && !onVacation && !requests.some((r) => isoDate(new Date(r.started_at)) === d) && (weekday === 0 || weekday === 6 || d > today)) return null
               const short = work > 0 && pause < minBreak(work)
               return (
                 <div key={d} className={`ts-day ${d === today ? 'today' : ''}`}>
                   <div className="ts-day-head">
-                    <strong>{formatDay(d).replace(/\.\d{4}$/, '.')}</strong>
+                    <strong>
+                      {formatDay(d).replace(/\.\d{4}$/, '.')}
+                      {holidayName(d) && <span className="holiday-name">{holidayName(d)}</span>}
+                    </strong>
                     <span className="ts-work">
                       {vac && <span className="ts-vacation">{vac.kind === 'ueberstunden' ? 'Frei (Überstunden) ' : 'Urlaub '}</span>}
                       {work > 0 ? formatMinutes(work) : !onVacation && <span className="muted">–</span>}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { JobCard } from '../components/JobCard'
+import { holidayName } from '../lib/holidays'
 import { supabase } from '../lib/supabase'
 import { loadMembers, useTeams, type TeamMember } from '../lib/teams'
 import { addDays, displayName, formatDay, isoDate, startOfWeek, weekNumber, type Ticket } from '../lib/types'
@@ -119,6 +120,7 @@ export function InstallerCalendar() {
             <h2>
               {formatDay(d)}
               {d === today && <span className="today-tag">Heute</span>}
+              {holidayName(d) && <span className="holiday-name">{holidayName(d)}</span>}
             </h2>
             {crewOf(d) ? (
               <p className="crew-line">

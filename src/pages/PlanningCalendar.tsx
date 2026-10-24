@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, type DragEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { JobCard } from '../components/JobCard'
+import { holidayName } from '../lib/holidays'
 import { supabase } from '../lib/supabase'
 import { loadMembers, useTeams, type Team, type TeamMember } from '../lib/teams'
 import {
@@ -171,7 +172,7 @@ export function PlanningCalendar() {
     return (
       <td
         key={key}
-        className={`${d === today ? 'cal-today' : ''} ${dropTarget === key ? 'cal-drop' : ''}`}
+        className={`${d === today ? 'cal-today' : ''} ${holidayName(d) ? 'cal-holiday' : ''} ${dropTarget === key ? 'cal-drop' : ''}`}
         {...dropProps(key, team, d)}
       >
         <div className="crew">
@@ -234,6 +235,7 @@ export function PlanningCalendar() {
   const dayLabel = (d: string) => (
     <>
       {new Date(d + 'T00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}
+      {holidayName(d) && <span className="holiday-name">{holidayName(d)}</span>}
     </>
   )
   // Teams einer Spalte nach Bereich gruppiert (für die Kopfzeile in der gedrehten Ansicht)
@@ -321,7 +323,7 @@ export function PlanningCalendar() {
               <tbody>
                 {days.map((d) => (
                   <tr key={d}>
-                    <th className={`cal-name ${d === today ? 'cal-today' : ''}`}>{dayLabel(d)}</th>
+                    <th className={`cal-name ${d === today ? 'cal-today' : ''} ${holidayName(d) ? 'cal-holiday' : ''}`}>{dayLabel(d)}</th>
                     {visibleTeams.map((team) => cell(team, d))}
                   </tr>
                 ))}
@@ -333,7 +335,7 @@ export function PlanningCalendar() {
                 <tr>
                   <th className="cal-corner">Team</th>
                   {days.map((d) => (
-                    <th key={d} className={d === today ? 'cal-today' : ''}>{dayLabel(d)}</th>
+                    <th key={d} className={`${d === today ? 'cal-today' : ''} ${holidayName(d) ? 'cal-holiday' : ''}`}>{dayLabel(d)}</th>
                   ))}
                 </tr>
               </thead>
