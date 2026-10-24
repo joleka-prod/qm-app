@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../auth'
+import { AttendanceApprovals, requestText, type AttendanceRequest } from '../components/AttendanceApprovals'
 import { ClockBar } from '../components/ClockBar'
 import { OvertimeCard } from '../components/OvertimeCard'
 import { VacationCard, type VacationRequest } from '../components/VacationCard'
@@ -27,7 +28,7 @@ function shiftMonth(month: string, n: number) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-type Edit = { id?: number; start: string; end: string }
+type Edit = { id?: number; start: string; end: string; reason: string }
 
 // Stundenkonto: Tage, Wochen und Monat aus den Stempelzeiten. Mitarbeiter sehen ihr eigenes,
 // QM und Teamleiter alle und können Zeiten korrigieren oder nachtragen.
@@ -55,8 +56,10 @@ export function Timesheet() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const now = Date.now()
-  // Eigene Zeiten korrigiert nur der Admin
-  const canCorrect = isAdmin || (isPlanner && installerId !== profile?.id)
+  // Nachtragen/Korrigieren darf man für sich selbst (mit Genehmigung), Planer und Vorgesetzte auch für andere
+  const canCorrect = installerId === profile?.id || isPlanner || isAbove(installerId)
+  const [requests, setRequests] = useState<AttendanceRequest[]>([])
+  const [info, setInfo] = useState('')
 
   const range = useMemo(() => {
     const all = monthDays(month)
@@ -65,7 +68,7 @@ export function Timesheet() {
 
   const load = useCallback(async () => {
     if (!installerId) return
-    const [att, te, vac] = await Promise.all([
+    const [att, te, vac, req] = await Promise.all([
       supabase.from('attendance').select('*').eq('installer_id', installerId).gte('started_at', range.from).lte('started_at', range.to).order('started_at'),
       supabase.from('time_entries').select('*').eq('installer_id', installerId).gte('started_at', range.from).lte('started_at', range.to),
       supabase
@@ -75,7 +78,16 @@ export function Timesheet() {
         .eq('state', 'genehmigt')
         .lte('start_date', range.all.at(-1)!)
         .gte('end_date', range.all[0]),
+      supabase
+        .from('attendance_requests')
+        .select('*')
+        .eq('user_id', installerId)
+        .in('state', ['beantragt', 'abgelehnt'])
+        .gte('started_at', range.from)
+        .lte('started_at', range.to)
+        .order('started_at'),
     ])
+    setRequests((req.data ?? []) as AttendanceRequest[])
     setVacation((vac.data ?? []) as VacationRequest[])
     setSessions((att.data ?? []) as Attendance[])
     setJobs((te.data ?? []) as TimeEntry[])
@@ -113,16 +125,32 @@ export function Timesheet() {
 
   async function saveEdit() {
     if (!edit) return
+    if (!edit.end) return setError('Bitte auch das Ende eintragen.')
+    if (edit.reason.trim().length < 3) return setError('Bitte einen Grund angeben.')
     setBusy(true)
     setError('')
-    const row = { started_at: new Date(edit.start).toISOString(), ended_at: edit.end ? new Date(edit.end).toISOString() : null }
-    const { error } = edit.id
-      ? await supabase.from('attendance').update(row).eq('id', edit.id)
-      : await supabase.from('attendance').insert({ ...row, installer_id: installerId })
-    if (error) setError(/attendance_check|Ende/.test(error.message) ? 'Das Ende muss nach dem Beginn liegen.' : error.message)
-    else setEdit(null)
+    setInfo('')
+    const { data, error } = await supabase.rpc('request_attendance_change', {
+      p_user: installerId,
+      p_attendance_id: edit.id ?? null,
+      p_start: new Date(edit.start).toISOString(),
+      p_end: new Date(edit.end).toISOString(),
+      p_reason: edit.reason.trim(),
+    })
+    if (error) setError(error.message)
+    else {
+      setEdit(null)
+      setInfo(data === 'genehmigt' ? 'Die Zeit wurde übernommen.' : 'Die Zeit wurde zur Genehmigung an den Vorgesetzten geschickt.')
+    }
     await load()
     setBusy(false)
+  }
+
+  async function cancelRequest(id: number) {
+    if (!confirm('Nachtrag zurückziehen?')) return
+    const { error } = await supabase.rpc('cancel_attendance_change', { p_id: id })
+    if (error) setError(error.message)
+    load()
   }
 
   async function remove(id: number) {
@@ -156,13 +184,27 @@ export function Timesheet() {
           <input type="datetime-local" value={edit.end} onChange={(e) => setEdit({ ...edit, end: e.target.value })} />
         </label>
       </div>
+      <label>
+        Grund *
+        <input
+          value={edit.reason}
+          maxLength={300}
+          onChange={(e) => setEdit({ ...edit, reason: e.target.value })}
+          placeholder="z. B. Ausstempeln vergessen"
+        />
+      </label>
+      {installerId === profile?.id || !(isAdmin || isAbove(installerId)) ? (
+        <p className="small muted">Die Änderung gilt erst, wenn der Vorgesetzte sie genehmigt hat.</p>
+      ) : null}
       {error && <p className="error">{error}</p>}
       <div className="actions">
         {edit.id && isAdmin && (
           <button type="button" className="link danger" disabled={busy} onClick={() => remove(edit.id!)}>Löschen</button>
         )}
         <button disabled={busy} onClick={() => setEdit(null)}>Abbrechen</button>
-        <button className="primary" disabled={busy || !edit.start} onClick={saveEdit}>Speichern</button>
+        <button className="primary" disabled={busy || !edit.start || !edit.end || edit.reason.trim().length < 3} onClick={saveEdit}>
+          {installerId !== profile?.id && (isAdmin || isAbove(installerId)) ? 'Speichern' : 'Zur Genehmigung senden'}
+        </button>
       </div>
     </div>
   )
@@ -190,6 +232,9 @@ export function Timesheet() {
         </div>
       )}
 
+      {profile && <AttendanceApprovals me={profile} byId={byId} onChanged={load} />}
+      {info && <p className="info">{info}</p>}
+
       {byId[installerId]?.supervisor_id && (
         <p className="small">Vorgesetzte(r): {displayName(byId[byId[installerId].supervisor_id!])}</p>
       )}
@@ -200,7 +245,7 @@ export function Timesheet() {
 
       <p className="muted small">
         Die Arbeitszeit kommt aus Start und Stopp der Zeiterfassung oben. „Aufträge“ zeigt die Zeit, die auf
-        Aufträge gebucht wurde.{canCorrect && ' Fehlende oder falsche Zeiten kannst du hier korrigieren oder nachtragen.'}
+        Aufträge gebucht wurde.{canCorrect && ' Fehlende oder falsche Zeiten kannst du hier mit Grund nachtragen oder korrigieren; sie gelten nach Genehmigung durch den Vorgesetzten.'}
       </p>
 
       <div className="timesheet-days">
@@ -213,7 +258,7 @@ export function Timesheet() {
               const weekday = parseDate(d).getDay()
               const vac = weekday !== 0 && weekday !== 6 ? vacation.find((v) => v.start_date <= d && v.end_date >= d) : undefined
               const onVacation = !!vac
-              if (list.length === 0 && !jobsByDay[d] && !onVacation && (weekday === 0 || weekday === 6 || d > today)) return null
+              if (list.length === 0 && !jobsByDay[d] && !onVacation && !requests.some((r) => isoDate(new Date(r.started_at)) === d) && (weekday === 0 || weekday === 6 || d > today)) return null
               const short = work > 0 && pause < minBreak(work)
               return (
                 <div key={d} className={`ts-day ${d === today ? 'today' : ''}`}>
@@ -238,7 +283,7 @@ export function Timesheet() {
                             className="link"
                             onClick={() => {
                               setError('')
-                              setEdit({ id: s.id, start: toLocalInput(s.started_at), end: toLocalInput(s.ended_at) })
+                              setEdit({ id: s.id, start: toLocalInput(s.started_at), end: toLocalInput(s.ended_at), reason: '' })
                             }}
                           >
                             Korrigieren
@@ -256,13 +301,27 @@ export function Timesheet() {
                         className="link"
                         onClick={() => {
                           setError('')
-                          setEdit({ start: `${d}T07:00`, end: `${d}T16:00` })
+                          setEdit({ start: `${d}T07:00`, end: `${d}T16:00`, reason: '' })
                         }}
                       >
                         + Zeit nachtragen
                       </button>
                     )}
                   </div>
+                  {requests
+                    .filter((r) => isoDate(new Date(r.started_at)) === d)
+                    .map((r) => (
+                      <div key={`r${r.id}`} className={`ts-request small ${r.state}`}>
+                        <span>
+                          {r.state === 'beantragt' ? 'Zur Genehmigung: ' : 'Abgelehnt: '}
+                          {requestText(r).replace(/^[^:]+: /, '')} · {r.reason}
+                          {r.decision_note && <> · {r.decision_note}</>}
+                        </span>
+                        {r.state === 'beantragt' && (r.requested_by === profile?.id || r.user_id === profile?.id) && (
+                          <button className="link" onClick={() => cancelRequest(r.id)}>Zurückziehen</button>
+                        )}
+                      </div>
+                    ))}
                   {edit && !edit.id && edit.start.startsWith(d) && editor}
                 </div>
               )
