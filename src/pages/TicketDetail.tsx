@@ -460,12 +460,16 @@ export function TicketDetail() {
         ) : (
           <>
             <h1 className="ticket-heading">{ticket.title}</h1>
-            {orderRef(ticket) && <p className="order-ref">{orderRef(ticket)}</p>}
-            {einsatz && (ticket.customer_name || ticket.customer_number || ticket.site_address || ticket.customer_email) && (
+            {(ticket.customer_number || orderRef(ticket)) && (
+              <p className="order-ref">
+                {[ticket.customer_number && `Kundennr. ${ticket.customer_number}`, orderRef(ticket)].filter(Boolean).join(' · ')}
+              </p>
+            )}
+            {einsatz && (ticket.customer_name || ticket.site_address || ticket.customer_email) && (
               <p className="small">
                 <span className="muted">Kunde: </span>
-                {[ticket.customer_number && `Kd.-Nr. ${ticket.customer_number}`, ticket.customer_name].filter(Boolean).join(' · ')}
-                {(ticket.customer_number || ticket.customer_name) && ticket.site_address && ', '}
+                {ticket.customer_name}
+                {ticket.customer_name && ticket.site_address && ', '}
                 {ticket.site_address && (
                   <a
                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.site_address)}`}
