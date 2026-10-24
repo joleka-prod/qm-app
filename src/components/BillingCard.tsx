@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { billingAddressLine } from './BillingAddressFields'
 import { BILLING_LABEL, displayName, formatDate, formatEuro, type Profile, type Ticket, type TicketPosition, UNITS, UNIT_HINT } from '../lib/types'
 
 interface Props {
@@ -83,6 +84,10 @@ export function BillingCard({ ticket: t, positions, byId, canEdit, isAdmin, onCh
       <h2>
         Berechnung <span className={`badge badge-${t.billing_state}`}>{BILLING_LABEL[t.billing_state as 'zur_berechnung' | 'berechnet']}</span>
       </h2>
+      <p className="small">
+        <span className="muted">Rechnung an: </span>
+        {t.billing_address_different ? billingAddressLine(t) : [t.customer_name, t.site_address.replace(/\s*\n\s*/g, ', ')].filter(Boolean).join(', ') || '–'}
+      </p>
       {positions.length === 0 ? (
         <p className="muted">Der Auftrag hat keine Positionen, deshalb können keine Preise eingetragen werden.</p>
       ) : (

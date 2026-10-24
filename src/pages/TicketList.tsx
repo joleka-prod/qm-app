@@ -94,6 +94,7 @@ export function TicketList() {
         t.order_number.toLowerCase().includes(q) ||
         t.position_number.toLowerCase().includes(q) ||
         t.customer_name.toLowerCase().includes(q) ||
+        (t.customer_number ?? '').toLowerCase().includes(q) ||
         ticketNo(t.id, t.ticket_type).toLowerCase().includes(q)
       )
     })

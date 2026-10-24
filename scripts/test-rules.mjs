@@ -868,6 +868,27 @@ await check('Vorgesetzter: nur Admin setzt ihn, keine Kreise, Vorgesetzter sieht
   await qm.c.from('profiles').update({ supervisor_id: null }).in('id', [worker.id, m4.id])
 })
 
+await check('Abweichende Rechnungsadresse: Pflichtfelder, ohne Haken leer, Monteur darf nicht ändern', async () => {
+  let r = await qm.c.from('tickets').insert({ ticket_type: 'reparatur', title: 'RA', billing_address_different: true, billing_name: 'Firma X' }).select().single()
+  assert.match(r.error?.message ?? '', /Rechnungsadresse/)
+  r = await qm.c.from('tickets').insert({ ticket_type: 'reparatur', title: 'RA', billing_address_different: false, billing_name: 'Firma X' }).select().single()
+  assert.equal(r.data.billing_name, '')
+  const id = r.data.id
+  r = await qm.c.from('tickets').update({ billing_address_different: true, billing_name: ' Firma X ', billing_street: 'Weg', billing_house_no: '3a', billing_zip: '54550', billing_city: 'Daun' }).eq('id', id).select().single()
+  assert.ifError(r.error)
+  assert.equal(r.data.billing_name, 'Firma X')
+  await admin.from('tickets').update({ team_id: T1, montage_date: '2026-11-02' }).eq('id', id)
+  const m = await m1.c.from('tickets').update({ billing_city: 'Trier' }).eq('id', id).select()
+  assert.ok(m.error || m.data.length === 0)
+  const m2r = await m1.c.from('tickets').update({ customer_number: '999' }).eq('id', id).select()
+  assert.ok(m2r.error || m2r.data.length === 0)
+  r = await qm.c.from('tickets').update({ customer_number: ' K-100 ' }).eq('id', id).select().single()
+  assert.equal(r.data.customer_number, 'K-100')
+  r = await qm.c.from('tickets').update({ billing_address_different: false }).eq('id', id).select().single()
+  assert.equal(r.data.billing_city, '')
+  await admin.from('tickets').delete().eq('id', id)
+})
+
 // Testteams wieder entfernen, damit sie nicht im Kalender auftauchen
 await admin.from('tickets').update({ team_id: null }).in('team_id', [T1, T2])
 await admin.from('teams').delete().in('id', [T1, T2])

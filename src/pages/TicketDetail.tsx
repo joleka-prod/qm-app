@@ -11,6 +11,7 @@ import { AppointmentCard } from '../components/AppointmentCard'
 import { BillingCard } from '../components/BillingCard'
 import { TimeCard } from '../components/TimeCard'
 import { DistanceLine } from '../components/DistanceLine'
+import { BillingAddressFields, billingAddressComplete, billingAddressLine, billingAddressOf, emptyBillingAddress, type BillingAddress } from '../components/BillingAddressFields'
 import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { deletePhoto, signedUrls, uploadPhotos, uploadSignature } from '../lib/photos'
 import { sendReport } from '../lib/reportMail'
@@ -97,9 +98,11 @@ export function TicketDetail() {
   const [positionNumber, setPositionNumber] = useState('')
   const [customer, setCustomer] = useState('')
   const [customerEmail, setCustomerEmail] = useState('')
+  const [customerNumber, setCustomerNumber] = useState('')
   const [wantsEmail, setWantsEmail] = useState(false)
   const [signEmail, setSignEmail] = useState('')
   const [address, setAddress] = useState('')
+  const [billingAddr, setBillingAddr] = useState<BillingAddress>(emptyBillingAddress)
   const [teamId, setTeamId] = useState('')
   const [montageDate, setMontageDate] = useState('')
   const [montageTime, setMontageTime] = useState('')
@@ -140,6 +143,8 @@ export function TicketDetail() {
     setCustomer(tk.customer_name)
     setCustomerEmail(tk.customer_email)
     setAddress(tk.site_address)
+    setCustomerNumber(tk.customer_number)
+    setBillingAddr(billingAddressOf(tk))
     setTeamId(tk.team_id ? String(tk.team_id) : '')
     if (tk.team_id && tk.montage_date) {
       const { data: m } = await supabase
@@ -406,10 +411,16 @@ export function TicketDetail() {
             </div>
             {einsatz && canEditBase && (
               <>
-                <label>
-                  Kunde
-                  <input value={customer} maxLength={150} onChange={(e) => setCustomer(e.target.value)} />
-                </label>
+                <div className="row customer-row">
+                  <label>
+                    Kunde
+                    <input value={customer} maxLength={150} onChange={(e) => setCustomer(e.target.value)} />
+                  </label>
+                  <label>
+                    Kundennummer
+                    <input value={customerNumber} maxLength={30} onChange={(e) => setCustomerNumber(e.target.value)} />
+                  </label>
+                </div>
                 <label>
                   E-Mail des Kunden
                   <input
@@ -425,9 +436,10 @@ export function TicketDetail() {
                   Einsatzort / Adresse
                   <textarea rows={2} value={address} onChange={(e) => setAddress(e.target.value)} />
                 </label>
+                <BillingAddressFields value={billingAddr} onChange={setBillingAddr} />
               </>
             )}
-            {canEditBase && (
+            {canEditBase && !einsatz && (
               <label>
                 Beschreibung
                 <textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} />
@@ -444,17 +456,19 @@ export function TicketDetail() {
                   setCustomer(ticket.customer_name)
                   setCustomerEmail(ticket.customer_email)
                   setAddress(ticket.site_address)
+                  setCustomerNumber(ticket.customer_number)
+                  setBillingAddr(billingAddressOf(ticket))
                 }}
               >
                 Abbrechen
               </button>
               <button
                 className="primary"
-                disabled={busy || !title.trim() || (einsatz && !!customerEmail.trim() && !isEmail(customerEmail))}
+                disabled={busy || !title.trim() || (einsatz && ((!!customerEmail.trim() && !isEmail(customerEmail)) || !billingAddressComplete(billingAddr)))}
                 onClick={async () => {
                   const ref = { order_number: orderNumber.trim(), position_number: positionNumber.trim() }
                   const base = { ...ref, title: title.trim(), description: description.trim() }
-                  const site = einsatz ? { customer_name: customer.trim(), customer_email: customerEmail.trim(), site_address: address.trim() } : {}
+                  const site = einsatz ? { customer_name: customer.trim(), customer_email: customerEmail.trim(), customer_number: customerNumber.trim(), site_address: address.trim(), ...billingAddr } : {}
                   const patch = canEditBase ? { ...base, ...site } : ref
                   if (await update(patch)) setEditing(false)
                 }}
@@ -467,18 +481,19 @@ export function TicketDetail() {
           <>
             <h1 className="ticket-heading">{ticket.title}</h1>
             {orderRef(ticket) && <p className="order-ref">{orderRef(ticket)}</p>}
-            {einsatz && (ticket.customer_name || ticket.site_address || ticket.customer_email) && (
+            {einsatz && (ticket.customer_name || ticket.customer_number || ticket.site_address || ticket.customer_email) && (
               <p className="site">
                 {ticket.customer_name && <strong>{ticket.customer_name}</strong>}
+                {ticket.customer_number && <span className="muted">{ticket.customer_name && ' · '}Kd.-Nr. {ticket.customer_number}</span>}
                 {ticket.customer_email && (
                   <>
-                    {ticket.customer_name && <br />}
+                    {(ticket.customer_name || ticket.customer_number) && <br />}
                     <a href={`mailto:${ticket.customer_email}`}>{ticket.customer_email}</a>
                   </>
                 )}
                 {ticket.site_address && (
                   <>
-                    {(ticket.customer_name || ticket.customer_email) && <br />}
+                    {(ticket.customer_name || ticket.customer_number || ticket.customer_email) && <br />}
                     <a
                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.site_address)}`}
                       target="_blank"
@@ -491,12 +506,18 @@ export function TicketDetail() {
                 )}
               </p>
             )}
+            {einsatz && ticket.billing_address_different && (
+              <p className="small">
+                <span className="muted">Rechnungsadresse: </span>
+                {billingAddressLine(ticket)}
+              </p>
+            )}
             {einsatz && <DistanceLine ticket={ticket} onChanged={load} />}
             <p className="muted small">
               Erstellt {formatDate(ticket.created_at)} von {displayName(byId[ticket.created_by])}
               {ticket.closed_at && <> · {einsatz ? 'Erledigt' : 'Abgeschlossen'} {formatDate(ticket.closed_at)}</>}
             </p>
-            {ticket.description ? <p className="pre">{ticket.description}</p> : <p className="muted">Keine Beschreibung.</p>}
+            {ticket.description ? <p className="pre">{ticket.description}</p> : !einsatz && <p className="muted">Keine Beschreibung.</p>}
             {canEditRef && (
               <button className="link" onClick={() => setEditing(true)}>
                 {canEditBase ? 'Bearbeiten' : 'Auftrag/Position bearbeiten'}

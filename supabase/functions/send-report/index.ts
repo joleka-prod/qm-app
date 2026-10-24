@@ -208,6 +208,7 @@ Deno.serve(async (req) => {
   w.text(`${TYPE_LABEL[t.ticket_type]}: ${t.title}`, { size: 12, bold: true, gap: 8 })
   const facts: [string, string][] = [
     ['Kunde', t.customer_name],
+    ['Kundennummer', t.customer_number ?? ''],
     ['Einsatzort', (t.site_address ?? '').replace(/\n/g, ', ')],
     ['Auftragsnummer', t.order_number],
     ['Team', team?.name ?? ''],

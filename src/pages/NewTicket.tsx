@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
+import { BillingAddressFields, emptyBillingAddress, type BillingAddress } from '../components/BillingAddressFields'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { TeamSelect } from '../components/TeamSelect'
 import { PositionsEditor, isEmptyPosition, newPositionDraft, type PositionDraft } from '../components/PositionsEditor'
@@ -40,7 +41,9 @@ export function NewTicket() {
   const [positions, setPositions] = useState<PositionDraft[]>(() => [newPositionDraft()])
   const [customer, setCustomer] = useState('')
   const [customerEmail, setCustomerEmail] = useState('')
+  const [customerNumber, setCustomerNumber] = useState('')
   const [address, setAddress] = useState('')
+  const [billingAddr, setBillingAddr] = useState<BillingAddress>(emptyBillingAddress)
   const [assignedTo, setAssignedTo] = useState('')
   const [teamId, setTeamId] = useState(params.get('team') ?? '')
   const [montageDate, setMontageDate] = useState(params.get('datum') ?? '')
@@ -61,12 +64,14 @@ export function NewTicket() {
         ticket_type: type,
         service_area: einsatz ? (area ?? defaultArea(type)) : null,
         title: title.trim(),
-        description: description.trim(),
+        description: einsatz ? '' : description.trim(),
         order_number: orderNumber.trim(),
         position_number: einsatz ? '' : positionNumber.trim(),
         customer_name: einsatz ? customer.trim() : '',
         customer_email: einsatz ? customerEmail.trim() : '',
+        customer_number: einsatz ? customerNumber.trim() : '',
         site_address: einsatz ? address.trim() : '',
+        ...(einsatz ? billingAddr : emptyBillingAddress),
         assigned_to: !einsatz && assignedTo ? assignedTo : null,
         team_id: einsatz && canPlan && teamId ? Number(teamId) : null,
         montage_date: einsatz && canPlan && montageDate ? montageDate : null,
@@ -164,10 +169,16 @@ export function NewTicket() {
               ))}
             </div>
           </div>
-          <label>
-            Kunde
-            <input value={customer} maxLength={150} onChange={(e) => setCustomer(e.target.value)} />
-          </label>
+          <div className="row customer-row">
+            <label>
+              Kunde
+              <input value={customer} maxLength={150} onChange={(e) => setCustomer(e.target.value)} />
+            </label>
+            <label>
+              Kundennummer
+              <input value={customerNumber} maxLength={30} onChange={(e) => setCustomerNumber(e.target.value)} />
+            </label>
+          </div>
           <label>
             E-Mail des Kunden
             <input
@@ -184,17 +195,15 @@ export function NewTicket() {
             Einsatzort / Adresse
             <textarea rows={2} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Straße, PLZ Ort" />
           </label>
+          <BillingAddressFields value={billingAddr} onChange={setBillingAddr} />
         </>
       )}
-      <label>
-        Beschreibung
-        <textarea
-          rows={5}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder={einsatz ? 'Was ist zu tun?' : 'Was ist passiert? Wo? Wann?'}
-        />
-      </label>
+      {!einsatz && (
+        <label>
+          Beschreibung
+          <textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Was ist passiert? Wo? Wann?" />
+        </label>
+      )}
       <div className="field">
         <span>{einsatz ? 'Fotos zum Auftrag' : 'Fotos'}</span>
         <PhotoPicker files={files} onChange={setFiles} />
