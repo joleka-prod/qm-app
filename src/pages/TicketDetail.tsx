@@ -462,21 +462,26 @@ export function TicketDetail() {
             <h1 className="ticket-heading">{ticket.title}</h1>
             {orderRef(ticket) && <p className="order-ref">{orderRef(ticket)}</p>}
             {einsatz && (ticket.customer_name || ticket.customer_number || ticket.site_address || ticket.customer_email) && (
-              <div className="site customer-block">
-                {ticket.customer_number && <div className="muted small">Kd.-Nr. {ticket.customer_number}</div>}
-                {ticket.customer_name && <strong>{ticket.customer_name}</strong>}
+              <p className="small">
+                <span className="muted">Kunde: </span>
+                {[ticket.customer_number && `Kd.-Nr. ${ticket.customer_number}`, ticket.customer_name].filter(Boolean).join(' · ')}
+                {(ticket.customer_number || ticket.customer_name) && ticket.site_address && ', '}
                 {ticket.site_address && (
                   <a
                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.site_address)}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="pre"
                   >
-                    {ticket.site_address}
+                    {ticket.site_address.replace(/\s*\n\s*/g, ', ')}
                   </a>
                 )}
-                {ticket.customer_email && <a href={`mailto:${ticket.customer_email}`}>{ticket.customer_email}</a>}
-              </div>
+                {ticket.customer_email && (
+                  <>
+                    {' · '}
+                    <a href={`mailto:${ticket.customer_email}`}>{ticket.customer_email}</a>
+                  </>
+                )}
+              </p>
             )}
             {einsatz && ticket.jobsite_address_different && (
               <p className="small">
