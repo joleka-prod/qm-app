@@ -675,8 +675,6 @@ export function TicketDetail() {
         <BillingCard ticket={ticket} positions={positions} byId={byId} canEdit={isPlanner} isAdmin={isAdmin} onChanged={load} />
       )}
 
-      {ticket.ticket_type === 'beanstandung' && closed && isPlanner && <SelfCostCard ticket={ticket} byId={byId} onChanged={load} />}
-
       <section className="card">
         <h2>{einsatz ? 'Fotos zum Auftrag' : 'Fotos'}</h2>
         <PhotoGallery
@@ -1038,6 +1036,8 @@ export function TicketDetail() {
       )}
 
       {error && <p className="error">{error}</p>}
+
+      {ticket.ticket_type === 'beanstandung' && closed && isPlanner && <SelfCostCard ticket={ticket} byId={byId} onChanged={load} />}
 
       {profile.role !== 'monteur' && (
         <section className="card">
