@@ -1034,35 +1034,37 @@ export function TicketDetail() {
 
       {error && <p className="error">{error}</p>}
 
-      <section className="card">
-        <h2>Verlauf</h2>
-        <ul className="history">
-          {events.map((ev) => (
-            <li key={ev.id}>
-              <span className="muted small">{formatDate(ev.created_at)}</span>
-              <span>
-                {EVENT_LABEL[ev.kind] ?? ev.kind}
-                {ev.kind === 'status' && <> „{statusLabel(ticket.ticket_type, ev.details as TicketStatus)}"</>}
-                {ev.kind === 'zugewiesen' && <> {ev.details || '–'}</>}
-                {(ev.kind === 'pruefhinweis' || ev.kind === 'loeschantrag') && <> {ev.details}</>}
-                {(ev.kind === 'auftrag' || ev.kind === 'eingeplant' || ev.kind.startsWith('termin_')) && <> {ev.details || '–'}</>}
-                {ev.kind === 'berechnet' && <> {ev.details}</>}
-                {ev.kind === 'erstellt' && <> ({TYPE_LABEL[ticket.ticket_type]})</>}
-                {ev.kind === 'unterschrift' && <> {ev.details}</>}
-                {ev.kind === 'folgeauftrag' && <> <Link to={`/ticket/${ev.details}`}>{ticketNo(Number(ev.details), ticket.ticket_type)}</Link></>}
-                {ev.kind === 'aus_auftrag' && (
-                  <>
-                    {' '}<Link to={`/ticket/${ev.details.split(':')[0]}`}>{ticketNo(Number(ev.details.split(':')[0]), ticket.ticket_type)}</Link>
-                    {' '}({ev.details.split(':')[1] ?? 0} {ev.details.split(':')[1] === '1' ? 'Position' : 'Positionen'} übernommen)
-                  </>
-                )}
-                {ev.kind === 'bereich' && <> „{AREA_LABEL[ev.details as ServiceArea] ?? ev.details}"</>}
-                {ev.actor && <span className="muted"> · {displayName(byId[ev.actor])}</span>}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {profile.role !== 'monteur' && (
+        <section className="card">
+          <h2>Verlauf</h2>
+          <ul className="history">
+            {events.map((ev) => (
+              <li key={ev.id}>
+                <span className="muted small">{formatDate(ev.created_at)}</span>
+                <span>
+                  {EVENT_LABEL[ev.kind] ?? ev.kind}
+                  {ev.kind === 'status' && <> „{statusLabel(ticket.ticket_type, ev.details as TicketStatus)}"</>}
+                  {ev.kind === 'zugewiesen' && <> {ev.details || '–'}</>}
+                  {(ev.kind === 'pruefhinweis' || ev.kind === 'loeschantrag') && <> {ev.details}</>}
+                  {(ev.kind === 'auftrag' || ev.kind === 'eingeplant' || ev.kind.startsWith('termin_')) && <> {ev.details || '–'}</>}
+                  {ev.kind === 'berechnet' && <> {ev.details}</>}
+                  {ev.kind === 'erstellt' && <> ({TYPE_LABEL[ticket.ticket_type]})</>}
+                  {ev.kind === 'unterschrift' && <> {ev.details}</>}
+                  {ev.kind === 'folgeauftrag' && <> <Link to={`/ticket/${ev.details}`}>{ticketNo(Number(ev.details), ticket.ticket_type)}</Link></>}
+                  {ev.kind === 'aus_auftrag' && (
+                    <>
+                      {' '}<Link to={`/ticket/${ev.details.split(':')[0]}`}>{ticketNo(Number(ev.details.split(':')[0]), ticket.ticket_type)}</Link>
+                      {' '}({ev.details.split(':')[1] ?? 0} {ev.details.split(':')[1] === '1' ? 'Position' : 'Positionen'} übernommen)
+                    </>
+                  )}
+                  {ev.kind === 'bereich' && <> „{AREA_LABEL[ev.details as ServiceArea] ?? ev.details}"</>}
+                  {ev.actor && <span className="muted"> · {displayName(byId[ev.actor])}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {deletion ? (
         <section className="card danger-card">
