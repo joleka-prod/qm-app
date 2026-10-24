@@ -1,9 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { useArticles, type Article } from '../lib/articles'
 import { supabase } from '../lib/supabase'
-import { formatEuro } from '../lib/types'
+import { formatEuro, UNITS, UNIT_HINT } from '../lib/types'
 
-const UNITS = ['Stk', 'Std', 'm', 'm²', 'lfm', 'km', 'pauschal']
 
 type Form = { id?: number; article_number: string; description: string; unit: string; price: string; active: boolean }
 
@@ -81,7 +80,7 @@ export function Articles() {
           <input required list="article-units" maxLength={20} value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
           <datalist id="article-units">
             {UNITS.map((u) => (
-              <option key={u} value={u} />
+              <option key={u} value={u}>{UNIT_HINT[u]}</option>
             ))}
           </datalist>
         </label>

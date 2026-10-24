@@ -269,3 +269,7 @@ export function appointmentMoveWarning(
 export function formatEuro(n: number | null | undefined) {
   return n == null ? '–' : n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
 }
+
+// Vorschläge für Mengeneinheiten (frei ergänzbar)
+export const UNITS = ['Stk', 'Std.', 'Lfm.', 'm', 'm²', 'km', 'pauschal']
+export const UNIT_HINT: Record<string, string> = { Stk: 'Stück', 'Std.': 'Stunden', 'Lfm.': 'Laufmeter', m: 'Meter', 'm²': 'Quadratmeter', km: 'Kilometer', pauschal: 'Pauschal' }

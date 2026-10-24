@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { BILLING_LABEL, displayName, formatDate, formatEuro, type Profile, type Ticket, type TicketPosition } from '../lib/types'
+import { BILLING_LABEL, displayName, formatDate, formatEuro, type Profile, type Ticket, type TicketPosition, UNITS, UNIT_HINT } from '../lib/types'
 
 interface Props {
   ticket: Ticket
@@ -19,7 +19,6 @@ function qtyText(n: number) {
   return String(n).replace('.', ',')
 }
 
-const UNITS = ['Stk', 'Std', 'm', 'm²', 'lfm', 'km', 'pauschal']
 
 type Row = { quantity: string; unit: string; price: string }
 
@@ -90,7 +89,7 @@ export function BillingCard({ ticket: t, positions, byId, canEdit, isAdmin, onCh
         <>
           <datalist id="billing-units">
             {UNITS.map((u) => (
-              <option key={u} value={u} />
+              <option key={u} value={u}>{UNIT_HINT[u]}</option>
             ))}
           </datalist>
           <ul className="billing-list">
