@@ -20,12 +20,12 @@ export function Users() {
   const [password, setPw] = useState(generatePassword)
   const [busy, setBusy] = useState(false)
 
-  const [edit, setEdit] = useState<{ id: string; full_name: string; email: string; role: Role; active: boolean; supervisor_id: string } | null>(null)
+  const [edit, setEdit] = useState<{ id: string; full_name: string; email: string; role: Role; active: boolean; supervisor_id: string; vacation_days: string } | null>(null)
 
   function startEdit(p: Profile) {
     setError('')
     setNotice('')
-    setEdit({ id: p.id, full_name: p.full_name, email: p.email, role: p.role, active: p.active, supervisor_id: p.supervisor_id ?? '' })
+    setEdit({ id: p.id, full_name: p.full_name, email: p.email, role: p.role, active: p.active, supervisor_id: p.supervisor_id ?? '', vacation_days: String(p.vacation_days ?? 0) })
   }
 
   async function saveEdit(e: FormEvent, p: Profile) {
@@ -40,6 +40,9 @@ export function Users() {
       if (edit.role !== p.role) change.role = edit.role
       if (edit.active !== p.active) change.active = edit.active
       if ((edit.supervisor_id || null) !== p.supervisor_id) change.supervisor_id = edit.supervisor_id || null
+      const days = Number(edit.vacation_days.replace(',', '.'))
+      if (!Number.isFinite(days) || days < 0 || days > 366) throw new Error('Bitte beim Urlaubsanspruch eine Zahl zwischen 0 und 366 eintragen.')
+      if (days !== Number(p.vacation_days)) change.vacation_days = days
       if (Object.keys(change).length > 0) {
         const { error } = await supabase.from('profiles').update(change).eq('id', p.id)
         if (error) throw error
@@ -186,6 +189,14 @@ export function Users() {
                       ))}
                   </select>
                 </label>
+                <label>
+                  Urlaubsanspruch (Tage pro Jahr)
+                  <input
+                    inputMode="decimal"
+                    value={edit.vacation_days}
+                    onChange={(e) => setEdit({ ...edit, vacation_days: e.target.value })}
+                  />
+                </label>
                 <label className="checkbox-row">
                   <input
                     type="checkbox"
@@ -215,7 +226,7 @@ export function Users() {
                   {!p.active && <span className="muted"> · deaktiviert</span>}
                 </div>
                 <div className="small muted">
-                  Vorgesetzte(r): {p.supervisor_id ? displayName(byId[p.supervisor_id]) : '–'}
+                  Vorgesetzte(r): {p.supervisor_id ? displayName(byId[p.supervisor_id]) : '–'} · Urlaub: {Number(p.vacation_days)} Tage/Jahr
                 </div>
               </div>
               <div className="user-controls">

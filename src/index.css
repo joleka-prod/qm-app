@@ -454,3 +454,15 @@ button.link.danger { color: #b42318; }
 .address-suggest { list-style: none; margin: -0.4rem 0 0; padding: 0.25rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card, #fff); box-shadow: 0 6px 18px rgba(16, 24, 40, 0.12); }
 .address-suggest button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 0.55rem 0.6rem; border-radius: 8px; font: inherit; color: inherit; min-height: 0; }
 .address-suggest button:hover { background: var(--bg); }
+/* Urlaub */
+.vacation-sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0.5rem 1rem; margin-bottom: 0.75rem; font-variant-numeric: tabular-nums; }
+.vacation-sum > div { display: flex; flex-direction: column; }
+.vacation-list { list-style: none; padding: 0; margin: 0.75rem 0 0; }
+.vacation-list li { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding: 0.6rem 0; border-top: 1px solid var(--border); }
+.vacation-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.vacation-form { margin-top: 0.5rem; }
+.badge-urlaub-beantragt { background: #fef0c7; color: #93370d; }
+.badge-urlaub-genehmigt { background: #d1fadf; color: #05603a; }
+.badge-urlaub-abgelehnt { background: #fee4e2; color: #b42318; }
+.badge-urlaub-storniert { background: #f2f4f7; color: #475467; }
+.ts-vacation { color: #05603a; font-weight: 600; }

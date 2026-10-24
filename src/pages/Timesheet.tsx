@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../auth'
 import { ClockBar } from '../components/ClockBar'
+import { VacationCard, type VacationRequest } from '../components/VacationCard'
 import { minutesOf, toLocalInput, type TimeEntry } from '../components/TimeCard'
 import { clockTime, formatMinutes, minutesBetween, useClockChanged, type Attendance } from '../lib/clock'
 import { supabase } from '../lib/supabase'
@@ -48,6 +49,7 @@ export function Timesheet() {
   const [month, setMonth] = useState(today.slice(0, 7))
   const [sessions, setSessions] = useState<Attendance[]>([])
   const [jobs, setJobs] = useState<TimeEntry[]>([])
+  const [vacation, setVacation] = useState<VacationRequest[]>([])
   const [edit, setEdit] = useState<Edit | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -62,10 +64,18 @@ export function Timesheet() {
 
   const load = useCallback(async () => {
     if (!installerId) return
-    const [att, te] = await Promise.all([
+    const [att, te, vac] = await Promise.all([
       supabase.from('attendance').select('*').eq('installer_id', installerId).gte('started_at', range.from).lte('started_at', range.to).order('started_at'),
       supabase.from('time_entries').select('*').eq('installer_id', installerId).gte('started_at', range.from).lte('started_at', range.to),
+      supabase
+        .from('vacation_requests')
+        .select('*')
+        .eq('user_id', installerId)
+        .eq('state', 'genehmigt')
+        .lte('start_date', range.all.at(-1)!)
+        .gte('end_date', range.all[0]),
     ])
+    setVacation((vac.data ?? []) as VacationRequest[])
     setSessions((att.data ?? []) as Attendance[])
     setJobs((te.data ?? []) as TimeEntry[])
   }, [installerId, range])
@@ -182,6 +192,10 @@ export function Timesheet() {
       {byId[installerId]?.supervisor_id && (
         <p className="small">Vorgesetzte(r): {displayName(byId[byId[installerId].supervisor_id!])}</p>
       )}
+      {profile && installerId && (
+        <VacationCard userId={installerId} me={profile} byId={byId} year={Number(month.slice(0, 4))} onChanged={load} />
+      )}
+
       <p className="muted small">
         Die Arbeitszeit kommt aus Start und Stopp der Zeiterfassung oben. „Aufträge“ zeigt die Zeit, die auf
         Aufträge gebucht wurde.{canCorrect && ' Fehlende oder falsche Zeiten kannst du hier korrigieren oder nachtragen.'}
@@ -195,13 +209,17 @@ export function Timesheet() {
               const work = workOf(d)
               const pause = breakOf(d)
               const weekday = parseDate(d).getDay()
-              if (list.length === 0 && !jobsByDay[d] && (weekday === 0 || weekday === 6 || d > today)) return null
+              const onVacation = vacation.some((v) => v.start_date <= d && v.end_date >= d) && weekday !== 0 && weekday !== 6
+              if (list.length === 0 && !jobsByDay[d] && !onVacation && (weekday === 0 || weekday === 6 || d > today)) return null
               const short = work > 0 && pause < minBreak(work)
               return (
                 <div key={d} className={`ts-day ${d === today ? 'today' : ''}`}>
                   <div className="ts-day-head">
                     <strong>{formatDay(d).replace(/\.\d{4}$/, '.')}</strong>
-                    <span className="ts-work">{work > 0 ? formatMinutes(work) : <span className="muted">–</span>}</span>
+                    <span className="ts-work">
+                      {onVacation && <span className="ts-vacation">Urlaub </span>}
+                      {work > 0 ? formatMinutes(work) : !onVacation && <span className="muted">–</span>}
+                    </span>
                   </div>
                   {list.map((s) =>
                     edit?.id === s.id ? (

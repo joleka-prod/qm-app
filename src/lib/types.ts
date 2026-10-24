@@ -12,6 +12,7 @@ export interface Profile {
   role: Role
   active: boolean
   supervisor_id: string | null
+  vacation_days: number
   created_at: string
 }
 
