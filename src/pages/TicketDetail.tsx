@@ -795,16 +795,6 @@ export function TicketDetail() {
                 >
                   Speichern
                 </button>
-                <button
-                  className="primary"
-                  disabled={busy || !report.trim() || openPositions > 0}
-                  onClick={() => {
-                    if (!ticket.signature_path && !confirm('Es gibt noch keine Kundenunterschrift. Trotzdem als erledigt melden?')) return
-                    closeJob()
-                  }}
-                >
-                  Erledigt melden
-                </button>
               </div>
               {openPositions > 0 && (
                 <p className="muted small">
@@ -866,7 +856,15 @@ export function TicketDetail() {
                 <input value={signerName} maxLength={100} onChange={(e) => setSignerName(e.target.value)} placeholder="Vorname Nachname" />
               </label>
               <label className="checkbox-row">
-                <input type="checkbox" checked={wantsEmail} onChange={(e) => setWantsEmail(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={wantsEmail}
+                  onChange={(e) => {
+                    setWantsEmail(e.target.checked)
+                    // E-Mail aus den Kundendaten vorschlagen
+                    if (e.target.checked && !signEmail.trim()) setSignEmail(ticket.customer_email ?? '')
+                  }}
+                />
                 Ich möchte den Bericht per E-Mail erhalten
               </label>
               {wantsEmail && (
@@ -881,6 +879,9 @@ export function TicketDetail() {
                     onChange={(e) => setSignEmail(e.target.value)}
                     placeholder="name@beispiel.de"
                   />
+                  {ticket.customer_email && signEmail.trim() === ticket.customer_email && (
+                    <span className="small muted">Aus den Kundendaten übernommen, bei Bedarf ändern.</span>
+                  )}
                 </label>
               )}
               <div className="actions">
@@ -898,7 +899,7 @@ export function TicketDetail() {
               onClick={() => {
                 setSigning(true)
                 setSignerName(ticket.customer_name)
-                setSignEmail(ticket.customer_email)
+                setSignEmail(ticket.customer_email ?? '')
                 setWantsEmail(false)
               }}
             >
@@ -907,6 +908,26 @@ export function TicketDetail() {
           ) : (
             <p className="muted">Noch nicht unterschrieben.</p>
           )}
+        </section>
+      )}
+
+      {einsatz && isInstaller && !closed && (
+        <section className="card">
+          <div className="actions">
+            <button
+              className="primary"
+              disabled={busy || signing || !report.trim() || openPositions > 0}
+              onClick={() => {
+                if (!ticket.signature_path && !confirm('Es gibt noch keine Kundenunterschrift. Trotzdem als erledigt melden?')) return
+                closeJob()
+              }}
+            >
+              Auftrag abschließen (Erledigt melden)
+            </button>
+          </div>
+          {!report.trim() && <p className="muted small">Bitte zuerst den Arbeitsbericht ausfüllen.</p>}
+          {openPositions > 0 && <p className="muted small">Noch {openPositions} Position(en) offen.</p>}
+          {signing && <p className="muted small">Bitte zuerst die Unterschrift speichern.</p>}
         </section>
       )}
 
