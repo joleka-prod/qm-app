@@ -28,7 +28,7 @@ function reply(status: number, body: Record<string, unknown>) {
 
 type Point = { lat: string; lon: string }
 // Treffer der Adresssuche; exact = Straße bzw. Hausnummer gefunden (nicht nur Ort)
-type Hit = Point & { exact: boolean; postcode: string; label: string }
+type Hit = Point & { exact: boolean; postcode: string; housenumber: string; label: string }
 
 const COUNTRIES = 'de,at,ch,lu,be,nl,fr'
 
@@ -49,6 +49,7 @@ async function lookup(address: string): Promise<Hit | null> {
           lon: String(c[0]), lat: String(c[1]),
           exact: ['house', 'street'].includes(p.type) || !!p.housenumber,
           postcode: p.postcode ?? '',
+          housenumber: p.housenumber ?? '',
           label: [`${street ?? ''} ${p.housenumber ?? ''}`.trim(), `${p.postcode ?? ''} ${p.city ?? p.name ?? ''}`.trim()].filter(Boolean).join(', '),
         }
       }
@@ -65,6 +66,7 @@ async function lookup(address: string): Promise<Hit | null> {
       lat: r.lat, lon: r.lon,
       exact: !!(a.road || a.house_number),
       postcode: a.postcode ?? '',
+      housenumber: a.house_number ?? '',
       label: [`${a.road ?? ''} ${a.house_number ?? ''}`.trim(), `${a.postcode ?? ''} ${a.city ?? a.town ?? a.village ?? ''}`.trim()].filter(Boolean).join(', '),
     }
   }
@@ -121,10 +123,17 @@ Deno.serve(async (req) => {
       .filter(Boolean).join(', ')
     if (!query) return reply(200, { found: true, label: '' })
     try {
+      if (v(body.street) && !v(body.house_no)) return reply(200, { found: false, reason: 'Die Hausnummer fehlt.' })
       const hit = await lookup(query)
-      const zipOk = !v(body.zip) || !hit?.postcode || hit.postcode === v(body.zip)
-      const found = !!hit && (!v(body.street) || hit.exact) && zipOk
-      return reply(200, { found, label: hit?.label ?? '' })
+      if (!hit || (v(body.street) && !hit.exact)) return reply(200, { found: false, reason: '', label: hit?.label ?? '' })
+      const norm = (x: string) => x.toLowerCase().replace(/\s+/g, '')
+      if (v(body.zip) && hit.postcode && norm(hit.postcode) !== norm(v(body.zip))) {
+        return reply(200, { found: false, reason: 'Die PLZ passt nicht zur Straße.', label: hit.label })
+      }
+      if (v(body.house_no) && norm(hit.housenumber) !== norm(v(body.house_no))) {
+        return reply(200, { found: false, reason: 'Diese Hausnummer wurde in der Straße nicht gefunden.', label: hit.label })
+      }
+      return reply(200, { found: true, label: hit.label })
     } catch (e) {
       return reply(200, { found: null, error: e instanceof Error ? e.message : 'Adresssuche nicht erreichbar' })
     }
