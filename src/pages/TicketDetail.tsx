@@ -458,7 +458,8 @@ export function TicketDetail() {
                     if (!(await confirmAddresses(addressesToCheck(cust, jobsiteAddr, billingAddr), before))) return
                   }
                   const linked = einsatz && canEditBase && canUseCrm(profile.role) ? await ensureCustomer(cust) : cust
-                  const site = einsatz ? { ...customerColumns(linked), ...addressColumns(billingAddr, 'billing'), ...addressColumns(jobsiteAddr, 'jobsite') } : {}
+                  const unlink = ticket.customer_id && !linked.customer_id ? { customer_id: null } : {}
+                  const site = einsatz ? { ...customerColumns(linked), ...unlink, ...addressColumns(billingAddr, 'billing'), ...addressColumns(jobsiteAddr, 'jobsite') } : {}
                   const patch = canEditBase ? { ...base, ...site } : ref
                   if (await update(patch)) setEditing(false)
                 }}

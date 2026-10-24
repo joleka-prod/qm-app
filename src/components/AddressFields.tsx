@@ -165,8 +165,11 @@ export function customerOf(t: Ticket): CustomerData {
   }
 }
 
+// customer_id nur mitschicken, wenn verknüpft (Aufheben einer Verknüpfung schickt der Aufrufer selbst)
 export function customerColumns(c: CustomerData) {
-  return Object.fromEntries(Object.entries(c).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])) as unknown as CustomerData
+  const { customer_id, ...rest } = c
+  const row = Object.fromEntries(Object.entries(rest).map(([k, v]) => [k, v.trim()])) as Omit<CustomerData, 'customer_id'>
+  return customer_id ? { ...row, customer_id } : row
 }
 
 // Daten eines Kunden aus dem Kundenstamm in den Auftrag übernehmen
