@@ -3,6 +3,7 @@ import { useAuth } from '../auth'
 import { AttendanceApprovals, requestText, type AttendanceRequest } from '../components/AttendanceApprovals'
 import { ClockBar } from '../components/ClockBar'
 import { OvertimeCard } from '../components/OvertimeCard'
+import { TeamOverview } from '../components/TeamOverview'
 import { VacationCard, type VacationRequest } from '../components/VacationCard'
 import { minutesOf, toLocalInput, type TimeEntry } from '../components/TimeCard'
 import { clockTime, fixedBreakMinutes, formatMinutes, minutesBetween, useClockChanged, workMinutes, type Attendance } from '../lib/clock'
@@ -223,6 +224,16 @@ export function Timesheet() {
           <button onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Nächster Monat">→</button>
         </div>
       </div>
+
+      <TeamOverview
+        members={staff.filter((p) => p.id !== profile?.id && (isAbove(p.id) || isAdmin))}
+        selected={installerId}
+        onPick={(id) => {
+          setEdit(null)
+          setInstallerId(id)
+        }}
+        reloadKey={sessions}
+      />
 
       {choices.length > 1 && (
         <div className="filters">
