@@ -210,7 +210,7 @@ Deno.serve(async (req) => {
     ['Kundennummer', t.customer_number ?? ''],
     ['Kunde', t.customer_name],
     ['Einsatzort', t.jobsite_address_different
-      ? [t.jobsite_name, `${t.jobsite_street} ${t.jobsite_house_no}`.trim(), `${t.jobsite_zip} ${t.jobsite_city}`.trim()].filter(Boolean).join(', ')
+      ? [t.jobsite_name, `${t.jobsite_street} ${t.jobsite_house_no}`.trim(), `${t.jobsite_zip} ${t.jobsite_city}`.trim(), t.jobsite_country === 'Deutschland' ? '' : t.jobsite_country].filter(Boolean).join(', ')
       : (t.site_address ?? '').replace(/\n/g, ', ')],
     ['Kundenadresse', t.jobsite_address_different ? (t.site_address ?? '').replace(/\n/g, ', ') : ''],
     ['Auftragsnummer', t.order_number],

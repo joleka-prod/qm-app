@@ -11,7 +11,8 @@ import { AppointmentCard } from '../components/AppointmentCard'
 import { BillingCard } from '../components/BillingCard'
 import { TimeCard } from '../components/TimeCard'
 import { DistanceLine } from '../components/DistanceLine'
-import { AddressFields, CustomerFields, addressColumns, customerColumns, customerOf, emptyCustomer, type CustomerData, addressComplete, addressLine, addressOf, emptyAddress, jobAddress, type AltAddress } from '../components/AddressFields'
+import { confirmAddresses } from '../lib/addressCheck'
+import { AddressFields, CustomerFields, addressesToCheck, addressColumns, customerColumns, customerOf, emptyCustomer, type CustomerData, addressComplete, addressLine, addressOf, emptyAddress, jobAddress, type AltAddress } from '../components/AddressFields'
 import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { deletePhoto, signedUrls, uploadPhotos, uploadSignature } from '../lib/photos'
 import { sendReport } from '../lib/reportMail'
@@ -441,6 +442,10 @@ export function TicketDetail() {
                   const base = { ...ref, title: title.trim(), description: description.trim() }
                   const site = einsatz ? { ...customerColumns(cust), ...addressColumns(billingAddr, 'billing'), ...addressColumns(jobsiteAddr, 'jobsite') } : {}
                   const patch = canEditBase ? { ...base, ...site } : ref
+                  if (einsatz && canEditBase) {
+                    const before = addressesToCheck(customerOf(ticket), addressOf(ticket, 'jobsite'), addressOf(ticket, 'billing'))
+                    if (!(await confirmAddresses(addressesToCheck(cust, jobsiteAddr, billingAddr), before))) return
+                  }
                   if (await update(patch)) setEditing(false)
                 }}
               >

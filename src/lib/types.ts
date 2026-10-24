@@ -39,18 +39,21 @@ export interface Ticket {
   customer_house_no: string
   customer_zip: string
   customer_city: string
+  customer_country: string
   billing_address_different: boolean
   billing_name: string
   billing_street: string
   billing_house_no: string
   billing_zip: string
   billing_city: string
+  billing_country: string
   jobsite_address_different: boolean
   jobsite_name: string
   jobsite_street: string
   jobsite_house_no: string
   jobsite_zip: string
   jobsite_city: string
+  jobsite_country: string
   site_address: string
   work_report: string
   service_area: ServiceArea | null

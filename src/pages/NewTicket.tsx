@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
-import { AddressFields, CustomerFields, addressColumns, customerColumns, emptyAddress, emptyCustomer, type AltAddress, type CustomerData } from '../components/AddressFields'
+import { confirmAddresses } from '../lib/addressCheck'
+import { AddressFields, CustomerFields, addressesToCheck, addressColumns, customerColumns, emptyAddress, emptyCustomer, type AltAddress, type CustomerData } from '../components/AddressFields'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { TeamSelect } from '../components/TeamSelect'
 import { PositionsEditor, isEmptyPosition, newPositionDraft, type PositionDraft } from '../components/PositionsEditor'
@@ -55,6 +56,10 @@ export function NewTicket() {
   async function submit(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
+    if (einsatz && !(await confirmAddresses(addressesToCheck(cust, jobsiteAddr, billingAddr)))) {
+      setBusy(false)
+      return
+    }
     setError('')
     const { data, error } = await supabase
       .from('tickets')

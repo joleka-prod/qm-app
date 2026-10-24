@@ -27,26 +27,53 @@ function reply(status: number, body: Record<string, unknown>) {
 }
 
 type Point = { lat: string; lon: string }
+// Treffer der Adresssuche; exact = Straße bzw. Hausnummer gefunden (nicht nur Ort)
+type Hit = Point & { exact: boolean; postcode: string; label: string }
+
+const COUNTRIES = 'de,at,ch,lu,be,nl,fr'
 
 // Erst Photon (bevorzugt Treffer rund um die Eifel), sonst Nominatim. null = Adresse nicht gefunden
-async function geocode(address: string): Promise<Point | null> {
+async function lookup(address: string): Promise<Hit | null> {
   const headers = { 'User-Agent': AGENT, 'Accept-Language': 'de' }
   let status = 0
   try {
     const res = await fetch(`${PHOTON}/api/?limit=1&lang=de&lat=50.2&lon=6.8&q=${encodeURIComponent(address)}`, { headers })
     status = res.status
     if (res.ok) {
-      const data = await res.json()
-      const c = data.features?.[0]?.geometry?.coordinates
-      if (c) return { lon: String(c[0]), lat: String(c[1]) }
+      const f = (await res.json()).features?.[0]
+      const c = f?.geometry?.coordinates
+      if (c) {
+        const p = f.properties ?? {}
+        const street = p.street ?? (p.type === 'street' ? p.name : '')
+        return {
+          lon: String(c[0]), lat: String(c[1]),
+          exact: ['house', 'street'].includes(p.type) || !!p.housenumber,
+          postcode: p.postcode ?? '',
+          label: [`${street ?? ''} ${p.housenumber ?? ''}`.trim(), `${p.postcode ?? ''} ${p.city ?? p.name ?? ''}`.trim()].filter(Boolean).join(', '),
+        }
+      }
     }
   } catch {
     // weiter mit Nominatim
   }
-  const res = await fetch(`${NOMINATIM}/search?format=json&limit=1&countrycodes=de,lu,be,nl,fr&q=${encodeURIComponent(address)}`, { headers })
-  if (res.ok) return ((await res.json()) as Point[])[0] ?? null
+  const res = await fetch(`${NOMINATIM}/search?format=json&limit=1&addressdetails=1&countrycodes=${COUNTRIES}&q=${encodeURIComponent(address)}`, { headers })
+  if (res.ok) {
+    const r = (await res.json())[0]
+    if (!r) return null
+    const a = r.address ?? {}
+    return {
+      lat: r.lat, lon: r.lon,
+      exact: !!(a.road || a.house_number),
+      postcode: a.postcode ?? '',
+      label: [`${a.road ?? ''} ${a.house_number ?? ''}`.trim(), `${a.postcode ?? ''} ${a.city ?? a.town ?? a.village ?? ''}`.trim()].filter(Boolean).join(', '),
+    }
+  }
   if (status === 200) return null
   throw new Error(`Adresssuche nicht erreichbar (${status || '-'} / ${res.status})`)
+}
+
+async function geocode(address: string): Promise<Point | null> {
+  return await lookup(address)
 }
 
 // Einfache Strecke in Metern
@@ -79,11 +106,28 @@ Deno.serve(async (req) => {
   const { data: caller } = await admin.auth.getUser(auth.replace(/^Bearer /, ''))
   if (!caller.user) return reply(401, { error: 'Nicht angemeldet' })
 
-  let body: { ticket_id?: number }
+  let body: { ticket_id?: number; action?: string; street?: string; house_no?: string; zip?: string; city?: string; country?: string }
   try {
     body = await req.json()
   } catch {
     return reply(400, { error: 'Ungültige Anfrage' })
+  }
+
+  // Adressprüfung beim Speichern: findet die Navigation diese Adresse?
+  if (body.action === 'check') {
+    const v = (x?: string) => (x ?? '').trim()
+    const country = v(body.country)
+    const query = [`${v(body.street)} ${v(body.house_no)}`.trim(), `${v(body.zip)} ${v(body.city)}`.trim(), country]
+      .filter(Boolean).join(', ')
+    if (!query) return reply(200, { found: true, label: '' })
+    try {
+      const hit = await lookup(query)
+      const zipOk = !v(body.zip) || !hit?.postcode || hit.postcode === v(body.zip)
+      const found = !!hit && (!v(body.street) || hit.exact) && zipOk
+      return reply(200, { found, label: hit?.label ?? '' })
+    } catch (e) {
+      return reply(200, { found: null, error: e instanceof Error ? e.message : 'Adresssuche nicht erreichbar' })
+    }
   }
 
   // Nur wer den Auftrag sehen darf (Zeilenrechte des Aufrufers)
@@ -91,19 +135,20 @@ Deno.serve(async (req) => {
     auth: { persistSession: false },
     global: { headers: { Authorization: auth } },
   })
-  const { data: t } = await user.from('tickets').select('id, ticket_type, site_address, jobsite_address_different, jobsite_street, jobsite_house_no, jobsite_zip, jobsite_city').eq('id', body.ticket_id ?? 0).maybeSingle()
+  const { data: t } = await user.from('tickets').select('id, ticket_type, site_address, jobsite_address_different, jobsite_street, jobsite_house_no, jobsite_zip, jobsite_city, jobsite_country').eq('id', body.ticket_id ?? 0).maybeSingle()
   if (!t) return reply(404, { error: 'Auftrag nicht gefunden' })
   if (t.ticket_type === 'qm') return reply(400, { error: 'Die Fahrstrecke gibt es nur bei Service-Aufträgen.' })
 
   // Einsatzort: abweichende Baustelle, sonst Kundenadresse (gleiche Schreibweise wie in der App)
   const address = t.jobsite_address_different
-    ? [`${t.jobsite_street} ${t.jobsite_house_no}`.trim(), `${t.jobsite_zip} ${t.jobsite_city}`.trim()].join('\n')
+    ? [`${t.jobsite_street} ${t.jobsite_house_no}`.trim(), `${t.jobsite_zip} ${t.jobsite_city}`.trim(), t.jobsite_country === 'Deutschland' ? '' : t.jobsite_country]
+      .filter(Boolean).join('\n')
     : (t.site_address ?? '').trim()
   const save = async (km: number | null, error: string) => {
     await admin.from('tickets').update({ distance_km: km, distance_address: address, distance_error: error }).eq('id', t.id)
       .eq('site_address', t.site_address).eq('jobsite_address_different', t.jobsite_address_different)
       .eq('jobsite_street', t.jobsite_street).eq('jobsite_house_no', t.jobsite_house_no)
-      .eq('jobsite_zip', t.jobsite_zip).eq('jobsite_city', t.jobsite_city)
+      .eq('jobsite_zip', t.jobsite_zip).eq('jobsite_city', t.jobsite_city).eq('jobsite_country', t.jobsite_country)
     return reply(200, { distance_km: km, distance_error: error })
   }
   if (!address) return save(null, '')
