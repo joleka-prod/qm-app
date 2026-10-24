@@ -17,10 +17,10 @@ export function Layout() {
           {profile?.role === 'monteur' ? (
             <>
               <NavLink to="/" end>Mein Kalender</NavLink>
-              <NavLink to="/tickets">Service-Aufträge</NavLink>
+              <NavLink to="/tickets">Aufträge</NavLink>
             </>
           ) : (
-            <NavLink to="/" end>Service-Aufträge</NavLink>
+            <NavLink to="/" end>Aufträge</NavLink>
           )}
           {isPlanner && <NavLink to="/kalender">Kalender</NavLink>}
           <NavLink to="/zeiterfassung">Zeiterfassung</NavLink>

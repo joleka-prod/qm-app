@@ -83,7 +83,7 @@ export function NewTicket() {
       .select('id')
       .single()
     if (error || !data) {
-      setError(error?.message ?? 'Service-Auftrag konnte nicht angelegt werden.')
+      setError(error?.message ?? 'Auftrag konnte nicht angelegt werden.')
       setBusy(false)
       return
     }
@@ -105,7 +105,7 @@ export function NewTicket() {
       await uploadPhotos(data.id, files)
       for (const row of saved) await uploadPhotos(data.id, filled[row.sort].files, row.id)
     } catch (err) {
-      alert(`Service-Auftrag wurde angelegt, aber nicht alle Fotos konnten hochgeladen werden: ${(err as Error).message}`)
+      alert(`Auftrag wurde angelegt, aber nicht alle Fotos konnten hochgeladen werden: ${(err as Error).message}`)
     }
     navigate(`/ticket/${data.id}`, { replace: true })
   }

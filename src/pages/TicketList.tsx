@@ -135,7 +135,7 @@ export function TicketList() {
       )}
       <div className="home-main">
       <div className="page-head">
-        <h1>Service-Aufträge</h1>
+        <h1>Aufträge</h1>
         <Link to="/neu" className="button primary">+ Neu</Link>
       </div>
       <div className="filters">
@@ -163,7 +163,7 @@ export function TicketList() {
       {loading ? (
         <p className="muted">Lädt…</p>
       ) : visible.length === 0 ? (
-        <p className="muted">Keine Service-Aufträge gefunden.</p>
+        <p className="muted">Keine Aufträge gefunden.</p>
       ) : (
         <ul className="ticket-list">
           {visible.map((t) => (

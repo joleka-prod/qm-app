@@ -175,7 +175,7 @@ export function TicketDetail() {
     load()
   }, [load])
 
-  if (notFound) return <p>Service-Auftrag nicht gefunden. <Link to="/">Zur Übersicht</Link></p>
+  if (notFound) return <p>Auftrag nicht gefunden. <Link to="/">Zur Übersicht</Link></p>
   if (!ticket || !profile) return <p className="muted">Lädt…</p>
 
   const isAdmin = profile.role === 'admin'
@@ -358,7 +358,7 @@ export function TicketDetail() {
   }
 
   async function removeTicket() {
-    if (!confirm('Service-Auftrag mit allen Fotos endgültig löschen? Das kann nicht rückgängig gemacht werden.')) return
+    if (!confirm('Auftrag mit allen Fotos endgültig löschen? Das kann nicht rückgängig gemacht werden.')) return
     if (photos.length > 0) {
       await supabase.storage.from('ticket-photos').remove(photos.map((p) => p.storage_path))
     }
@@ -1076,7 +1076,7 @@ export function TicketDetail() {
         </section>
       ) : isAdmin ? (
         <div className="actions danger-zone">
-          <button className="danger" onClick={removeTicket}>Service-Auftrag löschen</button>
+          <button className="danger" onClick={removeTicket}>Auftrag löschen</button>
         </div>
       ) : canRequestDeletion && requestingDeletion ? (
         <section className="card danger-card">

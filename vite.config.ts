@@ -18,7 +18,7 @@ export default defineConfig({
       manifest: {
         name: 'JOLEKA Service Dashboard',
         short_name: 'JOLEKA Service',
-        description: 'Service-Aufträge, QM und Monteurplanung',
+        description: 'Aufträge, QM und Monteurplanung',
         lang: 'de',
         theme_color: '#1d4ed8',
         background_color: '#f4f6f9',

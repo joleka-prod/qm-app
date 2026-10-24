@@ -1,4 +1,4 @@
-// Berechnet bei Service-Aufträgen (nicht QM) die Fahrstrecke vom Hauptstandort zur Kundenadresse (Hin- und Rückweg)
+// Berechnet bei Aufträgen (nicht QM) die Fahrstrecke vom Hauptstandort zur Kundenadresse (Hin- und Rückweg)
 // (bei abweichender Baustellenadresse zur Baustelle) und speichert sie am Auftrag. Adressen werden über OpenStreetMap-Daten gefunden (Photon, ersatzweise
 // Nominatim), die Strecke über OSRM (ersatzweise der OSRM-Server der FOSSGIS). Alles kostenlos, ohne Schlüssel.
 // Optional: ORIGIN_ADDRESS (Standard: Hauptstandort), PHOTON_URL, NOMINATIM_URL, OSRM_URL, OSRM_URL_2 (Tests).
@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
   })
   const { data: t } = await user.from('tickets').select('id, ticket_type, site_address, jobsite_address_different, jobsite_street, jobsite_house_no, jobsite_zip, jobsite_city, jobsite_country').eq('id', body.ticket_id ?? 0).maybeSingle()
   if (!t) return reply(404, { error: 'Auftrag nicht gefunden' })
-  if (t.ticket_type === 'qm') return reply(400, { error: 'Die Fahrstrecke gibt es nur bei Service-Aufträgen.' })
+  if (t.ticket_type === 'qm') return reply(400, { error: 'Die Fahrstrecke gibt es nur bei Aufträgen.' })
 
   // Einsatzort: abweichende Baustelle, sonst Kundenadresse (gleiche Schreibweise wie in der App)
   const address = t.jobsite_address_different
