@@ -906,6 +906,18 @@ await check('Abweichende Baustellenadresse: Pflichtfelder, Fahrstrecke wird bei 
   await admin.from('tickets').delete().eq('id', id)
 })
 
+await check('Kundenadresse in Feldern ergibt site_address, Freitext ohne Felder bleibt', async () => {
+  let r = await qm.c.from('tickets').insert({ ticket_type: 'reparatur', title: 'KA', customer_street: ' Bahnhofstr. ', customer_house_no: '5a', customer_zip: '54550', customer_city: 'Daun' }).select().single()
+  assert.ifError(r.error)
+  assert.equal(r.data.site_address, 'Bahnhofstr. 5a\n54550 Daun')
+  const id = r.data.id
+  r = await qm.c.from('tickets').update({ customer_house_no: '', customer_zip: '' }).eq('id', id).select().single()
+  assert.equal(r.data.site_address, 'Bahnhofstr.\nDaun')
+  r = await qm.c.from('tickets').insert({ ticket_type: 'reparatur', title: 'KA2', site_address: 'Alt 1\n12345 Ort' }).select().single()
+  assert.equal(r.data.site_address, 'Alt 1\n12345 Ort')
+  await admin.from('tickets').delete().in('id', [id, r.data.id])
+})
+
 // Testteams wieder entfernen, damit sie nicht im Kalender auftauchen
 await admin.from('tickets').update({ team_id: null }).in('team_id', [T1, T2])
 await admin.from('teams').delete().in('id', [T1, T2])

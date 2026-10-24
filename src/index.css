@@ -449,3 +449,4 @@ button.link.danger { color: #b42318; }
 .billing-address .street-row { grid-template-columns: 1fr 7rem; }
 .billing-address .zip-row { grid-template-columns: 6rem 1fr; }
 .customer-row { grid-template-columns: 1fr 9rem; }
+.customer-block { display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; }

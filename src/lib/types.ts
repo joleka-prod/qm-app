@@ -35,6 +35,10 @@ export interface Ticket {
   distance_address: string
   distance_error: string
   customer_number: string
+  customer_street: string
+  customer_house_no: string
+  customer_zip: string
+  customer_city: string
   billing_address_different: boolean
   billing_name: string
   billing_street: string

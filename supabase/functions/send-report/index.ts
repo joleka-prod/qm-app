@@ -207,8 +207,8 @@ Deno.serve(async (req) => {
   w.text(`Servicebericht ${no}`, { size: 20, bold: true, gap: 6 })
   w.text(`${TYPE_LABEL[t.ticket_type]}: ${t.title}`, { size: 12, bold: true, gap: 8 })
   const facts: [string, string][] = [
-    ['Kunde', t.customer_name],
     ['Kundennummer', t.customer_number ?? ''],
+    ['Kunde', t.customer_name],
     ['Einsatzort', t.jobsite_address_different
       ? [t.jobsite_name, `${t.jobsite_street} ${t.jobsite_house_no}`.trim(), `${t.jobsite_zip} ${t.jobsite_city}`.trim()].filter(Boolean).join(', ')
       : (t.site_address ?? '').replace(/\n/g, ', ')],

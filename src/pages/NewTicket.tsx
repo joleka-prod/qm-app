@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
-import { AddressFields, addressColumns, emptyAddress, type AltAddress } from '../components/AddressFields'
+import { AddressFields, CustomerFields, addressColumns, customerColumns, emptyAddress, emptyCustomer, type AltAddress, type CustomerData } from '../components/AddressFields'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { TeamSelect } from '../components/TeamSelect'
 import { PositionsEditor, isEmptyPosition, newPositionDraft, type PositionDraft } from '../components/PositionsEditor'
@@ -39,10 +39,7 @@ export function NewTicket() {
     SERVICE_AREAS.includes(params.get('bereich') as ServiceArea) ? (params.get('bereich') as ServiceArea) : null,
   )
   const [positions, setPositions] = useState<PositionDraft[]>(() => [newPositionDraft()])
-  const [customer, setCustomer] = useState('')
-  const [customerEmail, setCustomerEmail] = useState('')
-  const [customerNumber, setCustomerNumber] = useState('')
-  const [address, setAddress] = useState('')
+  const [cust, setCust] = useState<CustomerData>(emptyCustomer)
   const [billingAddr, setBillingAddr] = useState<AltAddress>(emptyAddress)
   const [jobsiteAddr, setJobsiteAddr] = useState<AltAddress>(emptyAddress)
   const [assignedTo, setAssignedTo] = useState('')
@@ -68,10 +65,8 @@ export function NewTicket() {
         description: einsatz ? '' : description.trim(),
         order_number: orderNumber.trim(),
         position_number: einsatz ? '' : positionNumber.trim(),
-        customer_name: einsatz ? customer.trim() : '',
-        customer_email: einsatz ? customerEmail.trim() : '',
-        customer_number: einsatz ? customerNumber.trim() : '',
-        site_address: einsatz ? address.trim() : '',
+        ...customerColumns(einsatz ? cust : emptyCustomer),
+        site_address: '',
         ...addressColumns(einsatz ? billingAddr : emptyAddress, 'billing'),
         ...addressColumns(einsatz ? jobsiteAddr : emptyAddress, 'jobsite'),
         assigned_to: !einsatz && assignedTo ? assignedTo : null,
@@ -171,32 +166,7 @@ export function NewTicket() {
               ))}
             </div>
           </div>
-          <div className="row customer-row">
-            <label>
-              Kunde
-              <input value={customer} maxLength={150} onChange={(e) => setCustomer(e.target.value)} />
-            </label>
-            <label>
-              Kundennummer
-              <input value={customerNumber} maxLength={30} onChange={(e) => setCustomerNumber(e.target.value)} />
-            </label>
-          </div>
-          <label>
-            E-Mail des Kunden
-            <input
-              type="email"
-              inputMode="email"
-              autoComplete="off"
-              value={customerEmail}
-              maxLength={200}
-              onChange={(e) => setCustomerEmail(e.target.value)}
-              placeholder="name@beispiel.de"
-            />
-          </label>
-          <label>
-            Adresse des Kunden
-            <textarea rows={2} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Straße, PLZ Ort" />
-          </label>
+          <CustomerFields value={cust} onChange={setCust} />
           <AddressFields kind="jobsite" value={jobsiteAddr} onChange={setJobsiteAddr} />
           <AddressFields kind="billing" value={billingAddr} onChange={setBillingAddr} />
         </>

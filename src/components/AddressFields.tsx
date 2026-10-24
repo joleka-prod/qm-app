@@ -92,3 +92,89 @@ export function AddressFields({ kind, value, onChange }: { kind: AddressKind; va
     </>
   )
 }
+
+// Kundendaten: Kundennummer zuerst, Adresse in Feldern wie bei der Rechnungsadresse
+export interface CustomerData {
+  customer_number: string
+  customer_name: string
+  customer_street: string
+  customer_house_no: string
+  customer_zip: string
+  customer_city: string
+  customer_email: string
+}
+
+export const emptyCustomer: CustomerData = {
+  customer_number: '',
+  customer_name: '',
+  customer_street: '',
+  customer_house_no: '',
+  customer_zip: '',
+  customer_city: '',
+  customer_email: '',
+}
+
+export function customerOf(t: Ticket): CustomerData {
+  return {
+    customer_number: t.customer_number,
+    customer_name: t.customer_name,
+    customer_street: t.customer_street,
+    customer_house_no: t.customer_house_no,
+    customer_zip: t.customer_zip,
+    customer_city: t.customer_city,
+    customer_email: t.customer_email,
+  }
+}
+
+export function customerColumns(c: CustomerData) {
+  return Object.fromEntries(Object.entries(c).map(([k, v]) => [k, v.trim()])) as unknown as CustomerData
+}
+
+export function CustomerFields({ value, onChange }: { value: CustomerData; onChange: (v: CustomerData) => void }) {
+  const set = (patch: Partial<CustomerData>) => onChange({ ...value, ...patch })
+  return (
+    <fieldset className="billing-address">
+      <legend>Kunde</legend>
+      <label>
+        Kundennummer
+        <input value={value.customer_number} maxLength={30} onChange={(e) => set({ customer_number: e.target.value })} />
+      </label>
+      <label>
+        Name
+        <input value={value.customer_name} maxLength={150} onChange={(e) => set({ customer_name: e.target.value })} />
+      </label>
+      <div className="row street-row">
+        <label>
+          Straße
+          <input value={value.customer_street} maxLength={150} onChange={(e) => set({ customer_street: e.target.value })} />
+        </label>
+        <label>
+          Hausnummer
+          <input value={value.customer_house_no} maxLength={20} onChange={(e) => set({ customer_house_no: e.target.value })} />
+        </label>
+      </div>
+      <div className="row zip-row">
+        <label>
+          PLZ
+          <input inputMode="numeric" value={value.customer_zip} maxLength={10} onChange={(e) => set({ customer_zip: e.target.value })} />
+        </label>
+        <label>
+          Ort
+          <input value={value.customer_city} maxLength={100} onChange={(e) => set({ customer_city: e.target.value })} />
+        </label>
+      </div>
+      <label>
+        E-Mail
+        <input
+          type="email"
+          inputMode="email"
+          autoComplete="off"
+          value={value.customer_email}
+          maxLength={200}
+          onChange={(e) => set({ customer_email: e.target.value })}
+          placeholder="name@beispiel.de"
+        />
+      </label>
+    </fieldset>
+  )
+}

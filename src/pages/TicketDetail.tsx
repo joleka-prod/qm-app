@@ -11,7 +11,7 @@ import { AppointmentCard } from '../components/AppointmentCard'
 import { BillingCard } from '../components/BillingCard'
 import { TimeCard } from '../components/TimeCard'
 import { DistanceLine } from '../components/DistanceLine'
-import { AddressFields, addressColumns, addressComplete, addressLine, addressOf, emptyAddress, jobAddress, type AltAddress } from '../components/AddressFields'
+import { AddressFields, CustomerFields, addressColumns, customerColumns, customerOf, emptyCustomer, type CustomerData, addressComplete, addressLine, addressOf, emptyAddress, jobAddress, type AltAddress } from '../components/AddressFields'
 import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { deletePhoto, signedUrls, uploadPhotos, uploadSignature } from '../lib/photos'
 import { sendReport } from '../lib/reportMail'
@@ -96,12 +96,9 @@ export function TicketDetail() {
   const [description, setDescription] = useState('')
   const [orderNumber, setOrderNumber] = useState('')
   const [positionNumber, setPositionNumber] = useState('')
-  const [customer, setCustomer] = useState('')
-  const [customerEmail, setCustomerEmail] = useState('')
-  const [customerNumber, setCustomerNumber] = useState('')
+  const [cust, setCust] = useState<CustomerData>(emptyCustomer)
   const [wantsEmail, setWantsEmail] = useState(false)
   const [signEmail, setSignEmail] = useState('')
-  const [address, setAddress] = useState('')
   const [billingAddr, setBillingAddr] = useState<AltAddress>(emptyAddress)
   const [jobsiteAddr, setJobsiteAddr] = useState<AltAddress>(emptyAddress)
   const [teamId, setTeamId] = useState('')
@@ -141,10 +138,7 @@ export function TicketDetail() {
     setDescription(tk.description)
     setOrderNumber(tk.order_number)
     setPositionNumber(tk.position_number)
-    setCustomer(tk.customer_name)
-    setCustomerEmail(tk.customer_email)
-    setAddress(tk.site_address)
-    setCustomerNumber(tk.customer_number)
+    setCust(customerOf(tk))
     setBillingAddr(addressOf(tk, 'billing'))
     setJobsiteAddr(addressOf(tk, 'jobsite'))
     setTeamId(tk.team_id ? String(tk.team_id) : '')
@@ -413,31 +407,7 @@ export function TicketDetail() {
             </div>
             {einsatz && canEditBase && (
               <>
-                <div className="row customer-row">
-                  <label>
-                    Kunde
-                    <input value={customer} maxLength={150} onChange={(e) => setCustomer(e.target.value)} />
-                  </label>
-                  <label>
-                    Kundennummer
-                    <input value={customerNumber} maxLength={30} onChange={(e) => setCustomerNumber(e.target.value)} />
-                  </label>
-                </div>
-                <label>
-                  E-Mail des Kunden
-                  <input
-                    type="email"
-                    inputMode="email"
-                    value={customerEmail}
-                    maxLength={200}
-                    onChange={(e) => setCustomerEmail(e.target.value)}
-                    placeholder="name@beispiel.de"
-                  />
-                </label>
-                <label>
-                  Einsatzort / Adresse
-                  <textarea rows={2} value={address} onChange={(e) => setAddress(e.target.value)} />
-                </label>
+                <CustomerFields value={cust} onChange={setCust} />
                 <AddressFields kind="jobsite" value={jobsiteAddr} onChange={setJobsiteAddr} />
                 <AddressFields kind="billing" value={billingAddr} onChange={setBillingAddr} />
               </>
@@ -456,10 +426,7 @@ export function TicketDetail() {
                   setDescription(ticket.description)
                   setOrderNumber(ticket.order_number)
                   setPositionNumber(ticket.position_number)
-                  setCustomer(ticket.customer_name)
-                  setCustomerEmail(ticket.customer_email)
-                  setAddress(ticket.site_address)
-                  setCustomerNumber(ticket.customer_number)
+                  setCust(customerOf(ticket))
                   setBillingAddr(addressOf(ticket, 'billing'))
                   setJobsiteAddr(addressOf(ticket, 'jobsite'))
                 }}
@@ -468,11 +435,11 @@ export function TicketDetail() {
               </button>
               <button
                 className="primary"
-                disabled={busy || !title.trim() || (einsatz && ((!!customerEmail.trim() && !isEmail(customerEmail)) || !addressComplete(billingAddr, 'billing') || !addressComplete(jobsiteAddr, 'jobsite')))}
+                disabled={busy || !title.trim() || (einsatz && ((!!cust.customer_email.trim() && !isEmail(cust.customer_email)) || !addressComplete(billingAddr, 'billing') || !addressComplete(jobsiteAddr, 'jobsite')))}
                 onClick={async () => {
                   const ref = { order_number: orderNumber.trim(), position_number: positionNumber.trim() }
                   const base = { ...ref, title: title.trim(), description: description.trim() }
-                  const site = einsatz ? { customer_name: customer.trim(), customer_email: customerEmail.trim(), customer_number: customerNumber.trim(), site_address: address.trim(), ...addressColumns(billingAddr, 'billing'), ...addressColumns(jobsiteAddr, 'jobsite') } : {}
+                  const site = einsatz ? { ...customerColumns(cust), ...addressColumns(billingAddr, 'billing'), ...addressColumns(jobsiteAddr, 'jobsite') } : {}
                   const patch = canEditBase ? { ...base, ...site } : ref
                   if (await update(patch)) setEditing(false)
                 }}
@@ -486,29 +453,21 @@ export function TicketDetail() {
             <h1 className="ticket-heading">{ticket.title}</h1>
             {orderRef(ticket) && <p className="order-ref">{orderRef(ticket)}</p>}
             {einsatz && (ticket.customer_name || ticket.customer_number || ticket.site_address || ticket.customer_email) && (
-              <p className="site">
+              <div className="site customer-block">
+                {ticket.customer_number && <div className="muted small">Kd.-Nr. {ticket.customer_number}</div>}
                 {ticket.customer_name && <strong>{ticket.customer_name}</strong>}
-                {ticket.customer_number && <span className="muted">{ticket.customer_name && ' · '}Kd.-Nr. {ticket.customer_number}</span>}
-                {ticket.customer_email && (
-                  <>
-                    {(ticket.customer_name || ticket.customer_number) && <br />}
-                    <a href={`mailto:${ticket.customer_email}`}>{ticket.customer_email}</a>
-                  </>
-                )}
                 {ticket.site_address && (
-                  <>
-                    {(ticket.customer_name || ticket.customer_number || ticket.customer_email) && <br />}
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.site_address)}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="pre"
-                    >
-                      {ticket.site_address}
-                    </a>
-                  </>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ticket.site_address)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="pre"
+                  >
+                    {ticket.site_address}
+                  </a>
                 )}
-              </p>
+                {ticket.customer_email && <a href={`mailto:${ticket.customer_email}`}>{ticket.customer_email}</a>}
+              </div>
             )}
             {einsatz && ticket.jobsite_address_different && (
               <p className="small">
