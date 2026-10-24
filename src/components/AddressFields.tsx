@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import type { Ticket } from '../lib/types'
+import { AddressSuggest } from './AddressSuggest'
 
 // Abweichende Adresse am Auftrag: Rechnungsadresse (billing_*) oder Baustellenadresse (jobsite_*)
 export type AddressKind = 'billing' | 'jobsite'
@@ -62,6 +64,7 @@ const TITLE: Record<AddressKind, string> = { billing: 'Rechnungsadresse', jobsit
 export function AddressFields({ kind, value, onChange }: { kind: AddressKind; value: AltAddress; onChange: (v: AltAddress) => void }) {
   const set = (patch: Partial<AltAddress>) => onChange({ ...value, ...patch })
   const nameRequired = kind === 'billing'
+  const [typing, setTyping] = useState(false)
   return (
     <>
       <label className="checkbox-row">
@@ -78,13 +81,31 @@ export function AddressFields({ kind, value, onChange }: { kind: AddressKind; va
           <div className="row street-row">
             <label>
               Straße *
-              <input required value={value.street} maxLength={150} onChange={(e) => set({ street: e.target.value })} />
+              <input
+                required
+                autoComplete="off"
+                value={value.street}
+                maxLength={150}
+                onChange={(e) => {
+                  setTyping(true)
+                  set({ street: e.target.value })
+                }}
+                onBlur={() => setTyping(false)}
+              />
             </label>
             <label>
               Hausnummer
               <input value={value.house_no} maxLength={20} onChange={(e) => set({ house_no: e.target.value })} />
             </label>
           </div>
+          <AddressSuggest
+            active={typing}
+            query={[`${value.street} ${value.house_no}`, `${value.zip} ${value.city}`].join(' ')}
+            onPick={(a) => {
+              setTyping(false)
+              set({ ...a, house_no: a.house_no || value.house_no, country: a.country || value.country })
+            }}
+          />
           <div className="row zip-row">
             <label>
               PLZ *
@@ -144,6 +165,7 @@ export function customerColumns(c: CustomerData) {
 
 export function CustomerFields({ value, onChange }: { value: CustomerData; onChange: (v: CustomerData) => void }) {
   const set = (patch: Partial<CustomerData>) => onChange({ ...value, ...patch })
+  const [typing, setTyping] = useState(false)
   return (
     <fieldset className="billing-address">
       <legend>Kunde</legend>
@@ -158,13 +180,36 @@ export function CustomerFields({ value, onChange }: { value: CustomerData; onCha
       <div className="row street-row">
         <label>
           Straße
-          <input value={value.customer_street} maxLength={150} onChange={(e) => set({ customer_street: e.target.value })} />
+          <input
+            autoComplete="off"
+            value={value.customer_street}
+            maxLength={150}
+            onChange={(e) => {
+              setTyping(true)
+              set({ customer_street: e.target.value })
+            }}
+            onBlur={() => setTyping(false)}
+          />
         </label>
         <label>
           Hausnummer
           <input value={value.customer_house_no} maxLength={20} onChange={(e) => set({ customer_house_no: e.target.value })} />
         </label>
       </div>
+      <AddressSuggest
+        active={typing}
+        query={`${value.customer_street} ${value.customer_house_no} ${value.customer_zip} ${value.customer_city}`}
+        onPick={(a) => {
+          setTyping(false)
+          set({
+            customer_street: a.street,
+            customer_house_no: a.house_no || value.customer_house_no,
+            customer_zip: a.zip,
+            customer_city: a.city,
+            customer_country: a.country || value.customer_country,
+          })
+        }}
+      />
       <div className="row zip-row">
         <label>
           PLZ

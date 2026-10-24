@@ -451,3 +451,6 @@ button.link.danger { color: #b42318; }
 .customer-row { grid-template-columns: 1fr 9rem; }
 .customer-block { display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; }
 .distance-target { flex-basis: 100%; }
+.address-suggest { list-style: none; margin: -0.4rem 0 0; padding: 0.25rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card, #fff); box-shadow: 0 6px 18px rgba(16, 24, 40, 0.12); }
+.address-suggest button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 0.55rem 0.6rem; border-radius: 8px; font: inherit; color: inherit; min-height: 0; }
+.address-suggest button:hover { background: var(--bg); }
