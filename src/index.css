@@ -474,3 +474,10 @@ button.link.danger { color: #b42318; }
 .chain-open { background: var(--highlight-bg, rgba(255, 196, 0, 0.12)); border-radius: 8px; padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; }
 .chain-open p { margin: 0 0 0.25rem; }
 .chain-open ul { margin: 0; padding-left: 1.2rem; }
+
+/* Kalender gedreht: Teams als Spalten, Tage als Zeilen */
+.cal-transposed th.cal-name { width: 7.5rem; }
+.cal-transposed td { height: auto; min-height: 5rem; }
+.cal-transposed thead th[class*='cal-team-'] { border-left-width: 1px !important; border-top: 4px solid; }
+.cal-transposed thead th.cal-team-montage { border-top-color: #7a5af8; }
+.cal-transposed thead th.cal-team-kundendienst { border-top-color: #2e90fa; }

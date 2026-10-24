@@ -44,6 +44,24 @@ export function PlanningCalendar() {
   const [info, setInfo] = useState('')
   const [dropTarget, setDropTarget] = useState('')
   const [areaFilter, setAreaFilter] = useState<ServiceArea | ''>('')
+  // Ansicht gedreht: Teams als Spalten, Tage als Zeilen (Einstellung bleibt im Browser gespeichert)
+  const [transposed, setTransposed] = useState(() => {
+    try {
+      return localStorage.getItem('cal-transposed') === '1'
+    } catch {
+      return false
+    }
+  })
+  function toggleTransposed() {
+    setTransposed((v) => {
+      try {
+        localStorage.setItem('cal-transposed', v ? '0' : '1')
+      } catch {
+        /* egal */
+      }
+      return !v
+    })
+  }
 
   const days = useMemo(() => Array.from({ length: DAYS }, (_, i) => isoDate(addDays(weekStart, i))), [weekStart])
   const today = isoDate(new Date())
@@ -173,6 +191,90 @@ export function PlanningCalendar() {
     return installers.filter((i) => !busy.has(i.id))
   }
 
+  // Eine Kalenderzelle: Besetzung und Einsätze eines Teams an einem Tag
+  const cell = (team: Team, d: string) => {
+    const key = `${team.id}|${d}`
+    const crew = membersIn(team.id, d)
+    const free = freeInstallers(d)
+    return (
+      <td
+        key={key}
+        className={`${d === today ? 'cal-today' : ''} ${dropTarget === key ? 'cal-drop' : ''}`}
+        {...dropProps(key, team, d)}
+      >
+        <div className="crew">
+          {crew.map((m) => (
+            <span key={m.installer_id} className={`crew-chip ${m.lead ? 'crew-lead' : ''}`}>
+              {m.lead ? (
+                <span className="crew-star" title="Verantwortlich">★</span>
+              ) : (
+                <button
+                  className="crew-star"
+                  title="Als verantwortlich festlegen"
+                  aria-label={`${displayName(byId[m.installer_id])} als verantwortlich festlegen`}
+                  onClick={() => makeLead(m)}
+                >
+                  ☆
+                </button>
+              )}
+              <Link to={`/monteur/${m.installer_id}`}>{displayName(byId[m.installer_id])}</Link>
+              <button
+                aria-label={`${displayName(byId[m.installer_id])} aus ${team.name} entfernen`}
+                onClick={() => removeMember(m)}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          {crew.length < MAX_MEMBERS && free.length > 0 && (
+            <select
+              className="crew-add"
+              aria-label={`Monteur zu ${team.name} am ${d} hinzufügen`}
+              value=""
+              onChange={(e) => e.target.value && addMember(team, d, e.target.value)}
+            >
+              <option value="">+ Monteur</option>
+              {free.map((p) => (
+                <option key={p.id} value={p.id}>{displayName(p)}</option>
+              ))}
+            </select>
+          )}
+          {crew.length === 0 && jobsIn(team.id, d).length > 0 && (
+            <span className="crew-missing">Kein verantwortlicher Monteur</span>
+          )}
+        </div>
+        {jobsIn(team.id, d).map((t) => (
+          <JobCard key={t.id} ticket={t} draggable={t.status !== 'abgeschlossen'} />
+        ))}
+        {crew.length > 0 && (
+          <Link
+            className="cal-add"
+            to={`/neu?art=${team.area === 'kundendienst' ? 'reparatur' : 'restarbeit'}&team=${team.id}&datum=${d}&bereich=${team.area}`}
+            aria-label={`Neuer Einsatz für ${team.name} am ${d}`}
+          >
+            +
+          </Link>
+        )}
+      </td>
+    )
+  }
+
+  const dayLabel = (d: string) => (
+    <>
+      {new Date(d + 'T00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}
+      <button className="link small cal-copy" title={`Besetzung vom ${formatDay(previousDay(d))} übernehmen`} onClick={() => copyPreviousDay(d)}>
+        wie Vortag
+      </button>
+    </>
+  )
+  // Teams einer Spalte nach Bereich gruppiert (für die Kopfzeile in der gedrehten Ansicht)
+  const areaGroups = visibleTeams.reduce<{ area: ServiceArea; count: number }[]>((acc, t) => {
+    const last = acc[acc.length - 1]
+    if (last && last.area === t.area) last.count++
+    else acc.push({ area: t.area, count: 1 })
+    return acc
+  }, [])
+
   return (
     <div className="calendar-page">
       <div className="page-head">
@@ -181,6 +283,9 @@ export function PlanningCalendar() {
           <button onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Vorige Woche">←</button>
           <button onClick={() => setWeekStart(startOfWeek(new Date()))}>KW {weekNumber(weekStart)}</button>
           <button onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Nächste Woche">→</button>
+          <button onClick={toggleTransposed} title="Zeilen und Spalten tauschen">
+            {transposed ? '⇄ Teams als Zeilen' : '⇄ Teams oben'}
+          </button>
         </div>
       </div>
       <div className="segmented three area-filter" role="radiogroup" aria-label="Bereich">
@@ -226,105 +331,60 @@ export function PlanningCalendar() {
         </section>
 
         <div className="cal-scroll">
-          <table className="cal">
-            <thead>
-              <tr>
-                <th className="cal-corner">Team</th>
-                {days.map((d) => (
-                  <th key={d} className={d === today ? 'cal-today' : ''}>
-                    {new Date(d + 'T00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}
-                    <button
-                      className="link small cal-copy"
-                      title={`Besetzung vom ${formatDay(previousDay(d))} übernehmen`}
-                      onClick={() => copyPreviousDay(d)}
-                    >
-                      wie Vortag
-                    </button>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {visibleTeams.map((team, i) => (
-                <Fragment key={team.id}>
-                  {!areaFilter && (i === 0 || visibleTeams[i - 1].area !== team.area) && (
-                    <tr className="cal-group">
-                      <th colSpan={DAYS + 1} className={`area-${team.area}`}>{AREA_LABEL[team.area]}</th>
-                    </tr>
-                  )}
-                  <tr>
-                    <th className={`cal-name cal-team-${team.area}`}>{team.name}</th>
-                    {days.map((d) => {
-                      const key = `${team.id}|${d}`
-                      const crew = membersIn(team.id, d)
-                      const free = freeInstallers(d)
-                      return (
-                        <td
-                          key={d}
-                          className={`${d === today ? 'cal-today' : ''} ${dropTarget === key ? 'cal-drop' : ''}`}
-                          {...dropProps(key, team, d)}
-                        >
-                          <div className="crew">
-                            {crew.map((m) => (
-                              <span key={m.installer_id} className={`crew-chip ${m.lead ? 'crew-lead' : ''}`}>
-                                {m.lead ? (
-                                  <span className="crew-star" title="Verantwortlich">★</span>
-                                ) : (
-                                  <button
-                                    className="crew-star"
-                                    title="Als verantwortlich festlegen"
-                                    aria-label={`${displayName(byId[m.installer_id])} als verantwortlich festlegen`}
-                                    onClick={() => makeLead(m)}
-                                  >
-                                    ☆
-                                  </button>
-                                )}
-                                <Link to={`/monteur/${m.installer_id}`}>{displayName(byId[m.installer_id])}</Link>
-                                <button
-                                  aria-label={`${displayName(byId[m.installer_id])} aus ${team.name} entfernen`}
-                                  onClick={() => removeMember(m)}
-                                >
-                                  ×
-                                </button>
-                              </span>
-                            ))}
-                            {crew.length < MAX_MEMBERS && free.length > 0 && (
-                              <select
-                                className="crew-add"
-                                aria-label={`Monteur zu ${team.name} am ${d} hinzufügen`}
-                                value=""
-                                onChange={(e) => e.target.value && addMember(team, d, e.target.value)}
-                              >
-                                <option value="">+ Monteur</option>
-                                {free.map((p) => (
-                                  <option key={p.id} value={p.id}>{displayName(p)}</option>
-                                ))}
-                              </select>
-                            )}
-                            {crew.length === 0 && jobsIn(team.id, d).length > 0 && (
-                              <span className="crew-missing">Kein verantwortlicher Monteur</span>
-                            )}
-                          </div>
-                          {jobsIn(team.id, d).map((t) => (
-                            <JobCard key={t.id} ticket={t} draggable={t.status !== 'abgeschlossen'} />
-                          ))}
-                          {crew.length > 0 && (
-                            <Link
-                              className="cal-add"
-                              to={`/neu?art=${team.area === 'kundendienst' ? 'reparatur' : 'restarbeit'}&team=${team.id}&datum=${d}&bereich=${team.area}`}
-                              aria-label={`Neuer Einsatz für ${team.name} am ${d}`}
-                            >
-                              +
-                            </Link>
-                          )}
-                        </td>
-                      )
-                    })}
+          {transposed ? (
+            <table className="cal cal-transposed" style={{ minWidth: `${7.5 + visibleTeams.length * 10}rem` }}>
+              <thead>
+                {!areaFilter && (
+                  <tr className="cal-group">
+                    <th className="cal-corner" />
+                    {areaGroups.map((g, i) => (
+                      <th key={i} colSpan={g.count} className={`area-${g.area}`}>{AREA_LABEL[g.area]}</th>
+                    ))}
                   </tr>
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
+                )}
+                <tr>
+                  <th className="cal-corner">Tag</th>
+                  {visibleTeams.map((team) => (
+                    <th key={team.id} className={`cal-team-${team.area}`}>{team.name}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {days.map((d) => (
+                  <tr key={d}>
+                    <th className={`cal-name ${d === today ? 'cal-today' : ''}`}>{dayLabel(d)}</th>
+                    {visibleTeams.map((team) => cell(team, d))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <table className="cal">
+              <thead>
+                <tr>
+                  <th className="cal-corner">Team</th>
+                  {days.map((d) => (
+                    <th key={d} className={d === today ? 'cal-today' : ''}>{dayLabel(d)}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {visibleTeams.map((team, i) => (
+                  <Fragment key={team.id}>
+                    {!areaFilter && (i === 0 || visibleTeams[i - 1].area !== team.area) && (
+                      <tr className="cal-group">
+                        <th colSpan={DAYS + 1} className={`area-${team.area}`}>{AREA_LABEL[team.area]}</th>
+                      </tr>
+                    )}
+                    <tr>
+                      <th className={`cal-name cal-team-${team.area}`}>{team.name}</th>
+                      {days.map((d) => cell(team, d))}
+                    </tr>
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
       </div>
