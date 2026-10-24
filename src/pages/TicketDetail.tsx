@@ -10,6 +10,7 @@ import { SignaturePad, canvasToBlob } from '../components/SignaturePad'
 import { TeamSelect } from '../components/TeamSelect'
 import { AppointmentCard } from '../components/AppointmentCard'
 import { BillingCard } from '../components/BillingCard'
+import { SelfCostCard } from '../components/SelfCostCard'
 import { TimeCard } from '../components/TimeCard'
 import { DistanceLine } from '../components/DistanceLine'
 import { confirmAddresses } from '../lib/addressCheck'
@@ -48,6 +49,7 @@ import { useProfiles } from '../lib/useProfiles'
 const EVENT_LABEL: Record<string, string> = {
   erstellt: 'Erstellt',
   folgeauftrag: 'Folgeauftrag erstellt:',
+  selbstkosten: 'Selbstkosten berechnet:',
   aus_auftrag: 'Als Folgeauftrag erstellt aus',
   eingeplant: 'Eingeplant:',
   zur_berechnung: 'Zur Berechnung weitergeleitet',
@@ -673,6 +675,8 @@ export function TicketDetail() {
         <BillingCard ticket={ticket} positions={positions} byId={byId} canEdit={isPlanner} isAdmin={isAdmin} onChanged={load} />
       )}
 
+      {ticket.ticket_type === 'beanstandung' && closed && isPlanner && <SelfCostCard ticket={ticket} byId={byId} onChanged={load} />}
+
       <section className="card">
         <h2>{einsatz ? 'Fotos zum Auftrag' : 'Fotos'}</h2>
         <PhotoGallery
@@ -1056,7 +1060,7 @@ export function TicketDetail() {
                   {ev.kind === 'zugewiesen' && <> {ev.details || '–'}</>}
                   {(ev.kind === 'pruefhinweis' || ev.kind === 'loeschantrag') && <> {ev.details}</>}
                   {(ev.kind === 'auftrag' || ev.kind === 'eingeplant' || ev.kind.startsWith('termin_')) && <> {ev.details || '–'}</>}
-                  {ev.kind === 'berechnet' && <> {ev.details}</>}
+                  {(ev.kind === 'berechnet' || ev.kind === 'selbstkosten') && <> {ev.details}</>}
                   {ev.kind === 'erstellt' && <> ({TYPE_LABEL[ticket.ticket_type]})</>}
                   {ev.kind === 'unterschrift' && <> {ev.details}</>}
                   {ev.kind === 'folgeauftrag' && <> <Link to={`/ticket/${ev.details}`}>{ticketNo(Number(ev.details), ticket.ticket_type)}</Link></>}

@@ -935,6 +935,36 @@ await check('Überstunden: Soll aus Wochenstunden, Ist aus Stempeluhr ohne feste
   await admin.from('attendance').delete().eq('installer_id', worker.id).gte('started_at', '2026-11-02').lt('started_at', '2026-11-03')
 })
 
+await check('Selbstkosten: km × 0,90 + Arbeitszeit × 55 + Positionen, nur abgeschlossene Beanstandung, nur Planer', async () => {
+  const { data: t } = await admin.from('tickets').insert({ ticket_type: 'beanstandung', title: 'Kosten', created_by: qm.id }).select().single()
+  const { data: art } = await admin.from('articles').insert({ article_number: `K-${run}`, description: 'Kostenartikel', unit: 'Stk', price: 10 }).select().single()
+  await admin.from('ticket_positions').insert([
+    { ticket_id: t.id, sort: 0, position_number: '1', description: 'A', article_id: art.id },
+    { ticket_id: t.id, sort: 1, position_number: '2', description: 'B' },
+  ])
+  let r = await qm.c.rpc('calc_self_cost', { p_ticket_id: t.id })
+  assert.match(r.error?.message ?? '', /nicht abgeschlossen/)
+  await admin.from('ticket_positions').update({ state: 'erledigt' }).eq('ticket_id', t.id)
+  await admin.from('tickets').update({ work_report: 'ok', status: 'abgeschlossen', distance_km: 100 }).eq('id', t.id)
+  await admin.from('time_entries').insert([
+    { ticket_id: t.id, installer_id: m1.id, kind: 'arbeit', started_at: '2026-11-02T07:00:00Z', ended_at: '2026-11-02T09:00:00Z' },
+    { ticket_id: t.id, installer_id: m2.id, kind: 'arbeit', started_at: '2026-11-02T07:00:00Z', ended_at: '2026-11-02T08:30:00Z' },
+  ])
+  r = await m1.c.rpc('calc_self_cost', { p_ticket_id: t.id })
+  assert.match(r.error?.message ?? '', /nur Admin/)
+  r = await lead.c.rpc('calc_self_cost', { p_ticket_id: t.id })
+  assert.ifError(r.error)
+  assert.equal(Number(r.data.km_cost), 90)
+  assert.equal(r.data.work_minutes, 210)
+  assert.equal(Number(r.data.work_cost), 192.5)
+  assert.equal(Number(r.data.positions_cost), 10)
+  assert.equal(r.data.positions_without_price, 1)
+  assert.equal(Number(r.data.total), 292.5)
+  assert.equal((await m1.c.from('ticket_costs').select('*').eq('ticket_id', t.id)).data.length, 0)
+  await admin.from('tickets').delete().eq('id', t.id)
+  await admin.from('articles').delete().eq('id', art.id)
+})
+
 // Testteams wieder entfernen, damit sie nicht im Kalender auftauchen
 await admin.from('tickets').update({ team_id: null }).in('team_id', [T1, T2])
 await admin.from('teams').delete().in('id', [T1, T2])

@@ -512,3 +512,9 @@ button.link.danger { color: #b42318; }
 .viewing-other { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; padding: 0.6rem 0.9rem; margin-bottom: 0.75rem; border-radius: 10px; background: var(--info-bg); }
 .staff-section { margin-top: 2rem; padding-top: 1rem; border-top: 2px solid var(--border); }
 .staff-section > h2 { margin: 0 0 0.75rem; }
+
+/* Selbstkosten */
+.cost-table { width: 100%; border-collapse: collapse; margin-bottom: 0.5rem; }
+.cost-table td { padding: 0.35rem 0.25rem; border-bottom: 1px solid var(--border); }
+.cost-table td:last-child { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cost-total td { font-weight: 700; border-bottom: none; border-top: 2px solid var(--text); }
