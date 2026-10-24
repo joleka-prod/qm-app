@@ -12,7 +12,7 @@ import { BillingCard } from '../components/BillingCard'
 import { TimeCard } from '../components/TimeCard'
 import { DistanceLine } from '../components/DistanceLine'
 import { confirmAddresses } from '../lib/addressCheck'
-import { AddressFields, CustomerFields, addressesToCheck, addressColumns, customerColumns, customerOf, emptyCustomer, type CustomerData, addressProblem, addressLine, addressOf, emptyAddress, jobAddress, type AltAddress } from '../components/AddressFields'
+import { AddressFields, CustomerFields, addressesToCheck, addressColumns, customerColumns, customerOf, emptyCustomer, type CustomerData, addressComplete, addressLine, addressOf, emptyAddress, jobAddress, type AltAddress } from '../components/AddressFields'
 import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { deletePhoto, signedUrls, uploadPhotos, uploadSignature } from '../lib/photos'
 import { sendReport } from '../lib/reportMail'
@@ -419,9 +419,6 @@ export function TicketDetail() {
                 <textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} />
               </label>
             )}
-            {einsatz && canEditBase && addressProblem(cust, jobsiteAddr, billingAddr) && (
-              <p className="error small">{addressProblem(cust, jobsiteAddr, billingAddr)}</p>
-            )}
             <div className="actions">
               <button
                 onClick={() => {
@@ -439,7 +436,7 @@ export function TicketDetail() {
               </button>
               <button
                 className="primary"
-                disabled={busy || !title.trim() || (einsatz && ((!!cust.customer_email.trim() && !isEmail(cust.customer_email)) || !!addressProblem(cust, jobsiteAddr, billingAddr)))}
+                disabled={busy || !title.trim() || (einsatz && ((!!cust.customer_email.trim() && !isEmail(cust.customer_email)) || !addressComplete(billingAddr, 'billing') || !addressComplete(jobsiteAddr, 'jobsite')))}
                 onClick={async () => {
                   const ref = { order_number: orderNumber.trim(), position_number: positionNumber.trim() }
                   const base = { ...ref, title: title.trim(), description: description.trim() }

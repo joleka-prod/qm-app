@@ -36,23 +36,10 @@ export function addressColumns(a: AltAddress, kind: AddressKind) {
   return row
 }
 
-// Pflichtfelder: Straße, Hausnummer, PLZ, Ort; bei der Rechnungsadresse auch der Name
+// Pflichtfelder: Straße, PLZ, Ort; bei der Rechnungsadresse auch der Name
 export function addressComplete(a: AltAddress, kind: AddressKind) {
-  const req = [a.street, a.house_no, a.zip, a.city, ...(kind === 'billing' ? [a.name] : [])]
+  const req = [a.street, a.zip, a.city, ...(kind === 'billing' ? [a.name] : [])]
   return !a.different || req.every((v) => v.trim())
-}
-
-// Kundenadresse: ist eine Straße eingetragen, ist die Hausnummer Pflicht
-export function customerComplete(c: CustomerData) {
-  return !c.customer_street.trim() || !!c.customer_house_no.trim()
-}
-
-// Hinweis, was beim Speichern noch fehlt ('' = alles da)
-export function addressProblem(c: CustomerData, jobsite: AltAddress, billing: AltAddress) {
-  if (!customerComplete(c)) return 'Bitte bei der Kundenadresse die Hausnummer eintragen.'
-  if (!addressComplete(jobsite, 'jobsite')) return 'Bitte bei der Baustellenadresse Straße, Hausnummer, PLZ und Ort eintragen.'
-  if (!addressComplete(billing, 'billing')) return 'Bitte bei der Rechnungsadresse Name, Straße, Hausnummer, PLZ und Ort eintragen.'
-  return ''
 }
 
 // "Name, Straße Nr., PLZ Ort"
@@ -94,8 +81,8 @@ export function AddressFields({ kind, value, onChange }: { kind: AddressKind; va
               <input required value={value.street} maxLength={150} onChange={(e) => set({ street: e.target.value })} />
             </label>
             <label>
-              Hausnummer *
-              <input required value={value.house_no} maxLength={20} onChange={(e) => set({ house_no: e.target.value })} />
+              Hausnummer
+              <input value={value.house_no} maxLength={20} onChange={(e) => set({ house_no: e.target.value })} />
             </label>
           </div>
           <div className="row zip-row">
@@ -174,13 +161,8 @@ export function CustomerFields({ value, onChange }: { value: CustomerData; onCha
           <input value={value.customer_street} maxLength={150} onChange={(e) => set({ customer_street: e.target.value })} />
         </label>
         <label>
-          Hausnummer{value.customer_street.trim() ? ' *' : ''}
-          <input
-            required={!!value.customer_street.trim()}
-            value={value.customer_house_no}
-            maxLength={20}
-            onChange={(e) => set({ customer_house_no: e.target.value })}
-          />
+          Hausnummer
+          <input value={value.customer_house_no} maxLength={20} onChange={(e) => set({ customer_house_no: e.target.value })} />
         </label>
       </div>
       <div className="row zip-row">
