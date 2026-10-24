@@ -1,6 +1,6 @@
 // Schickt dem Kunden nach Abschluss eines Einsatzes den Servicebericht als PDF per E-Mail (über Resend).
 // Wird von der App nach "Erledigt melden" aufgerufen. Benötigte Secrets: RESEND_API_KEY, MAIL_FROM.
-// Optional: MAIL_REPLY_TO, COMPANY_NAME, RESEND_API_URL (nur für Tests).
+// Optional: MAIL_REPLY_TO, COMPANY_NAME, LOGO_URL (Logo oben rechts, Standard: logo.png der App), RESEND_API_URL (nur für Tests).
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'npm:pdf-lib@1.17.1'
 import { encodeBase64 } from 'jsr:@std/encoding@1/base64'
@@ -48,6 +48,9 @@ class Writer {
   page!: PDFPage
   y = 0
   readonly margin = 50
+  // Platz rechts oben für das Logo: bis zu dieser Höhe werden Zeilen schmaler umbrochen
+  reserveW = 0
+  reserveUntil = 842
   constructor(private doc: PDFDocument, private font: PDFFont, private bold: PDFFont) {
     this.newPage()
   }
@@ -80,7 +83,8 @@ class Writer {
     const size = opts.size ?? 10
     const font = opts.bold ? this.bold : this.font
     const indent = opts.indent ?? 0
-    for (const line of this.lines(text, size, font, this.width - indent)) {
+    const reserve = this.y > this.reserveUntil ? this.reserveW : 0
+    for (const line of this.lines(text, size, font, this.width - indent - reserve)) {
       this.need(size * 1.4)
       this.page.drawText(line, {
         x: this.margin + indent, y: this.y - size, size, font,
@@ -178,6 +182,25 @@ Deno.serve(async (req) => {
   doc.setAuthor(company)
   const w = new Writer(doc, await doc.embedFont(StandardFonts.Helvetica), await doc.embedFont(StandardFonts.HelveticaBold))
   const grey: [number, number, number] = [0.4, 0.44, 0.5]
+
+  // Firmenlogo oben rechts (PNG oder JPG); fehlt es, bleibt der Platz frei
+  const logoUrl = Deno.env.get('LOGO_URL') ?? 'https://qm-app.fabian-rieder.workers.dev/logo.png'
+  try {
+    const res = await fetch(logoUrl)
+    if (res.ok) {
+      const bytes = new Uint8Array(await res.arrayBuffer())
+      const isPng = bytes[0] === 0x89 && bytes[1] === 0x50
+      const img = isPng ? await doc.embedPng(bytes) : await doc.embedJpg(bytes)
+      const scale = Math.min(160 / img.width, 60 / img.height)
+      const lw = img.width * scale
+      const lh = img.height * scale
+      w.page.drawImage(img, { x: 595 - w.margin - lw, y: 842 - w.margin - lh, width: lw, height: lh })
+      w.reserveW = lw + 12
+      w.reserveUntil = 842 - w.margin - lh - 4
+    }
+  } catch {
+    // ohne Logo weiter
+  }
 
   w.text(company, { size: 11, bold: true, color: grey })
   w.text(`Servicebericht ${no}`, { size: 20, bold: true, gap: 6 })
