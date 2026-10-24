@@ -356,6 +356,19 @@ await check('Monteur kann Text nicht ändern und nichts löschen', async () => {
   assert.equal(data.length, 3)
 })
 
+await check('Monteur ergänzt Position im eigenen Einsatz (Verlauf), fremder Monteur nicht', async () => {
+  const { data, error } = await m1.c.from('ticket_positions').insert({ ticket_id: posJob, sort: 3, position_number: '4', description: 'Zusatz vor Ort' }).select().single()
+  assert.ifError(error)
+  assert.equal(data.state, 'offen')
+  const r = await m2.c.from('ticket_positions').insert({ ticket_id: posJob, sort: 4, description: 'fremd' })
+  assert.ok(r.error)
+  const { data: ev } = await qm.c.from('ticket_events').select('details').eq('ticket_id', posJob).eq('kind', 'position_ergaenzt')
+  assert.equal(ev.length, 1)
+  assert.match(ev[0].details, /Zusatz vor Ort/)
+  const del = await lead.c.from('ticket_positions').delete().eq('id', data.id)
+  assert.ifError(del.error)
+})
+
 await check('Monteur hängt Foto an Position, fremde Position wird abgelehnt', async () => {
   const ok = await m1.c.from('ticket_photos').insert({ ticket_id: posJob, position_id: posIds[1], storage_path: `${posJob}/pos-${run}.jpg` }).select().single()
   assert.ifError(ok.error)

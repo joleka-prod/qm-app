@@ -50,6 +50,7 @@ const EVENT_LABEL: Record<string, string> = {
   erstellt: 'Erstellt',
   folgeauftrag: 'Folgeauftrag erstellt:',
   selbstkosten: 'Selbstkosten berechnet:',
+  position_ergaenzt: 'Position ergänzt:',
   aus_auftrag: 'Als Folgeauftrag erstellt aus',
   eingeplant: 'Eingeplant:',
   zur_berechnung: 'Zur Berechnung weitergeleitet',
@@ -121,6 +122,8 @@ export function TicketDetail() {
   const signatureCanvas = useRef<HTMLCanvasElement>(null)
   const [positions, setPositions] = useState<TicketPosition[]>([])
   const [positionDrafts, setPositionDrafts] = useState<PositionDraft[] | null>(null)
+  // Monteure ergänzen nur neue Positionen, bestehende bleiben unverändert
+  const [appendOnly, setAppendOnly] = useState(false)
   const [reasonFor, setReasonFor] = useState<number | null>(null)
   const [mailStatus, setMailStatus] = useState('')
   const [reasonText, setReasonText] = useState('')
@@ -204,6 +207,7 @@ export function TicketDetail() {
   const canEditPositions =
     einsatz && (isAdmin || (isPlanner && !closed) || (ticket.created_by === profile.id && ticket.status === 'neu'))
   const canCheckPositions = einsatz && !closed && (isInstaller || canEditPositions)
+  const canAddPositions = einsatz && !closed && isInstaller && !canEditPositions
   const canDeletePhoto = (p: TicketPhoto) => isAdmin || (p.uploaded_by === profile.id && !closed)
   const openPositions = positions.filter((p) => p.state === 'offen').length
   const donePositions = positions.filter((p) => p.state === 'erledigt').length
@@ -237,13 +241,14 @@ export function TicketDetail() {
     setError('')
     try {
       const keep = positionDrafts.filter((p) => !isEmptyPosition(p))
-      const removed = positions.filter((p) => !keep.some((k) => k.id === p.id)).map((p) => p.id)
+      const offset = appendOnly ? positions.length : 0
+      const removed = appendOnly ? [] : positions.filter((p) => !keep.some((k) => k.id === p.id)).map((p) => p.id)
       if (removed.length > 0) {
         const { error } = await supabase.from('ticket_positions').delete().in('id', removed)
         if (error) throw error
       }
       for (const [i, p] of keep.entries()) {
-        const row = { sort: i, position_number: String(i + 1), description: p.description.trim(), article_id: p.article_id ?? null }
+        const row = { sort: offset + i, position_number: String(offset + i + 1), description: p.description.trim(), article_id: p.article_id ?? null }
         const { error } = p.id
           ? await supabase.from('ticket_positions').update(row).eq('id', p.id)
           : await supabase.from('ticket_positions').insert({ ...row, ticket_id: ticketId })
@@ -537,6 +542,7 @@ export function TicketDetail() {
           </h2>
           {positionDrafts ? (
             <div className="form">
+              {appendOnly && <p className="muted small">Neue Positionen werden an die bestehenden angehängt (ab Pos. {positions.length + 1}).</p>}
               <PositionsEditor positions={positionDrafts} onChange={setPositionDrafts} />
               <div className="actions">
                 <button disabled={busy} onClick={() => setPositionDrafts(null)}>Abbrechen</button>
@@ -645,10 +651,22 @@ export function TicketDetail() {
                   ))}
                 </ul>
               )}
+              {canAddPositions && (
+                <button
+                  className="link"
+                  onClick={() => {
+                    setAppendOnly(true)
+                    setPositionDrafts([newPositionDraft()])
+                  }}
+                >
+                  + Position ergänzen
+                </button>
+              )}
               {canEditPositions && (
                 <button
                   className="link"
-                  onClick={() =>
+                  onClick={() => {
+                    setAppendOnly(false)
                     setPositionDrafts(
                       positions.length > 0
                         ? positions.map((p) => ({
@@ -661,7 +679,7 @@ export function TicketDetail() {
                           }))
                         : [newPositionDraft()],
                     )
-                  }
+                  }}
                 >
                   Positionen bearbeiten
                 </button>
@@ -1052,7 +1070,7 @@ export function TicketDetail() {
                   {ev.kind === 'zugewiesen' && <> {ev.details || '–'}</>}
                   {(ev.kind === 'pruefhinweis' || ev.kind === 'loeschantrag') && <> {ev.details}</>}
                   {(ev.kind === 'auftrag' || ev.kind === 'eingeplant' || ev.kind.startsWith('termin_')) && <> {ev.details || '–'}</>}
-                  {(ev.kind === 'berechnet' || ev.kind === 'selbstkosten') && <> {ev.details}</>}
+                  {(ev.kind === 'berechnet' || ev.kind === 'selbstkosten' || ev.kind === 'position_ergaenzt') && <> {ev.details}</>}
                   {ev.kind === 'erstellt' && <> ({TYPE_LABEL[ticket.ticket_type]})</>}
                   {ev.kind === 'unterschrift' && <> {ev.details}</>}
                   {ev.kind === 'folgeauftrag' && <> <Link to={`/ticket/${ev.details}`}>{ticketNo(Number(ev.details), ticket.ticket_type)}</Link></>}
