@@ -1,6 +1,6 @@
 // Schickt dem Kunden nach Abschluss eines Einsatzes den Servicebericht als PDF per E-Mail (über Resend).
 // Wird von der App nach "Erledigt melden" aufgerufen. Benötigte Secrets: RESEND_API_KEY, MAIL_FROM.
-// Optional: MAIL_REPLY_TO, COMPANY_NAME, LOGO_URL (Logo oben rechts, Standard: logo.png der App), RESEND_API_URL (nur für Tests).
+// Optional: MAIL_REPLY_TO, COMPANY_NAME, LOGO_URL (Logo oben rechts, Standard: logo.jpg der App), RESEND_API_URL (nur für Tests).
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'npm:pdf-lib@1.17.1'
 import { encodeBase64 } from 'jsr:@std/encoding@1/base64'
@@ -184,7 +184,7 @@ Deno.serve(async (req) => {
   const grey: [number, number, number] = [0.4, 0.44, 0.5]
 
   // Firmenlogo oben rechts (PNG oder JPG); fehlt es, bleibt der Platz frei
-  const logoUrl = Deno.env.get('LOGO_URL') ?? 'https://qm-app.fabian-rieder.workers.dev/logo.png'
+  const logoUrl = Deno.env.get('LOGO_URL') ?? 'https://qm-app.fabian-rieder.workers.dev/logo.jpg'
   try {
     const res = await fetch(logoUrl)
     if (res.ok) {
@@ -202,7 +202,8 @@ Deno.serve(async (req) => {
     // ohne Logo weiter
   }
 
-  w.text(company, { size: 11, bold: true, color: grey })
+  // Firmenname nur ohne Logo
+  if (!w.reserveW) w.text(company, { size: 11, bold: true, color: grey })
   w.text(`Servicebericht ${no}`, { size: 20, bold: true, gap: 6 })
   w.text(`${TYPE_LABEL[t.ticket_type]}: ${t.title}`, { size: 12, bold: true, gap: 8 })
   const facts: [string, string][] = [
