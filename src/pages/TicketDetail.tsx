@@ -43,7 +43,9 @@ import {
   type TicketPosition,
   type TicketStatus,
   isPlannerRole,
+  canUseCrm,
 } from '../lib/types'
+import { ensureCustomer } from '../lib/customers'
 import { useProfiles } from '../lib/useProfiles'
 
 const EVENT_LABEL: Record<string, string> = {
@@ -419,7 +421,7 @@ export function TicketDetail() {
             </div>
             {einsatz && canEditBase && (
               <>
-                <CustomerFields value={cust} onChange={setCust} />
+                <CustomerFields value={cust} onChange={setCust} crm={canUseCrm(profile.role)} />
                 <AddressFields kind="jobsite" value={jobsiteAddr} onChange={setJobsiteAddr} />
                 <AddressFields kind="billing" value={billingAddr} onChange={setBillingAddr} />
               </>
@@ -451,12 +453,13 @@ export function TicketDetail() {
                 onClick={async () => {
                   const ref = { order_number: orderNumber.trim(), position_number: positionNumber.trim() }
                   const base = { ...ref, title: title.trim(), description: description.trim() }
-                  const site = einsatz ? { ...customerColumns(cust), ...addressColumns(billingAddr, 'billing'), ...addressColumns(jobsiteAddr, 'jobsite') } : {}
-                  const patch = canEditBase ? { ...base, ...site } : ref
                   if (einsatz && canEditBase) {
                     const before = addressesToCheck(customerOf(ticket), addressOf(ticket, 'jobsite'), addressOf(ticket, 'billing'))
                     if (!(await confirmAddresses(addressesToCheck(cust, jobsiteAddr, billingAddr), before))) return
                   }
+                  const linked = einsatz && canEditBase && canUseCrm(profile.role) ? await ensureCustomer(cust) : cust
+                  const site = einsatz ? { ...customerColumns(linked), ...addressColumns(billingAddr, 'billing'), ...addressColumns(jobsiteAddr, 'jobsite') } : {}
+                  const patch = canEditBase ? { ...base, ...site } : ref
                   if (await update(patch)) setEditing(false)
                 }}
               >
@@ -490,6 +493,12 @@ export function TicketDetail() {
                   <>
                     {' · '}
                     <a href={`mailto:${ticket.customer_email}`}>{ticket.customer_email}</a>
+                  </>
+                )}
+                {ticket.customer_id && canUseCrm(profile.role) && (
+                  <>
+                    {' · '}
+                    <Link to={`/kunden/${ticket.customer_id}`}>Kundenakte</Link>
                   </>
                 )}
               </p>

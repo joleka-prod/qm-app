@@ -2,8 +2,10 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth'
 import { Layout } from './components/Layout'
 import { configMissing } from './lib/supabase'
-import { isPlannerRole } from './lib/types'
+import { canUseCrm, isPlannerRole } from './lib/types'
 import { Articles } from './pages/Articles'
+import { CustomerDetail } from './pages/CustomerDetail'
+import { Customers } from './pages/Customers'
 import { InstallerCalendar } from './pages/InstallerCalendar'
 import { Login } from './pages/Login'
 import { NewTicket } from './pages/NewTicket'
@@ -35,6 +37,8 @@ function Routed() {
         {isPlanner && <Route path="monteur/:id" element={<InstallerCalendar />} />}
         <Route path="neu" element={<NewTicket />} />
         <Route path="ticket/:id" element={<TicketDetail />} />
+        {canUseCrm(profile.role) && <Route path="kunden" element={<Customers />} />}
+        {canUseCrm(profile.role) && <Route path="kunden/:id" element={<CustomerDetail />} />}
         <Route path="profil" element={<ProfilePage />} />
         <Route path="zeiterfassung" element={<Timesheet />} />
         <Route path="stundenzettel" element={<Navigate to="/zeiterfassung" replace />} />

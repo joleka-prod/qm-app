@@ -1,8 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { confirmAddresses } from '../lib/addressCheck'
-import { AddressFields, CustomerFields, addressesToCheck, addressColumns, customerColumns, emptyAddress, emptyCustomer, type AltAddress, type CustomerData } from '../components/AddressFields'
+import { AddressFields, CustomerFields, customerFromMaster, addressesToCheck, addressColumns, customerColumns, emptyAddress, emptyCustomer, type AltAddress, type CustomerData } from '../components/AddressFields'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { TeamSelect } from '../components/TeamSelect'
 import { PositionsEditor, isEmptyPosition, newPositionDraft, type PositionDraft } from '../components/PositionsEditor'
@@ -19,7 +19,9 @@ import {
   type ServiceArea,
   type TicketType,
   isPlannerRole,
+  canUseCrm,
 } from '../lib/types'
+import { ensureCustomer, type Customer } from '../lib/customers'
 import { useProfiles } from '../lib/useProfiles'
 
 export function NewTicket() {
@@ -29,6 +31,7 @@ export function NewTicket() {
   const { leads } = useProfiles()
   const { teams, teamById } = useTeams()
   const canPlan = isPlannerRole(profile?.role)
+  const crm = canUseCrm(profile?.role)
 
   const [type, setType] = useState<TicketType>(
     TICKET_TYPES.includes(params.get('art') as TicketType) ? (params.get('art') as TicketType) : 'restarbeit',
@@ -54,6 +57,18 @@ export function NewTicket() {
 
   const einsatz = type !== 'qm'
 
+  // Aus der Kundenakte: /neu?kunde=<id> übernimmt den Kunden
+  const fromCustomer = params.get('kunde')
+  useEffect(() => {
+    if (!fromCustomer) return
+    supabase
+      .from('customers')
+      .select('*')
+      .eq('id', Number(fromCustomer))
+      .maybeSingle()
+      .then(({ data }) => data && setCust(customerFromMaster(data as Customer)))
+  }, [fromCustomer])
+
   async function submit(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
@@ -71,7 +86,7 @@ export function NewTicket() {
         description: einsatz ? '' : description.trim(),
         order_number: orderNumber.trim(),
         position_number: einsatz ? '' : positionNumber.trim(),
-        ...customerColumns(einsatz ? cust : emptyCustomer),
+        ...customerColumns(einsatz ? (crm ? await ensureCustomer(cust) : cust) : emptyCustomer),
         site_address: '',
         ...addressColumns(einsatz ? billingAddr : emptyAddress, 'billing'),
         ...addressColumns(einsatz ? jobsiteAddr : emptyAddress, 'jobsite'),
@@ -172,7 +187,7 @@ export function NewTicket() {
               ))}
             </div>
           </div>
-          <CustomerFields value={cust} onChange={setCust} />
+          <CustomerFields value={cust} onChange={setCust} crm={crm} />
           <AddressFields kind="jobsite" value={jobsiteAddr} onChange={setJobsiteAddr} />
           <AddressFields kind="billing" value={billingAddr} onChange={setBillingAddr} />
         </>

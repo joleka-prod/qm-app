@@ -36,6 +36,7 @@ export interface Ticket {
   report_sent_at: string | null
   report_send_error: string
   parent_id: number | null
+  customer_id: number | null
   distance_km: number | null
   distance_minutes: number | null
   distance_address: string
@@ -216,6 +217,11 @@ export const ROLE_LABEL: Record<Role, string> = {
 // Planen Service-Aufträge (Kalender, Teams, Termine, Zeiterfassung, Berechnung)
 export function isPlannerRole(role: Role | undefined | null) {
   return role === 'admin' || role === 'teamleiter' || role === 'disposition'
+}
+
+// Kundenstamm und Kommunikation: alle außer Monteure
+export function canUseCrm(role: Role | undefined | null) {
+  return !!role && role !== 'monteur'
 }
 
 export function ticketNo(id: number, type: TicketType = 'qm') {

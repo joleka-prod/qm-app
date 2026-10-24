@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { GROUP_LABEL, searchCustomers, type Customer } from '../lib/customers'
 import type { Ticket } from '../lib/types'
 import { AddressSuggest } from './AddressSuggest'
 
@@ -125,6 +127,8 @@ export function AddressFields({ kind, value, onChange }: { kind: AddressKind; va
 
 // Kundendaten: Kundennummer zuerst, Adresse in Feldern wie bei der Rechnungsadresse
 export interface CustomerData {
+  // Verknüpfung mit dem Kundenstamm (null = noch nicht verknüpft)
+  customer_id: number | null
   customer_number: string
   customer_name: string
   customer_street: string
@@ -136,6 +140,7 @@ export interface CustomerData {
 }
 
 export const emptyCustomer: CustomerData = {
+  customer_id: null,
   customer_number: '',
   customer_name: '',
   customer_street: '',
@@ -148,6 +153,7 @@ export const emptyCustomer: CustomerData = {
 
 export function customerOf(t: Ticket): CustomerData {
   return {
+    customer_id: t.customer_id,
     customer_number: t.customer_number,
     customer_name: t.customer_name,
     customer_street: t.customer_street,
@@ -160,23 +166,110 @@ export function customerOf(t: Ticket): CustomerData {
 }
 
 export function customerColumns(c: CustomerData) {
-  return Object.fromEntries(Object.entries(c).map(([k, v]) => [k, v.trim()])) as unknown as CustomerData
+  return Object.fromEntries(Object.entries(c).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])) as unknown as CustomerData
 }
 
-export function CustomerFields({ value, onChange }: { value: CustomerData; onChange: (v: CustomerData) => void }) {
+// Daten eines Kunden aus dem Kundenstamm in den Auftrag übernehmen
+export function customerFromMaster(c: Customer): CustomerData {
+  return {
+    customer_id: c.id,
+    customer_number: c.customer_number,
+    customer_name: [c.name, c.name2].filter(Boolean).join(' '),
+    customer_street: c.street,
+    customer_house_no: c.house_no,
+    customer_zip: c.zip,
+    customer_city: c.city,
+    customer_country: c.country || DEFAULT_COUNTRY,
+    customer_email: c.email,
+  }
+}
+
+// crm: Kunden aus dem Kundenstamm suchen und verknüpfen
+export function CustomerFields({ value, onChange, crm }: { value: CustomerData; onChange: (v: CustomerData) => void; crm?: boolean }) {
   const set = (patch: Partial<CustomerData>) => onChange({ ...value, ...patch })
   const [typing, setTyping] = useState(false)
+  const [typingName, setTypingName] = useState(false)
+  const [matches, setMatches] = useState<Customer[]>([])
+  const searchText = crm && typingName && !value.customer_id ? `${value.customer_number || value.customer_name}` : ''
+
+  useEffect(() => {
+    if (searchText.trim().length < 2) {
+      setMatches([])
+      return
+    }
+    let stale = false
+    const t = setTimeout(async () => {
+      const found = await searchCustomers(searchText)
+      if (!stale) setMatches(found)
+    }, 250)
+    return () => {
+      stale = true
+      clearTimeout(t)
+    }
+  }, [searchText])
+
+  const pick = (c: Customer) => {
+    setTypingName(false)
+    setMatches([])
+    onChange(customerFromMaster(c))
+  }
+
+  const suggestions = matches.length > 0 && (
+    <ul className="address-suggest" role="listbox" aria-label="Kunden aus dem Kundenstamm">
+      {matches.map((c) => (
+        <li key={c.id}>
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(c)}>
+            <strong>{c.customer_number}</strong> {c.name} {c.name2}
+            <span className="muted small"> · {GROUP_LABEL[c.customer_group]}{c.city && ` · ${c.zip} ${c.city}`}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
+
   return (
     <fieldset className="billing-address">
       <legend>Kunde</legend>
+      {crm && (
+        <p className="small muted customer-link">
+          {value.customer_id ? (
+            <>
+              Verknüpft mit <Link to={`/kunden/${value.customer_id}`}>Kundenakte {value.customer_number}</Link>
+              {' · '}
+              <button type="button" className="link" onClick={() => set({ customer_id: null })}>Verknüpfung lösen</button>
+            </>
+          ) : (
+            'Name oder Kundennummer eintippen, um einen Kunden aus dem Kundenstamm zu übernehmen. Neue Kunden werden beim Speichern angelegt.'
+          )}
+        </p>
+      )}
       <label>
         Kundennummer
-        <input value={value.customer_number} maxLength={30} onChange={(e) => set({ customer_number: e.target.value })} />
+        <input
+          value={value.customer_number}
+          maxLength={30}
+          autoComplete="off"
+          onChange={(e) => {
+            setTypingName(true)
+            set({ customer_number: e.target.value })
+          }}
+          onBlur={() => setTypingName(false)}
+        />
       </label>
       <label>
         Name
-        <input value={value.customer_name} maxLength={150} onChange={(e) => set({ customer_name: e.target.value })} />
+        <input
+          value={value.customer_name}
+          maxLength={150}
+          autoComplete="off"
+          onChange={(e) => {
+            setTypingName(true)
+            set({ customer_name: e.target.value })
+          }}
+          onBlur={() => setTypingName(false)}
+        />
       </label>
+      {suggestions}
       <div className="row street-row">
         <label>
           Straße

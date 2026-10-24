@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { supabase } from '../lib/supabase'
-import { ROLE_LABEL, displayName, isPlannerRole } from '../lib/types'
+import { ROLE_LABEL, canUseCrm, displayName, isPlannerRole } from '../lib/types'
 
 export function Layout() {
   const { profile } = useAuth()
@@ -23,6 +23,7 @@ export function Layout() {
             <NavLink to="/" end>Aufträge</NavLink>
           )}
           {isPlanner && <NavLink to="/kalender">Kalender</NavLink>}
+          {canUseCrm(profile?.role) && <NavLink to="/kunden">Kunden</NavLink>}
           <NavLink to="/zeiterfassung">Zeiterfassung</NavLink>
           {profile?.role === 'admin' && <NavLink to="/artikel">Artikel</NavLink>}
           {profile?.role === 'admin' && <NavLink to="/benutzer">Benutzer</NavLink>}
