@@ -20,12 +20,12 @@ export function Users() {
   const [password, setPw] = useState(generatePassword)
   const [busy, setBusy] = useState(false)
 
-  const [edit, setEdit] = useState<{ id: string; full_name: string; email: string; role: Role; active: boolean; supervisor_id: string; vacation_days: string } | null>(null)
+  const [edit, setEdit] = useState<{ id: string; full_name: string; email: string; role: Role; active: boolean; supervisor_id: string; vacation_days: string; weekly_hours: string; overtime_start: string; overtime_opening: string } | null>(null)
 
   function startEdit(p: Profile) {
     setError('')
     setNotice('')
-    setEdit({ id: p.id, full_name: p.full_name, email: p.email, role: p.role, active: p.active, supervisor_id: p.supervisor_id ?? '', vacation_days: String(p.vacation_days ?? 0) })
+    setEdit({ id: p.id, full_name: p.full_name, email: p.email, role: p.role, active: p.active, supervisor_id: p.supervisor_id ?? '', vacation_days: String(p.vacation_days ?? 0), weekly_hours: String(p.weekly_hours ?? 40).replace('.', ','), overtime_start: p.overtime_start ?? '', overtime_opening: String(p.overtime_opening ?? 0).replace('.', ',') })
   }
 
   async function saveEdit(e: FormEvent, p: Profile) {
@@ -43,6 +43,14 @@ export function Users() {
       const days = Number(edit.vacation_days.replace(',', '.'))
       if (!Number.isFinite(days) || days < 0 || days > 366) throw new Error('Bitte beim Urlaubsanspruch eine Zahl zwischen 0 und 366 eintragen.')
       if (days !== Number(p.vacation_days)) change.vacation_days = days
+      const hours = Number(edit.weekly_hours.replace(',', '.'))
+      if (!Number.isFinite(hours) || hours < 0 || hours > 60) throw new Error('Bitte bei der Wochenarbeitszeit eine Zahl zwischen 0 und 60 eintragen.')
+      if (hours !== Number(p.weekly_hours)) change.weekly_hours = hours
+      const opening = Number(edit.overtime_opening.replace(',', '.'))
+      if (!Number.isFinite(opening) || Math.abs(opening) > 999) throw new Error('Bitte beim Übertrag eine Zahl in Stunden eintragen (z. B. 12,5 oder -3).')
+      if (opening !== Number(p.overtime_opening)) change.overtime_opening = opening
+      if (!edit.overtime_start) throw new Error('Bitte ein Startdatum für das Stundenkonto eintragen.')
+      if (edit.overtime_start !== p.overtime_start) change.overtime_start = edit.overtime_start
       if (Object.keys(change).length > 0) {
         const { error } = await supabase.from('profiles').update(change).eq('id', p.id)
         if (error) throw error
@@ -197,6 +205,20 @@ export function Users() {
                     onChange={(e) => setEdit({ ...edit, vacation_days: e.target.value })}
                   />
                 </label>
+                <div className="row">
+                  <label>
+                    Wochenstunden laut Arbeitsvertrag
+                    <input inputMode="decimal" value={edit.weekly_hours} onChange={(e) => setEdit({ ...edit, weekly_hours: e.target.value })} />
+                  </label>
+                  <label>
+                    Stundenkonto ab
+                    <input type="date" value={edit.overtime_start} onChange={(e) => setEdit({ ...edit, overtime_start: e.target.value })} />
+                  </label>
+                  <label>
+                    Übertrag Überstunden (Std.)
+                    <input inputMode="decimal" value={edit.overtime_opening} onChange={(e) => setEdit({ ...edit, overtime_opening: e.target.value })} />
+                  </label>
+                </div>
                 <label className="checkbox-row">
                   <input
                     type="checkbox"
@@ -226,7 +248,7 @@ export function Users() {
                   {!p.active && <span className="muted"> · deaktiviert</span>}
                 </div>
                 <div className="small muted">
-                  Vorgesetzte(r): {p.supervisor_id ? displayName(byId[p.supervisor_id]) : '–'} · Urlaub: {Number(p.vacation_days)} Tage/Jahr
+                  Vorgesetzte(r): {p.supervisor_id ? displayName(byId[p.supervisor_id]) : '–'} · Urlaub: {Number(p.vacation_days)} Tage/Jahr · {Number(p.weekly_hours).toLocaleString('de-DE')} Std./Woche
                 </div>
               </div>
               <div className="user-controls">

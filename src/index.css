@@ -482,3 +482,11 @@ button.link.danger { color: #b42318; }
 .cal-transposed thead th[class*='cal-team-'] { border-left-width: 1px !important; border-top: 4px solid; }
 .cal-transposed thead th.cal-team-montage { border-top-color: #7a5af8; }
 .cal-transposed thead th.cal-team-kundendienst { border-top-color: #2e90fa; }
+
+/* Überstunden */
+.overtime-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.overtime-head h2 { margin: 0; }
+.overtime-head strong { font-size: 1.4rem; }
+.overtime-plus { color: #067647; }
+.overtime-minus { color: #b42318; }
+.overtime p { margin: 0.35rem 0 0; }

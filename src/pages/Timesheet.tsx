@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../auth'
 import { ClockBar } from '../components/ClockBar'
+import { OvertimeCard } from '../components/OvertimeCard'
 import { VacationCard, type VacationRequest } from '../components/VacationCard'
 import { minutesOf, toLocalInput, type TimeEntry } from '../components/TimeCard'
 import { clockTime, formatMinutes, minutesBetween, useClockChanged, type Attendance } from '../lib/clock'
@@ -192,6 +193,7 @@ export function Timesheet() {
       {byId[installerId]?.supervisor_id && (
         <p className="small">Vorgesetzte(r): {displayName(byId[byId[installerId].supervisor_id!])}</p>
       )}
+      {installerId && <OvertimeCard userId={installerId} reloadKey={sessions} />}
       {profile && installerId && (
         <VacationCard userId={installerId} me={profile} byId={byId} year={Number(month.slice(0, 4))} onChanged={load} />
       )}

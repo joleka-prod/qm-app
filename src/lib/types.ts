@@ -13,6 +13,9 @@ export interface Profile {
   active: boolean
   supervisor_id: string | null
   vacation_days: number
+  weekly_hours: number
+  overtime_start: string
+  overtime_opening: number
   created_at: string
 }
 
