@@ -5,7 +5,7 @@ import { ClockBar } from '../components/ClockBar'
 import { OvertimeCard } from '../components/OvertimeCard'
 import { VacationCard, type VacationRequest } from '../components/VacationCard'
 import { minutesOf, toLocalInput, type TimeEntry } from '../components/TimeCard'
-import { clockTime, formatMinutes, minutesBetween, useClockChanged, type Attendance } from '../lib/clock'
+import { clockTime, fixedBreakMinutes, formatMinutes, minutesBetween, useClockChanged, workMinutes, type Attendance } from '../lib/clock'
 import { supabase } from '../lib/supabase'
 import { displayName, formatDay, isPlannerRole, isoDate, parseDate, weekNumber } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
@@ -112,10 +112,11 @@ export function Timesheet() {
     return m
   }, [jobs])
 
-  const workOf = (day: string) => (byDay[day] ?? []).reduce((a, s) => a + minutesBetween(s.started_at, s.ended_at, now), 0)
+  const workOf = (day: string) => (byDay[day] ?? []).reduce((a, s) => a + workMinutes(s.started_at, s.ended_at, now), 0)
   const breakOf = (day: string) => {
     const list = byDay[day] ?? []
-    let gap = 0
+    // feste Pausen (Frühstück, Mittag) plus Lücken zwischen den Stempelzeiten
+    let gap = list.reduce((a, s) => a + fixedBreakMinutes(s.started_at, s.ended_at, now), 0)
     for (let i = 1; i < list.length; i++) {
       const prevEnd = list[i - 1].ended_at
       if (prevEnd) gap += minutesBetween(prevEnd, list[i].started_at)
@@ -244,7 +245,7 @@ export function Timesheet() {
       )}
 
       <p className="muted small">
-        Die Arbeitszeit kommt aus Start und Stopp der Zeiterfassung oben. „Aufträge“ zeigt die Zeit, die auf
+        Die Arbeitszeit kommt aus Start und Stopp der Zeiterfassung oben, abzüglich der festen Pausen 09:00–09:15 und 12:00–12:30. „Aufträge“ zeigt die Zeit, die auf
         Aufträge gebucht wurde.{canCorrect && ' Fehlende oder falsche Zeiten kannst du hier mit Grund nachtragen oder korrigieren; sie gelten nach Genehmigung durch den Vorgesetzten.'}
       </p>
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { clockTime, formatMinutes, minutesBetween, useClock } from '../lib/clock'
+import { clockTime, formatMinutes, useClock, workMinutes } from '../lib/clock'
 
 // Stempeluhr für Monteure: Arbeitszeit fürs Stundenkonto starten und stoppen
 export function ClockBar({ userId }: { userId: string }) {
@@ -26,7 +26,7 @@ export function ClockBar({ userId }: { userId: string }) {
       {running ? (
         <>
           <span>
-            ● Zeiterfassung läuft seit {clockTime(running.started_at)} ({formatMinutes(minutesBetween(running.started_at, null, now))})
+            ● Zeiterfassung läuft seit {clockTime(running.started_at)} ({formatMinutes(workMinutes(running.started_at, null, now))})
           </span>
           <button
             disabled={busy}

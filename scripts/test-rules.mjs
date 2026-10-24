@@ -905,7 +905,7 @@ await check('Folgeauftrag: übernimmt Kunde und offene Positionen, Kette sichtba
   await admin.from('tickets').delete().in('id', [grandId, childId, src.id])
 })
 
-await check('Überstunden: Soll aus Wochenstunden, Ist aus Stempeluhr, nur Admin pflegt', async () => {
+await check('Überstunden: Soll aus Wochenstunden, Ist aus Stempeluhr ohne feste Pausen, nur Admin pflegt', async () => {
   let r = await worker.c.from('profiles').update({ weekly_hours: 20 }).eq('id', worker.id)
   assert.match(r.error?.message ?? '', /nur der Admin/)
   r = await qm.c.from('profiles').update({ weekly_hours: 40, overtime_start: '2026-11-02', overtime_opening: 2.5 }).eq('id', worker.id)
@@ -913,7 +913,7 @@ await check('Überstunden: Soll aus Wochenstunden, Ist aus Stempeluhr, nur Admin
   await admin.from('attendance').insert({ installer_id: worker.id, started_at: '2026-11-02T07:00:00+01:00', ended_at: '2026-11-02T17:00:00+01:00' })
   const { data, error } = await worker.c.rpc('overtime_balance', { p_user: worker.id, p_until: '2026-11-06' })
   assert.ifError(error)
-  assert.deepEqual(data[0], { since: '2026-11-02', until: '2026-11-06', target_min: 2400, actual_min: 600, opening_min: 150, balance_min: -1650, planned_min: 0, requested_min: 0 })
+  assert.deepEqual(data[0], { since: '2026-11-02', until: '2026-11-06', target_min: 2400, actual_min: 555, opening_min: 150, balance_min: -1695, planned_min: 0, requested_min: 0 })
   r = await other.c.rpc('overtime_balance', { p_user: worker.id })
   assert.match(r.error?.message ?? '', /Berechtigung/)
   // Freizeit über Überstunden: bleibt Soll (mindert den Saldo), künftige Tage werden als verplant gezeigt
