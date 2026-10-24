@@ -92,7 +92,7 @@ export function TeamOverview({ members, selected, onPick, reloadKey }: {
           </tbody>
         </table>
       </div>
-      <p className="small muted">Auf einen Namen tippen, um die Zeiterfassung dieser Person unten anzuzeigen.</p>
+      <p className="small muted">Auf einen Namen tippen, um die Zeiterfassung dieser Person oben anzuzeigen.</p>
     </section>
   )
 }

@@ -41,10 +41,12 @@ interface Props {
   byId: Record<string, Profile>
   year: number
   onChanged?: () => void
+  // 'own': nur Urlaub der Person, 'approvals': nur Anträge zum Genehmigen
+  part?: 'all' | 'own' | 'approvals'
 }
 
 // Urlaub in der Zeiterfassung: Anträge stellen, Übersicht des Jahres, Genehmigung durch Vorgesetzte
-export function VacationCard({ userId, me, byId, year, onChanged }: Props) {
+export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }: Props) {
   const [list, setList] = useState<VacationRequest[]>([])
   const [pending, setPending] = useState<VacationRequest[]>([])
   const [form, setForm] = useState<{ start: string; end: string; note: string; kind: VacationKind } | null>(null)
@@ -127,7 +129,7 @@ export function VacationCard({ userId, me, byId, year, onChanged }: Props) {
 
   return (
     <>
-      {pending.some(canDecide) && (
+      {part !== 'own' && pending.some(canDecide) && (
         <section className="card highlight">
           <h2>Urlaubsanträge zu genehmigen</h2>
           <ul className="vacation-list">
@@ -151,6 +153,7 @@ export function VacationCard({ userId, me, byId, year, onChanged }: Props) {
         </section>
       )}
 
+      {part !== 'approvals' && (
       <section className="card">
         <h2>Urlaub {year}</h2>
         <div className="vacation-sum">
@@ -252,6 +255,7 @@ export function VacationCard({ userId, me, byId, year, onChanged }: Props) {
           </ul>
         )}
       </section>
+      )}
     </>
   )
 }

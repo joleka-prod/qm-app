@@ -507,3 +507,8 @@ button.link.danger { color: #b42318; }
 .team-overview th { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
 .team-overview tbody tr { cursor: pointer; }
 .team-overview tbody tr:hover, .team-overview tr.selected { background: var(--info-bg); }
+
+/* Zeiterfassung: fremde Zeiten ansehen, Mitarbeiterbereich unten */
+.viewing-other { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; padding: 0.6rem 0.9rem; margin-bottom: 0.75rem; border-radius: 10px; background: var(--info-bg); }
+.staff-section { margin-top: 2rem; padding-top: 1rem; border-top: 2px solid var(--border); }
+.staff-section > h2 { margin: 0 0 0.75rem; }

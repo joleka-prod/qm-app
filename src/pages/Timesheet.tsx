@@ -50,6 +50,12 @@ export function Timesheet() {
   const choices = isPlanner ? staff : staff.filter((p) => p.id === profile?.id || isAbove(p.id))
 
   const [installerId, setInstallerId] = useState(profile?.id ?? '')
+  // Person wechseln und nach oben springen, wo deren Zeiten stehen
+  function pick(id: string) {
+    setEdit(null)
+    setInstallerId(id)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
   const [month, setMonth] = useState(today.slice(0, 7))
   const [sessions, setSessions] = useState<Attendance[]>([])
   const [jobs, setJobs] = useState<TimeEntry[]>([])
@@ -225,35 +231,19 @@ export function Timesheet() {
         </div>
       </div>
 
-      <TeamOverview
-        members={staff.filter((p) => p.id !== profile?.id && (isAbove(p.id) || isAdmin))}
-        selected={installerId}
-        onPick={(id) => {
-          setEdit(null)
-          setInstallerId(id)
-        }}
-        reloadKey={sessions}
-      />
-
-      {choices.length > 1 && (
-        <div className="filters">
-          <select value={installerId} onChange={(e) => { setEdit(null); setInstallerId(e.target.value) }} aria-label="Mitarbeiter">
-            {choices.map((p) => (
-              <option key={p.id} value={p.id}>{displayName(p)}</option>
-            ))}
-          </select>
+      {info && <p className="info">{info}</p>}
+      {installerId !== profile?.id && (
+        <div className="viewing-other">
+          <span>Zeiterfassung von <strong>{displayName(byId[installerId])}</strong></span>
+          <button className="link" onClick={() => pick(profile?.id ?? '')}>Zurück zu meinen Zeiten</button>
         </div>
       )}
-
-      {profile && <AttendanceApprovals me={profile} byId={byId} onChanged={load} />}
-      {info && <p className="info">{info}</p>}
-
       {byId[installerId]?.supervisor_id && (
         <p className="small">Vorgesetzte(r): {displayName(byId[byId[installerId].supervisor_id!])}</p>
       )}
       {installerId && <OvertimeCard userId={installerId} reloadKey={sessions} />}
       {profile && installerId && (
-        <VacationCard userId={installerId} me={profile} byId={byId} year={Number(month.slice(0, 4))} onChanged={load} />
+        <VacationCard userId={installerId} me={profile} byId={byId} year={Number(month.slice(0, 4))} onChanged={load} part="own" />
       )}
 
       <p className="muted small">
@@ -354,6 +344,31 @@ export function Timesheet() {
         <strong>{formatMinutes(sum(range.all, workOf))}</strong>
         <span className="muted small">davon auf Aufträge gebucht {formatMinutes(sum(range.all, (d) => jobsByDay[d] ?? 0))}</span>
       </div>
+
+      {(choices.length > 1 || isAdmin) && profile && (
+        <div className="staff-section">
+          <h2>Mitarbeiter</h2>
+          <AttendanceApprovals me={profile} byId={byId} onChanged={load} />
+          <VacationCard userId={profile.id} me={profile} byId={byId} year={Number(month.slice(0, 4))} onChanged={load} part="approvals" />
+          <TeamOverview
+            members={staff.filter((p) => p.id !== profile?.id && (isAbove(p.id) || isAdmin))}
+            selected={installerId}
+            onPick={pick}
+            reloadKey={sessions}
+          />
+
+          {choices.length > 1 && (
+            <label className="filters">
+              Zeiterfassung einer anderen Person ansehen
+              <select value={installerId} onChange={(e) => pick(e.target.value)} aria-label="Mitarbeiter">
+                {choices.map((p) => (
+                  <option key={p.id} value={p.id}>{displayName(p)}</option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+      )}
     </div>
   )
 }
