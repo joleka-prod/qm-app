@@ -45,7 +45,7 @@ export function TicketList() {
       .then(({ data }) => setDeletionIds(new Set((data ?? []).map((d) => d.ticket_id as number))))
     supabase
       .from('tickets')
-      .select('*, ticket_positions(count), time_entries(started_at, ended_at)')
+      .select('*, ticket_positions(count), time_entries(started_at, ended_at), ticket_costs(total)')
       .neq('ticket_type', 'qm')
       .order('created_at', { ascending: false })
       .then(({ data }) => {
@@ -197,6 +197,11 @@ export function TicketList() {
                     {formatDay(t.montage_date)} {formatTime(t.montage_time)} · {teamById[t.team_id]?.name}
                   </div>
                 )}
+                {costOf(t) != null && (
+                  <div className="small">
+                    Selbstkosten <strong>{costOf(t)!.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</strong>
+                  </div>
+                )}
                 <div className="muted small">
                   {formatDate(t.created_at)} · von {displayName(byId[t.created_by])}
                   {t.assigned_to && <> · Verantwortlich: {displayName(byId[t.assigned_to])}</>}
@@ -209,6 +214,12 @@ export function TicketList() {
       </div>
     </div>
   )
+}
+
+// Gespeicherte Selbstkosten (nur für Planer sichtbar); PostgREST liefert die 1:1-Verknüpfung als Objekt
+function costOf(t: Ticket & { ticket_costs?: { total: number } | { total: number }[] | null }) {
+  const c = Array.isArray(t.ticket_costs) ? t.ticket_costs[0] : t.ticket_costs
+  return c ? Number(c.total) : null
 }
 
 // So viele Werktage vor dem Einsatz muss der Termin beim Kunden angemeldet sein
