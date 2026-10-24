@@ -16,9 +16,9 @@ export default defineConfig({
       injectRegister: false,
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'JOLEKA Service Dashboard',
-        short_name: 'JOLEKA Service',
-        description: 'Aufträge, QM und Monteurplanung',
+        name: 'JOLEKA - Einfach besonders!',
+        short_name: 'JOLEKA',
+        description: 'Aufträge, Monteurplanung und Zeiterfassung',
         lang: 'de',
         theme_color: '#1d4ed8',
         background_color: '#f4f6f9',

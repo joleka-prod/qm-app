@@ -12,7 +12,7 @@ export function Layout() {
   return (
     <div className="app">
       <header className="topbar">
-        <NavLink to="/" className="brand">JOLEKA Service Dashboard</NavLink>
+        <NavLink to="/" className="brand">JOLEKA - Einfach besonders!</NavLink>
         <nav>
           {profile?.role === 'monteur' ? (
             <>

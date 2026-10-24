@@ -33,7 +33,7 @@ export function Login() {
   return (
     <div className="auth-page">
       <form className="card auth-card" onSubmit={submit}>
-        <h1>JOLEKA Service Dashboard</h1>
+        <h1>JOLEKA - Einfach besonders!</h1>
         <label>
           E-Mail
           <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
