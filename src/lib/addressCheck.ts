@@ -36,6 +36,10 @@ export async function confirmAddresses(list: AddressToCheck[], before: AddressTo
           'Ist die Adresse trotzdem korrekt und soll sie so übernommen werden?\n\nOK = so übernehmen · Abbrechen = Adresse korrigieren',
       )
     }
+    // Adresse passt, aber ohne Hausnummer: nachfragen
+    if (ok && a.street.trim() && !a.house_no.trim()) {
+      ok = confirm(`Bei der ${a.label} „${line}“ ist keine Hausnummer eingetragen.\n\nGibt es wirklich keine Hausnummer?\n\nOK = ohne Hausnummer speichern · Abbrechen = Hausnummer eintragen`)
+    }
     if (!ok) return false
   }
   return true

@@ -123,7 +123,6 @@ Deno.serve(async (req) => {
       .filter(Boolean).join(', ')
     if (!query) return reply(200, { found: true, label: '' })
     try {
-      if (v(body.street) && !v(body.house_no)) return reply(200, { found: false, reason: 'Die Hausnummer fehlt.' })
       const hit = await lookup(query)
       if (!hit || (v(body.street) && !hit.exact)) return reply(200, { found: false, reason: '', label: hit?.label ?? '' })
       const norm = (x: string) => x.toLowerCase().replace(/\s+/g, '')
