@@ -194,7 +194,8 @@ export function defaultArea(type: TicketType): ServiceArea {
   return type === 'restarbeit' ? 'montage' : 'kundendienst'
 }
 
-export const TICKET_TYPES = Object.keys(TYPE_LABEL) as TicketType[]
+// QM-Tickets gibt es nicht mehr (2026-10-24); der Typ bleibt nur für alte Daten in der Datenbank
+export const TICKET_TYPES: TicketType[] = (Object.keys(TYPE_LABEL) as TicketType[]).filter((t) => t !== 'qm')
 
 export function isEinsatz(t: Pick<Ticket, 'ticket_type'>) {
   return t.ticket_type !== 'qm'

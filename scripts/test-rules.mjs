@@ -35,18 +35,6 @@ const lead2 = await user('lead2', 'teamleiter')
 const worker = await user('worker', 'mitarbeiter')
 const other = await user('other', 'mitarbeiter')
 
-let ticketId
-
-await check('Mitarbeiter legt Ticket an, Status neu', async () => {
-  const { data, error } = await worker.c.from('tickets').insert({ title: 'Kratzer', description: 'am Gehäuse', order_number: '4711', status: 'abgeschlossen', cause: 'x' }).select().single()
-  assert.ifError(error)
-  assert.equal(data.order_number, '4711')
-  assert.equal(data.status, 'neu')
-  assert.equal(data.cause, '')
-  assert.equal(data.created_by, worker.id)
-  ticketId = data.id
-})
-
 await check('Mitarbeiter kann Rolle nicht selbst ändern', async () => {
   const { error } = await worker.c.from('profiles').update({ role: 'admin' }).eq('id', worker.id)
   assert.ok(error)
@@ -65,111 +53,9 @@ await check('Admin bearbeitet Benutzer, E-Mail nur über die Benutzerverwaltung'
   assert.ifError(own.error)
 })
 
-await check('Anderer Mitarbeiter sieht fremdes Ticket nicht', async () => {
-  const { data } = await other.c.from('tickets').select().eq('id', ticketId)
-  assert.equal(data.length, 0)
-})
-
-await check('Foto hochladen durch Ersteller, fremder Nutzer darf nicht', async () => {
-  const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082', 'hex')
-  const path = `${ticketId}/a.png`
-  const up = await worker.c.storage.from('ticket-photos').upload(path, png, { contentType: 'image/png' })
-  assert.ifError(up.error)
-  const ins = await worker.c.from('ticket_photos').insert({ ticket_id: ticketId, storage_path: path })
-  assert.ifError(ins.error)
-  const bad = await other.c.storage.from('ticket-photos').upload(`${ticketId}/b.png`, png, { contentType: 'image/png' })
-  assert.ok(bad.error)
-  const dl = await other.c.storage.from('ticket-photos').createSignedUrl(path, 60)
-  assert.ok(dl.error)
-  const ok = await lead.c.storage.from('ticket-photos').createSignedUrl(path, 60)
-  assert.ifError(ok.error)
-})
-
-await check('Teamleiter kann sich nicht selbst zuweisen', async () => {
-  const { error, data } = await lead.c.from('tickets').update({ assigned_to: lead.id }).eq('id', ticketId).select()
-  assert.ok(error || data.length === 0)
-})
-
-await check('Mitarbeiter kann keinen Mitarbeiter als Verantwortlichen setzen', async () => {
-  const { error } = await worker.c.from('tickets').insert({ title: 'x', assigned_to: other.id })
-  assert.ok(error)
-})
-
-await check('QM weist Teamleiter zu, Status zugewiesen', async () => {
-  const { data, error } = await qm.c.from('tickets').update({ assigned_to: lead.id }).eq('id', ticketId).select().single()
-  assert.ifError(error)
-  assert.equal(data.status, 'zugewiesen')
-})
-
-await check('Ersteller kann nach Zuweisung nichts mehr ändern', async () => {
-  const { error, data } = await worker.c.from('tickets').update({ title: 'neu' }).eq('id', ticketId).select()
-  assert.ok(error || data.length === 0)
-})
-
-await check('Anderer Teamleiter kann Ursache nicht eintragen', async () => {
-  const { error, data } = await lead2.c.from('tickets').update({ cause: 'x' }).eq('id', ticketId).select()
-  assert.ok(error || data.length === 0)
-})
-
-await check('Teamleiter ergänzt Auftrags- und Positionsnummer', async () => {
-  const { data, error } = await lead.c.from('tickets').update({ order_number: ' A-4711 ', position_number: '3' }).eq('id', ticketId).select().single()
-  assert.ifError(error)
-  assert.equal(data.order_number, 'A-4711')
-  assert.equal(data.position_number, '3')
-})
-
-await check('Anderer Teamleiter kann Auftragsnummer nicht ändern', async () => {
-  const { error, data } = await lead2.c.from('tickets').update({ order_number: 'X' }).eq('id', ticketId).select()
-  assert.ok(error || data.length === 0)
-})
-
-await check('Teamleiter darf Titel nicht ändern', async () => {
-  const { error } = await lead.c.from('tickets').update({ title: 'anders' }).eq('id', ticketId)
-  assert.ok(error)
-})
-
-await check('Zur Prüfung nur mit Ursache und Maßnahme', async () => {
-  const { error } = await lead.c.from('tickets').update({ cause: 'Werkzeug stumpf', status: 'zur_pruefung' }).eq('id', ticketId)
-  assert.ok(error)
-})
-
-await check('Teamleiter trägt Ursache ein, Status in Bearbeitung', async () => {
-  const { data, error } = await lead.c.from('tickets').update({ cause: 'Werkzeug stumpf' }).eq('id', ticketId).select().single()
-  assert.ifError(error)
-  assert.equal(data.status, 'in_bearbeitung')
-})
-
-await check('Teamleiter kann nicht selbst abschließen', async () => {
-  const { error } = await lead.c.from('tickets').update({ corrective_action: 'Wechselintervall', status: 'abgeschlossen' }).eq('id', ticketId)
-  assert.ok(error)
-})
-
-await check('Teamleiter meldet erledigt', async () => {
-  const { data, error } = await lead.c.from('tickets').update({ corrective_action: 'Wechselintervall verkürzt', status: 'zur_pruefung' }).eq('id', ticketId).select().single()
-  assert.ifError(error)
-  assert.equal(data.status, 'zur_pruefung')
-})
-
-await check('QM gibt zurück, dann schließt ab', async () => {
-  let r = await qm.c.from('tickets').update({ status: 'in_bearbeitung', review_note: 'Bitte Schulung ergänzen' }).eq('id', ticketId).select().single()
-  assert.ifError(r.error)
-  r = await lead.c.from('tickets').update({ corrective_action: 'Wechselintervall verkürzt, Schulung', status: 'zur_pruefung' }).eq('id', ticketId).select().single()
-  assert.ifError(r.error)
-  r = await qm.c.from('tickets').update({ status: 'abgeschlossen' }).eq('id', ticketId).select().single()
-  assert.ifError(r.error)
-  assert.ok(r.data.closed_at)
-})
-
-await check('Abgeschlossenes Ticket ist für Teamleiter gesperrt', async () => {
-  const { error } = await lead.c.from('tickets').update({ cause: 'y' }).eq('id', ticketId)
-  assert.ok(error)
-})
-
-await check('Verlauf ist vollständig und für Ersteller sichtbar', async () => {
-  const { data, error } = await worker.c.from('ticket_events').select('kind, details').eq('ticket_id', ticketId).order('id')
-  assert.ifError(error)
-  const kinds = data.map((e) => e.kind)
-  for (const k of ['auftrag', 'erstellt', 'zugewiesen', 'ursache', 'massnahme', 'status', 'pruefhinweis']) assert.ok(kinds.includes(k), k)
+await check('QM-Tickets können nicht mehr angelegt werden', async () => {
+  const r = await qm.c.from('tickets').insert({ ticket_type: 'qm', title: 'QM' })
+  assert.match(r.error?.message ?? '', /QM-Tickets gibt es nicht mehr/)
 })
 
 // --- Einsätze (Restarbeit, Beanstandung, Reparatur) ---
@@ -373,9 +259,6 @@ await check('Kunde wünscht Bericht per E-Mail, Adresse wird geprüft', async ()
   const ok = await m1.c.from('tickets').update({ report_by_email: true, customer_email: ' Mueller@Example.de ' }).eq('id', jobId).select().single()
   assert.ifError(ok.error)
   assert.equal(ok.data.customer_email, 'mueller@example.de')
-  const { data: q } = await qm.c.from('tickets').insert({ title: 'QM mit Mail', customer_email: 'a@b.de', report_by_email: true }).select().single()
-  assert.equal(q.customer_email, '')
-  assert.equal(q.report_by_email, false)
 })
 
 await check('Erledigt nur mit Arbeitsbericht', async () => {
@@ -421,13 +304,6 @@ await check('Einsatz-Verlauf enthält Planung und Bericht', async () => {
   const { data } = await qm.c.from('ticket_events').select('kind').eq('ticket_id', jobId)
   const kinds = data.map((e) => e.kind)
   for (const k of ['erstellt', 'eingeplant', 'bericht', 'status', 'unterschrift', 'bereich']) assert.ok(kinds.includes(k), k)
-})
-
-await check('QM-Ticket ignoriert Monteur-Felder', async () => {
-  const { data, error } = await qm.c.from('tickets').insert({ title: 'QM', team_id: T1, montage_date: '2026-11-02' }).select().single()
-  assert.ifError(error)
-  assert.equal(data.team_id, null)
-  assert.equal(data.montage_date, null)
 })
 
 // --- Positionen ---
@@ -539,12 +415,6 @@ await check('Nach Erledigt sind Positionen für Monteur und Teamleiter gesperrt'
   const c = await qm.c.from('ticket_positions').update({ state: 'erledigt' }).eq('id', posIds[1]).select().single()
   assert.ifError(c.error)
   assert.equal(c.data.done_by, qm.id)
-})
-
-await check('QM-Ticket bekommt keine Positionen', async () => {
-  const { data: t } = await qm.c.from('tickets').insert({ title: 'QM ohne Pos' }).select().single()
-  const r = await qm.c.from('ticket_positions').insert({ ticket_id: t.id, description: 'x' })
-  assert.ok(r.error)
 })
 
 // --- Löschanträge ---
@@ -962,8 +832,6 @@ await check('Disposition plant Einsätze wie Teamleiter, meldet aber nicht erled
   assert.ifError(r.error)
   r = await dispo.c.from('tickets').update({ work_report: 'x', status: 'abgeschlossen' }).eq('id', data.id)
   assert.match(r.error?.message ?? '', /nicht als erledigt/)
-  r = await qm.c.from('tickets').insert({ ticket_type: 'qm', title: 'QM an Dispo', assigned_to: dispo.id })
-  assert.ok(r.error, 'Disposition ist kein Verantwortlicher für QM-Tickets')
   const seen = await dispo.c.from('attendance').select('id').limit(1)
   assert.ifError(seen.error)
   await admin.from('tickets').delete().eq('id', data.id)

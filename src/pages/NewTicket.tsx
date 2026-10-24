@@ -31,7 +31,7 @@ export function NewTicket() {
   const canPlan = isPlannerRole(profile?.role)
 
   const [type, setType] = useState<TicketType>(
-    TICKET_TYPES.includes(params.get('art') as TicketType) ? (params.get('art') as TicketType) : 'qm',
+    TICKET_TYPES.includes(params.get('art') as TicketType) ? (params.get('art') as TicketType) : 'restarbeit',
   )
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')

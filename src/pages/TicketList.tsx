@@ -7,7 +7,7 @@ import { formatMinutes } from '../lib/clock'
 import { supabase } from '../lib/supabase'
 import { useTeams } from '../lib/teams'
 import {
-  STATUS_LABEL,
+  statusLabel,
   TICKET_TYPES,
   TYPE_LABEL,
   addDays,
@@ -34,7 +34,7 @@ export function TicketList() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
   const [deletionIds, setDeletionIds] = useState<Set<number>>(new Set())
-  const [filter, setFilter] = useState<Filter>(profile?.role === 'teamleiter' || profile?.role === 'monteur' ? 'meine' : 'offen')
+  const [filter, setFilter] = useState<Filter>(profile?.role === 'monteur' ? 'meine' : 'offen')
   const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<TicketType | ''>('')
 
@@ -46,6 +46,7 @@ export function TicketList() {
     supabase
       .from('tickets')
       .select('*, ticket_positions(count), time_entries(started_at, ended_at)')
+      .neq('ticket_type', 'qm')
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         setTickets((data ?? []) as Ticket[])
@@ -144,8 +145,8 @@ export function TicketList() {
           <option value="meine">Meine</option>
           <option value="alle">Alle</option>
           <option value="loeschung">Löschung beantragt{deletionIds.size > 0 ? ` (${deletionIds.size})` : ''}</option>
-          {(Object.keys(STATUS_LABEL) as TicketStatus[]).map((s) => (
-            <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+          {(['neu', 'zugewiesen', 'abgeschlossen'] as TicketStatus[]).map((s) => (
+            <option key={s} value={s}>{statusLabel('restarbeit', s)}</option>
           ))}
           <option value="nicht_angemeldet">Geplant, Termin noch nicht angemeldet</option>
           <option value="termin_angemeldet">Termin bei Kunde angemeldet</option>
