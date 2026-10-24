@@ -209,7 +209,10 @@ Deno.serve(async (req) => {
   const facts: [string, string][] = [
     ['Kunde', t.customer_name],
     ['Kundennummer', t.customer_number ?? ''],
-    ['Einsatzort', (t.site_address ?? '').replace(/\n/g, ', ')],
+    ['Einsatzort', t.jobsite_address_different
+      ? [t.jobsite_name, `${t.jobsite_street} ${t.jobsite_house_no}`.trim(), `${t.jobsite_zip} ${t.jobsite_city}`.trim()].filter(Boolean).join(', ')
+      : (t.site_address ?? '').replace(/\n/g, ', ')],
+    ['Kundenadresse', t.jobsite_address_different ? (t.site_address ?? '').replace(/\n/g, ', ') : ''],
     ['Auftragsnummer', t.order_number],
     ['Team', team?.name ?? ''],
     ['Verantwortlich', leadId ? name(leadId) : ''],

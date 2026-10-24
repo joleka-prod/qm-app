@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { formatTime, ticketNo, type Ticket } from '../lib/types'
+import { jobAddress } from './AddressFields'
 import { AreaBadge, TypeBadge } from './StatusBadge'
 
 interface Props {
@@ -39,7 +40,7 @@ export function JobCard({ ticket: t, draggable, showAddress }: Props) {
       )}
       {t.customer_name && <div className="job-sub">{t.customer_name}</div>}
       {!!t.ticket_positions?.[0]?.count && <div className="job-sub">{t.ticket_positions[0].count} Pos.</div>}
-      {showAddress && t.site_address && <div className="job-sub pre">{t.site_address}</div>}
+      {showAddress && jobAddress(t) && <div className="job-sub pre">{jobAddress(t)}</div>}
     </Link>
   )
 }

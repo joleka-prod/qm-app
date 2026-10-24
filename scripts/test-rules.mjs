@@ -889,6 +889,23 @@ await check('Abweichende Rechnungsadresse: Pflichtfelder, ohne Haken leer, Monte
   await admin.from('tickets').delete().eq('id', id)
 })
 
+await check('Abweichende Baustellenadresse: Pflichtfelder, Fahrstrecke wird bei Änderung gelöscht', async () => {
+  let r = await qm.c.from('tickets').insert({ ticket_type: 'beanstandung', title: 'BS', jobsite_address_different: true, jobsite_street: 'Weg' }).select().single()
+  assert.match(r.error?.message ?? '', /Baustellenadresse/)
+  r = await qm.c.from('tickets').insert({ ticket_type: 'beanstandung', title: 'BS', site_address: 'Hauptstr. 1\n54550 Daun' }).select().single()
+  const id = r.data.id
+  await admin.from('tickets').update({ distance_km: 10, distance_address: 'Hauptstr. 1\n54550 Daun' }).eq('id', id)
+  r = await qm.c.from('tickets').update({ jobsite_address_different: true, jobsite_street: 'Baustraße', jobsite_house_no: '1', jobsite_zip: '54568', jobsite_city: 'Gerolstein' }).eq('id', id).select().single()
+  assert.ifError(r.error)
+  assert.equal(r.data.distance_km, null)
+  await admin.from('tickets').update({ team_id: T1, montage_date: '2026-11-02' }).eq('id', id)
+  const m = await m1.c.from('tickets').update({ jobsite_city: 'Trier' }).eq('id', id).select()
+  assert.ok(m.error || m.data.length === 0)
+  r = await qm.c.from('tickets').update({ jobsite_address_different: false }).eq('id', id).select().single()
+  assert.equal(r.data.jobsite_street, '')
+  await admin.from('tickets').delete().eq('id', id)
+})
+
 // Testteams wieder entfernen, damit sie nicht im Kalender auftauchen
 await admin.from('tickets').update({ team_id: null }).in('team_id', [T1, T2])
 await admin.from('teams').delete().in('id', [T1, T2])

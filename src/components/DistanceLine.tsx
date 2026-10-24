@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { Ticket } from '../lib/types'
+import { jobAddress } from './AddressFields'
 
 const km = (v: number) => v.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
@@ -11,7 +12,7 @@ export function DistanceLine({ ticket, onChanged }: { ticket: Ticket; onChanged:
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const asked = useRef('')
-  const address = ticket.site_address.trim()
+  const address = jobAddress(ticket)
   const stale = !!address && ticket.distance_address !== address
 
   async function calc() {
@@ -35,7 +36,7 @@ export function DistanceLine({ ticket, onChanged }: { ticket: Ticket; onChanged:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticket.id, address, stale])
 
-  if (!address) return <p className="distance small muted">Fahrstrecke: Bitte zuerst die Kundenadresse eintragen.</p>
+  if (!address) return <p className="distance small muted">Fahrstrecke: Bitte zuerst die Adresse des Kunden oder der Baustelle eintragen.</p>
 
   return (
     <p className="distance small">

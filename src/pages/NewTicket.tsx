@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
-import { BillingAddressFields, emptyBillingAddress, type BillingAddress } from '../components/BillingAddressFields'
+import { AddressFields, addressColumns, emptyAddress, type AltAddress } from '../components/AddressFields'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { TeamSelect } from '../components/TeamSelect'
 import { PositionsEditor, isEmptyPosition, newPositionDraft, type PositionDraft } from '../components/PositionsEditor'
@@ -43,7 +43,8 @@ export function NewTicket() {
   const [customerEmail, setCustomerEmail] = useState('')
   const [customerNumber, setCustomerNumber] = useState('')
   const [address, setAddress] = useState('')
-  const [billingAddr, setBillingAddr] = useState<BillingAddress>(emptyBillingAddress)
+  const [billingAddr, setBillingAddr] = useState<AltAddress>(emptyAddress)
+  const [jobsiteAddr, setJobsiteAddr] = useState<AltAddress>(emptyAddress)
   const [assignedTo, setAssignedTo] = useState('')
   const [teamId, setTeamId] = useState(params.get('team') ?? '')
   const [montageDate, setMontageDate] = useState(params.get('datum') ?? '')
@@ -71,7 +72,8 @@ export function NewTicket() {
         customer_email: einsatz ? customerEmail.trim() : '',
         customer_number: einsatz ? customerNumber.trim() : '',
         site_address: einsatz ? address.trim() : '',
-        ...(einsatz ? billingAddr : emptyBillingAddress),
+        ...addressColumns(einsatz ? billingAddr : emptyAddress, 'billing'),
+        ...addressColumns(einsatz ? jobsiteAddr : emptyAddress, 'jobsite'),
         assigned_to: !einsatz && assignedTo ? assignedTo : null,
         team_id: einsatz && canPlan && teamId ? Number(teamId) : null,
         montage_date: einsatz && canPlan && montageDate ? montageDate : null,
@@ -192,10 +194,11 @@ export function NewTicket() {
             />
           </label>
           <label>
-            Einsatzort / Adresse
+            Adresse des Kunden
             <textarea rows={2} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Straße, PLZ Ort" />
           </label>
-          <BillingAddressFields value={billingAddr} onChange={setBillingAddr} />
+          <AddressFields kind="jobsite" value={jobsiteAddr} onChange={setJobsiteAddr} />
+          <AddressFields kind="billing" value={billingAddr} onChange={setBillingAddr} />
         </>
       )}
       {!einsatz && (

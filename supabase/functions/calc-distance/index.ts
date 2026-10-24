@@ -1,5 +1,5 @@
 // Berechnet bei Service-Aufträgen (nicht QM) die Fahrstrecke vom Hauptstandort zur Kundenadresse (Hin- und Rückweg)
-// und speichert sie am Auftrag. Adressen werden über OpenStreetMap-Daten gefunden (Photon, ersatzweise
+// (bei abweichender Baustellenadresse zur Baustelle) und speichert sie am Auftrag. Adressen werden über OpenStreetMap-Daten gefunden (Photon, ersatzweise
 // Nominatim), die Strecke über OSRM (ersatzweise der OSRM-Server der FOSSGIS). Alles kostenlos, ohne Schlüssel.
 // Optional: ORIGIN_ADDRESS (Standard: Hauptstandort), PHOTON_URL, NOMINATIM_URL, OSRM_URL, OSRM_URL_2 (Tests).
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -91,13 +91,19 @@ Deno.serve(async (req) => {
     auth: { persistSession: false },
     global: { headers: { Authorization: auth } },
   })
-  const { data: t } = await user.from('tickets').select('id, ticket_type, site_address').eq('id', body.ticket_id ?? 0).maybeSingle()
+  const { data: t } = await user.from('tickets').select('id, ticket_type, site_address, jobsite_address_different, jobsite_street, jobsite_house_no, jobsite_zip, jobsite_city').eq('id', body.ticket_id ?? 0).maybeSingle()
   if (!t) return reply(404, { error: 'Auftrag nicht gefunden' })
   if (t.ticket_type === 'qm') return reply(400, { error: 'Die Fahrstrecke gibt es nur bei Service-Aufträgen.' })
 
-  const address = (t.site_address ?? '').trim()
+  // Einsatzort: abweichende Baustelle, sonst Kundenadresse (gleiche Schreibweise wie in der App)
+  const address = t.jobsite_address_different
+    ? [`${t.jobsite_street} ${t.jobsite_house_no}`.trim(), `${t.jobsite_zip} ${t.jobsite_city}`.trim()].join('\n')
+    : (t.site_address ?? '').trim()
   const save = async (km: number | null, error: string) => {
-    await admin.from('tickets').update({ distance_km: km, distance_address: address, distance_error: error }).eq('id', t.id).eq('site_address', t.site_address)
+    await admin.from('tickets').update({ distance_km: km, distance_address: address, distance_error: error }).eq('id', t.id)
+      .eq('site_address', t.site_address).eq('jobsite_address_different', t.jobsite_address_different)
+      .eq('jobsite_street', t.jobsite_street).eq('jobsite_house_no', t.jobsite_house_no)
+      .eq('jobsite_zip', t.jobsite_zip).eq('jobsite_city', t.jobsite_city)
     return reply(200, { distance_km: km, distance_error: error })
   }
   if (!address) return save(null, '')

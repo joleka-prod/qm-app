@@ -11,7 +11,7 @@ import { AppointmentCard } from '../components/AppointmentCard'
 import { BillingCard } from '../components/BillingCard'
 import { TimeCard } from '../components/TimeCard'
 import { DistanceLine } from '../components/DistanceLine'
-import { BillingAddressFields, billingAddressComplete, billingAddressLine, billingAddressOf, emptyBillingAddress, type BillingAddress } from '../components/BillingAddressFields'
+import { AddressFields, addressColumns, addressComplete, addressLine, addressOf, emptyAddress, jobAddress, type AltAddress } from '../components/AddressFields'
 import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { deletePhoto, signedUrls, uploadPhotos, uploadSignature } from '../lib/photos'
 import { sendReport } from '../lib/reportMail'
@@ -102,7 +102,8 @@ export function TicketDetail() {
   const [wantsEmail, setWantsEmail] = useState(false)
   const [signEmail, setSignEmail] = useState('')
   const [address, setAddress] = useState('')
-  const [billingAddr, setBillingAddr] = useState<BillingAddress>(emptyBillingAddress)
+  const [billingAddr, setBillingAddr] = useState<AltAddress>(emptyAddress)
+  const [jobsiteAddr, setJobsiteAddr] = useState<AltAddress>(emptyAddress)
   const [teamId, setTeamId] = useState('')
   const [montageDate, setMontageDate] = useState('')
   const [montageTime, setMontageTime] = useState('')
@@ -144,7 +145,8 @@ export function TicketDetail() {
     setCustomerEmail(tk.customer_email)
     setAddress(tk.site_address)
     setCustomerNumber(tk.customer_number)
-    setBillingAddr(billingAddressOf(tk))
+    setBillingAddr(addressOf(tk, 'billing'))
+    setJobsiteAddr(addressOf(tk, 'jobsite'))
     setTeamId(tk.team_id ? String(tk.team_id) : '')
     if (tk.team_id && tk.montage_date) {
       const { data: m } = await supabase
@@ -436,7 +438,8 @@ export function TicketDetail() {
                   Einsatzort / Adresse
                   <textarea rows={2} value={address} onChange={(e) => setAddress(e.target.value)} />
                 </label>
-                <BillingAddressFields value={billingAddr} onChange={setBillingAddr} />
+                <AddressFields kind="jobsite" value={jobsiteAddr} onChange={setJobsiteAddr} />
+                <AddressFields kind="billing" value={billingAddr} onChange={setBillingAddr} />
               </>
             )}
             {canEditBase && !einsatz && (
@@ -457,18 +460,19 @@ export function TicketDetail() {
                   setCustomerEmail(ticket.customer_email)
                   setAddress(ticket.site_address)
                   setCustomerNumber(ticket.customer_number)
-                  setBillingAddr(billingAddressOf(ticket))
+                  setBillingAddr(addressOf(ticket, 'billing'))
+                  setJobsiteAddr(addressOf(ticket, 'jobsite'))
                 }}
               >
                 Abbrechen
               </button>
               <button
                 className="primary"
-                disabled={busy || !title.trim() || (einsatz && ((!!customerEmail.trim() && !isEmail(customerEmail)) || !billingAddressComplete(billingAddr)))}
+                disabled={busy || !title.trim() || (einsatz && ((!!customerEmail.trim() && !isEmail(customerEmail)) || !addressComplete(billingAddr, 'billing') || !addressComplete(jobsiteAddr, 'jobsite')))}
                 onClick={async () => {
                   const ref = { order_number: orderNumber.trim(), position_number: positionNumber.trim() }
                   const base = { ...ref, title: title.trim(), description: description.trim() }
-                  const site = einsatz ? { customer_name: customer.trim(), customer_email: customerEmail.trim(), customer_number: customerNumber.trim(), site_address: address.trim(), ...billingAddr } : {}
+                  const site = einsatz ? { customer_name: customer.trim(), customer_email: customerEmail.trim(), customer_number: customerNumber.trim(), site_address: address.trim(), ...addressColumns(billingAddr, 'billing'), ...addressColumns(jobsiteAddr, 'jobsite') } : {}
                   const patch = canEditBase ? { ...base, ...site } : ref
                   if (await update(patch)) setEditing(false)
                 }}
@@ -506,10 +510,22 @@ export function TicketDetail() {
                 )}
               </p>
             )}
+            {einsatz && ticket.jobsite_address_different && (
+              <p className="small">
+                <span className="muted">Baustelle: </span>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(jobAddress(ticket))}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {addressLine(addressOf(ticket, 'jobsite'))}
+                </a>
+              </p>
+            )}
             {einsatz && ticket.billing_address_different && (
               <p className="small">
                 <span className="muted">Rechnungsadresse: </span>
-                {billingAddressLine(ticket)}
+                {addressLine(addressOf(ticket, 'billing'))}
               </p>
             )}
             {einsatz && <DistanceLine ticket={ticket} onChanged={load} />}
