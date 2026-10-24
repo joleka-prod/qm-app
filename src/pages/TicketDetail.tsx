@@ -40,6 +40,7 @@ import {
   type PositionState,
   type TicketPosition,
   type TicketStatus,
+  isPlannerRole,
 } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 
@@ -182,13 +183,13 @@ export function TicketDetail() {
   const closed = ticket.status === 'abgeschlossen'
   const canWork = !closed && (isLead || isAdmin) && ticket.assigned_to !== null
   const einsatz = isEinsatz(ticket)
-  const isPlanner = isAdmin || profile.role === 'teamleiter'
+  const isPlanner = isPlannerRole(profile.role)
   // Monteur ist, wer am Einsatztag im eingeplanten Team ist
   const isInstaller = crew.includes(profile.id)
   const canPlan = einsatz && isPlanner && !closed
   const canEditBase =
     isAdmin || (einsatz && isPlanner && !closed) || (ticket.created_by === profile.id && ticket.status === 'neu')
-  const canRequestDeletion = ticket.created_by === profile.id || isLead || profile.role === 'teamleiter'
+  const canRequestDeletion = ticket.created_by === profile.id || isLead || isPlanner
   const canEditRef = canEditBase || (isLead && !closed)
   const planDirty =
     teamId !== (ticket.team_id ? String(ticket.team_id) : '') ||
@@ -196,7 +197,7 @@ export function TicketDetail() {
     montageTime !== formatTime(ticket.montage_time) ||
     area !== (ticket.service_area ?? '')
   const canEditPositions =
-    einsatz && (isAdmin || (profile.role === 'teamleiter' && !closed) || (ticket.created_by === profile.id && ticket.status === 'neu'))
+    einsatz && (isAdmin || (isPlanner && !closed) || (ticket.created_by === profile.id && ticket.status === 'neu'))
   const canCheckPositions = einsatz && !closed && (isInstaller || canEditPositions)
   const canDeletePhoto = (p: TicketPhoto) => isAdmin || (p.uploaded_by === profile.id && !closed)
   const openPositions = positions.filter((p) => p.state === 'offen').length

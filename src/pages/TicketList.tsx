@@ -21,6 +21,7 @@ import {
   type Ticket,
   type TicketStatus,
   type TicketType,
+  isPlannerRole,
 } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 
@@ -52,7 +53,7 @@ export function TicketList() {
       })
   }, [])
 
-  const isPlanner = profile?.role === 'admin' || profile?.role === 'teamleiter'
+  const isPlanner = isPlannerRole(profile?.role)
   const urgent = useMemo(() => {
     const planned = tickets
       .filter((t) => t.ticket_type !== 'qm' && t.status === 'zugewiesen' && t.montage_date)

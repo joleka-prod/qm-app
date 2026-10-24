@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth'
 import { Layout } from './components/Layout'
 import { configMissing } from './lib/supabase'
+import { isPlannerRole } from './lib/types'
 import { Articles } from './pages/Articles'
 import { InstallerCalendar } from './pages/InstallerCalendar'
 import { Login } from './pages/Login'
@@ -23,7 +24,7 @@ function Routed() {
   if (!profile) return <p className="center muted">Profil wird geladen…</p>
   if (!profile.active) return <p className="center">Dein Zugang ist deaktiviert. Bitte wende dich an die Verwaltung.</p>
 
-  const isPlanner = profile.role === 'admin' || profile.role === 'teamleiter'
+  const isPlanner = isPlannerRole(profile.role)
 
   return (
     <Routes>

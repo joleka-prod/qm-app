@@ -1,12 +1,12 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { supabase } from '../lib/supabase'
-import { ROLE_LABEL, displayName } from '../lib/types'
+import { ROLE_LABEL, displayName, isPlannerRole } from '../lib/types'
 
 export function Layout() {
   const { profile } = useAuth()
   const path = useLocation().pathname
-  const isPlanner = profile?.role === 'admin' || profile?.role === 'teamleiter'
+  const isPlanner = isPlannerRole(profile?.role)
   // Kalender und die Startseite der Planer (mit Spalte "Dringender Handlungsbedarf") nutzen die volle Breite
   const wide = path === '/kalender' || (isPlanner && (path === '/' || path === '/tickets'))
   return (
@@ -22,7 +22,7 @@ export function Layout() {
           ) : (
             <NavLink to="/" end>Service-Aufträge</NavLink>
           )}
-          {(profile?.role === 'admin' || profile?.role === 'teamleiter') && <NavLink to="/kalender">Kalender</NavLink>}
+          {isPlanner && <NavLink to="/kalender">Kalender</NavLink>}
           <NavLink to="/zeiterfassung">Zeiterfassung</NavLink>
           {profile?.role === 'admin' && <NavLink to="/artikel">Artikel</NavLink>}
           {profile?.role === 'admin' && <NavLink to="/benutzer">Benutzer</NavLink>}

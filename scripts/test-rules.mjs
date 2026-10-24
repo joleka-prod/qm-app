@@ -949,6 +949,27 @@ await check('Urlaub: Antrag, Feiertage, nur Vorgesetzter/Admin genehmigt, Anspru
   await qm.c.from('profiles').update({ supervisor_id: null }).eq('id', worker.id)
 })
 
+await check('Disposition plant Einsätze wie Teamleiter, meldet aber nicht erledigt', async () => {
+  const dispo = await user('dispo', 'disposition')
+  let r = await dispo.c.from('team_members').insert({ team_id: T1, day: '2026-11-20', installer_id: m1.id })
+  assert.ifError(r.error)
+  const { data, error } = await dispo.c.from('tickets').insert({
+    ticket_type: 'beanstandung', title: 'Dispo-Test', customer_name: 'Dispo', team_id: T1, montage_date: '2026-11-20',
+  }).select().single()
+  assert.ifError(error)
+  assert.equal(data.status, 'zugewiesen')
+  r = await dispo.c.from('tickets').update({ montage_time: '10:00' }).eq('id', data.id).select().single()
+  assert.ifError(r.error)
+  r = await dispo.c.from('tickets').update({ work_report: 'x', status: 'abgeschlossen' }).eq('id', data.id)
+  assert.match(r.error?.message ?? '', /nicht als erledigt/)
+  r = await qm.c.from('tickets').insert({ ticket_type: 'qm', title: 'QM an Dispo', assigned_to: dispo.id })
+  assert.ok(r.error, 'Disposition ist kein Verantwortlicher für QM-Tickets')
+  const seen = await dispo.c.from('attendance').select('id').limit(1)
+  assert.ifError(seen.error)
+  await admin.from('tickets').delete().eq('id', data.id)
+  await admin.from('team_members').delete().match({ team_id: T1, day: '2026-11-20' })
+})
+
 // Testteams wieder entfernen, damit sie nicht im Kalender auftauchen
 await admin.from('tickets').update({ team_id: null }).in('team_id', [T1, T2])
 await admin.from('teams').delete().in('id', [T1, T2])

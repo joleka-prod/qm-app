@@ -1,4 +1,4 @@
-export type Role = 'mitarbeiter' | 'teamleiter' | 'monteur' | 'admin'
+export type Role = 'mitarbeiter' | 'teamleiter' | 'disposition' | 'monteur' | 'admin'
 export type TicketType = 'qm' | 'restarbeit' | 'beanstandung' | 'reparatur'
 export type ServiceArea = 'kundendienst' | 'montage'
 export type TicketStatus = 'neu' | 'zugewiesen' | 'in_bearbeitung' | 'zur_pruefung' | 'abgeschlossen'
@@ -202,8 +202,14 @@ export function isEinsatz(t: Pick<Ticket, 'ticket_type'>) {
 export const ROLE_LABEL: Record<Role, string> = {
   mitarbeiter: 'Mitarbeiter',
   teamleiter: 'Teamleiter',
+  disposition: 'Disposition',
   monteur: 'Monteur',
   admin: 'QM / Admin',
+}
+
+// Planen Service-Aufträge (Kalender, Teams, Termine, Zeiterfassung, Berechnung)
+export function isPlannerRole(role: Role | undefined | null) {
+  return role === 'admin' || role === 'teamleiter' || role === 'disposition'
 }
 
 export function ticketNo(id: number, type: TicketType = 'qm') {

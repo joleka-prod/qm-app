@@ -5,7 +5,7 @@ import { VacationCard, type VacationRequest } from '../components/VacationCard'
 import { minutesOf, toLocalInput, type TimeEntry } from '../components/TimeCard'
 import { clockTime, formatMinutes, minutesBetween, useClockChanged, type Attendance } from '../lib/clock'
 import { supabase } from '../lib/supabase'
-import { displayName, formatDay, isoDate, parseDate, weekNumber } from '../lib/types'
+import { displayName, formatDay, isPlannerRole, isoDate, parseDate, weekNumber } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 
 // Gesetzliche Mindestpause (ArbZG): über 6 Std. 30 Min., über 9 Std. 45 Min.
@@ -34,7 +34,7 @@ export function Timesheet() {
   const { profile } = useAuth()
   const { profiles, byId } = useProfiles()
   const staff = profiles.filter((p) => p.active)
-  const isPlanner = profile?.role === 'admin' || profile?.role === 'teamleiter'
+  const isPlanner = isPlannerRole(profile?.role)
   const isAdmin = profile?.role === 'admin'
   const today = isoDate(new Date())
   // Vorgesetzte sehen die Zeiten ihrer Mitarbeiter (auch über mehrere Ebenen)

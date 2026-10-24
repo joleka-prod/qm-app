@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
 
   const { data: t } = await admin.from('tickets').select('*').eq('id', body.ticket_id ?? 0).maybeSingle()
   if (!t || t.ticket_type === 'qm') return reply(404, { error: 'Auftrag nicht gefunden' })
-  const planner = me.role === 'admin' || me.role === 'teamleiter'
+  const planner = ['admin', 'teamleiter', 'disposition'].includes(me.role)
   const { data: crew } = await admin
     .from('team_members')
     .select('installer_id, lead')

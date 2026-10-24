@@ -18,6 +18,7 @@ import {
   displayName,
   type ServiceArea,
   type TicketType,
+  isPlannerRole,
 } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 
@@ -27,7 +28,7 @@ export function NewTicket() {
   const { profile } = useAuth()
   const { leads } = useProfiles()
   const { teams, teamById } = useTeams()
-  const canPlan = profile?.role === 'admin' || profile?.role === 'teamleiter'
+  const canPlan = isPlannerRole(profile?.role)
 
   const [type, setType] = useState<TicketType>(
     TICKET_TYPES.includes(params.get('art') as TicketType) ? (params.get('art') as TicketType) : 'qm',
