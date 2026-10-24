@@ -10,6 +10,8 @@ interface Balance {
   actual_min: number
   opening_min: number
   balance_min: number
+  planned_min: number
+  requested_min: number
 }
 
 const signed = (m: number) => `${m < 0 ? '−' : '+'}${formatMinutes(Math.abs(m))}`
@@ -46,6 +48,17 @@ export function OvertimeCard({ userId, reloadKey }: { userId: string; reloadKey?
           </>
         )}
       </p>
+      {(b.planned_min > 0 || b.requested_min > 0) && (
+        <p className="small">
+          Für Freizeit verplant: {b.planned_min > 0 && <>{formatMinutes(b.planned_min)} genehmigt</>}
+          {b.planned_min > 0 && b.requested_min > 0 && ' · '}
+          {b.requested_min > 0 && <>{formatMinutes(b.requested_min)} beantragt</>}
+          {' · '}danach frei verfügbar{' '}
+          <strong className={b.balance_min - b.planned_min - b.requested_min < 0 ? 'overtime-minus' : ''}>
+            {signed(b.balance_min - b.planned_min - b.requested_min)}
+          </strong>
+        </p>
+      )}
     </section>
   )
 }

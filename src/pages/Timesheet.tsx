@@ -211,7 +211,8 @@ export function Timesheet() {
               const work = workOf(d)
               const pause = breakOf(d)
               const weekday = parseDate(d).getDay()
-              const onVacation = vacation.some((v) => v.start_date <= d && v.end_date >= d) && weekday !== 0 && weekday !== 6
+              const vac = weekday !== 0 && weekday !== 6 ? vacation.find((v) => v.start_date <= d && v.end_date >= d) : undefined
+              const onVacation = !!vac
               if (list.length === 0 && !jobsByDay[d] && !onVacation && (weekday === 0 || weekday === 6 || d > today)) return null
               const short = work > 0 && pause < minBreak(work)
               return (
@@ -219,7 +220,7 @@ export function Timesheet() {
                   <div className="ts-day-head">
                     <strong>{formatDay(d).replace(/\.\d{4}$/, '.')}</strong>
                     <span className="ts-work">
-                      {onVacation && <span className="ts-vacation">Urlaub </span>}
+                      {vac && <span className="ts-vacation">{vac.kind === 'ueberstunden' ? 'Frei (Überstunden) ' : 'Urlaub '}</span>}
                       {work > 0 ? formatMinutes(work) : !onVacation && <span className="muted">–</span>}
                     </span>
                   </div>

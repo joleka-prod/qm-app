@@ -892,9 +892,25 @@ await check('Überstunden: Soll aus Wochenstunden, Ist aus Stempeluhr, nur Admin
   await admin.from('attendance').insert({ installer_id: worker.id, started_at: '2026-11-02T07:00:00+01:00', ended_at: '2026-11-02T17:00:00+01:00' })
   const { data, error } = await worker.c.rpc('overtime_balance', { p_user: worker.id, p_until: '2026-11-06' })
   assert.ifError(error)
-  assert.deepEqual(data[0], { since: '2026-11-02', until: '2026-11-06', target_min: 2400, actual_min: 600, opening_min: 150, balance_min: -1650 })
+  assert.deepEqual(data[0], { since: '2026-11-02', until: '2026-11-06', target_min: 2400, actual_min: 600, opening_min: 150, balance_min: -1650, planned_min: 0, requested_min: 0 })
   r = await other.c.rpc('overtime_balance', { p_user: worker.id })
   assert.match(r.error?.message ?? '', /Berechtigung/)
+  // Freizeit über Überstunden: bleibt Soll (mindert den Saldo), künftige Tage werden als verplant gezeigt
+  await qm.c.from('profiles').update({ supervisor_id: other.id }).eq('id', worker.id)
+  r = await worker.c.rpc('request_vacation', { p_start: '2026-11-05', p_end: '2026-11-05', p_kind: 'ueberstunden' })
+  assert.ifError(r.error)
+  await other.c.rpc('decide_vacation', { p_id: r.data, p_approve: true })
+  r = await worker.c.rpc('request_vacation', { p_start: '2026-11-04', p_end: '2026-11-04', p_kind: 'urlaub' })
+  await other.c.rpc('decide_vacation', { p_id: r.data, p_approve: true })
+  r = await worker.c.rpc('request_vacation', { p_start: '2026-11-09', p_end: '2026-11-10', p_kind: 'ueberstunden' })
+  let b = (await worker.c.rpc('overtime_balance', { p_user: worker.id, p_until: '2026-11-06' })).data[0]
+  assert.equal(b.target_min, 1920, 'nur der Urlaubstag zählt nicht als Soll')
+  assert.equal(b.planned_min, 0)
+  assert.equal(b.requested_min, 960)
+  b = (await worker.c.rpc('overtime_balance', { p_user: worker.id, p_until: '2026-11-03' })).data[0]
+  assert.equal(b.planned_min, 480)
+  await admin.from('vacation_requests').delete().eq('user_id', worker.id)
+  await qm.c.from('profiles').update({ supervisor_id: null }).eq('id', worker.id)
   await admin.from('attendance').delete().eq('installer_id', worker.id).gte('started_at', '2026-11-02').lt('started_at', '2026-11-03')
 })
 

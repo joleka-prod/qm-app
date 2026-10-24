@@ -3,6 +3,9 @@ import { supabase } from '../lib/supabase'
 import { displayName, formatDate, formatDay, type Profile } from '../lib/types'
 
 export type VacationState = 'beantragt' | 'genehmigt' | 'abgelehnt' | 'storniert'
+export type VacationKind = 'urlaub' | 'ueberstunden'
+
+export const KIND_LABEL: Record<VacationKind, string> = { urlaub: 'Urlaubstage', ueberstunden: 'Überstunden' }
 
 export interface VacationRequest {
   id: number
@@ -12,6 +15,7 @@ export interface VacationRequest {
   days: number
   note: string
   state: VacationState
+  kind: VacationKind
   decided_by: string | null
   decided_at: string | null
   decision_note: string
@@ -43,7 +47,7 @@ interface Props {
 export function VacationCard({ userId, me, byId, year, onChanged }: Props) {
   const [list, setList] = useState<VacationRequest[]>([])
   const [pending, setPending] = useState<VacationRequest[]>([])
-  const [form, setForm] = useState<{ start: string; end: string; note: string } | null>(null)
+  const [form, setForm] = useState<{ start: string; end: string; note: string; kind: VacationKind } | null>(null)
   const [preview, setPreview] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -98,15 +102,15 @@ export function VacationCard({ userId, me, byId, year, onChanged }: Props) {
   }
 
   const allowance = Number(byId[userId]?.vacation_days ?? 0)
-  const sum = (s: VacationState) => list.filter((r) => r.state === s).reduce((a, r) => a + r.days, 0)
+  const sum = (s: VacationState) => list.filter((r) => r.state === s && r.kind !== 'ueberstunden').reduce((a, r) => a + r.days, 0)
   const approved = sum('genehmigt')
   const requested = sum('beantragt')
   const rest = allowance - approved - requested
 
   async function submit() {
     if (!form) return
-    if (preview != null && preview > rest && !confirm(`Der Antrag (${dayWord(preview)}) ist mehr als der Resturlaub (${dayWord(rest)}). Trotzdem beantragen?`)) return
-    const ok = await run(() => supabase.rpc('request_vacation', { p_start: form.start, p_end: form.end, p_note: form.note }))
+    if (form.kind === 'urlaub' && preview != null && preview > rest && !confirm(`Der Antrag (${dayWord(preview)}) ist mehr als der Resturlaub (${dayWord(rest)}). Trotzdem beantragen?`)) return
+    const ok = await run(() => supabase.rpc('request_vacation', { p_start: form.start, p_end: form.end, p_note: form.note, p_kind: form.kind }))
     if (ok) setForm(null)
   }
 
@@ -133,6 +137,7 @@ export function VacationCard({ userId, me, byId, year, onChanged }: Props) {
                   <strong>{displayName(byId[r.user_id])}</strong>
                   <div className="small">
                     {period(r)} · {dayWord(r.days)}
+                    {r.kind === 'ueberstunden' && <> · über Überstunden</>}
                   </div>
                   {r.note && <div className="small muted">{r.note}</div>}
                 </div>
@@ -157,12 +162,26 @@ export function VacationCard({ userId, me, byId, year, onChanged }: Props) {
         {allowance === 0 && <p className="small muted">Kein Urlaubsanspruch eingetragen. Der Admin kann ihn in der Benutzerverwaltung ändern.</p>}
 
         {own && !form && (
-          <button className="primary" onClick={() => { setError(''); setForm({ start: '', end: '', note: '' }) }}>
+          <button className="primary" onClick={() => { setError(''); setForm({ start: '', end: '', note: '', kind: 'urlaub' }) }}>
             + Urlaub beantragen
           </button>
         )}
         {form && (
           <div className="form vacation-form">
+            <div className="segmented two" role="radiogroup" aria-label="Freizeit über">
+              {(['urlaub', 'ueberstunden'] as VacationKind[]).map((k) => (
+                <button
+                  type="button"
+                  key={k}
+                  role="radio"
+                  aria-checked={form.kind === k}
+                  className={form.kind === k ? 'active' : ''}
+                  onClick={() => setForm({ ...form, kind: k })}
+                >
+                  {KIND_LABEL[k]}
+                </button>
+              ))}
+            </div>
             <div className="row">
               <label>
                 Von
@@ -179,7 +198,10 @@ export function VacationCard({ userId, me, byId, year, onChanged }: Props) {
             </label>
             {preview != null && (
               <p className="small">
-                {dayWord(preview)} Urlaub (ohne Wochenenden und Feiertage in Rheinland-Pfalz)
+                {form.kind === 'urlaub'
+                  ? `${dayWord(preview)} Urlaub`
+                  : `${dayWord(preview)} frei über Überstunden (${(preview * Number(byId[userId]?.weekly_hours ?? 40) / 5).toLocaleString('de-DE')} Std.)`}{' '}
+                (ohne Wochenenden und Feiertage in Rheinland-Pfalz)
               </p>
             )}
             {!byId[me.id]?.supervisor_id && !isAdmin && (
@@ -199,7 +221,9 @@ export function VacationCard({ userId, me, byId, year, onChanged }: Props) {
               <li key={r.id} className={r.state === 'storniert' || r.state === 'abgelehnt' ? 'muted' : ''}>
                 <div>
                   <div>
-                    {period(r)} · {dayWord(r.days)} <span className={`badge badge-urlaub-${r.state}`}>{STATE_LABEL[r.state]}</span>
+                    {period(r)} · {dayWord(r.days)}
+                    {r.kind === 'ueberstunden' && <span className="muted"> · über Überstunden</span>}{' '}
+                    <span className={`badge badge-urlaub-${r.state}`}>{STATE_LABEL[r.state]}</span>
                   </div>
                   {r.note && <div className="small muted">{r.note}</div>}
                   {r.decided_by && (
