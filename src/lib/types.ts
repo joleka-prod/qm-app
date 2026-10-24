@@ -209,7 +209,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   teamleiter: 'Teamleiter',
   disposition: 'Disposition',
   monteur: 'Monteur',
-  admin: 'QM / Admin',
+  admin: 'Admin',
 }
 
 // Planen Service-Aufträge (Kalender, Teams, Termine, Zeiterfassung, Berechnung)

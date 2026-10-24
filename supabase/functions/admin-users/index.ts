@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
   const { data: caller } = await admin.auth.getUser(token)
   if (!caller.user) return reply(401, { error: 'Nicht angemeldet' })
   const { data: me } = await admin.from('profiles').select('role, active').eq('id', caller.user.id).single()
-  if (!me || me.role !== 'admin' || !me.active) return reply(403, { error: 'Nur für QM/Admin' })
+  if (!me || me.role !== 'admin' || !me.active) return reply(403, { error: 'Nur für Admins' })
 
   let body: Record<string, string>
   try {

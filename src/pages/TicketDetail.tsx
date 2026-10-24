@@ -1093,7 +1093,7 @@ export function TicketDetail() {
               <button disabled={busy} onClick={dropDeletionRequest}>Antrag zurückziehen</button>
             )}
             {!isAdmin && deletion.requested_by !== profile.id && (
-              <p className="muted small">Wartet auf Freigabe durch QM/Admin.</p>
+              <p className="muted small">Wartet auf Freigabe durch den Admin.</p>
             )}
           </div>
         </section>
@@ -1104,7 +1104,7 @@ export function TicketDetail() {
       ) : canRequestDeletion && requestingDeletion ? (
         <section className="card danger-card">
           <h2>Löschung beantragen</h2>
-          <p className="muted small">Das Ticket wird erst gelöscht, wenn QM/Admin den Antrag freigibt.</p>
+          <p className="muted small">Der Auftrag wird erst gelöscht, wenn der Admin den Antrag freigibt.</p>
           <label className="form">
             Begründung *
             <textarea rows={3} value={deletionReason} onChange={(e) => setDeletionReason(e.target.value)} placeholder="z. B. doppelt angelegt" />
