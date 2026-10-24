@@ -466,3 +466,11 @@ button.link.danger { color: #b42318; }
 .badge-urlaub-abgelehnt { background: #fee4e2; color: #b42318; }
 .badge-urlaub-storniert { background: #f2f4f7; color: #475467; }
 .ts-vacation { color: #05603a; font-weight: 600; }
+
+/* Auftragskette */
+.chain-list { list-style: none; margin: 0 0 0.75rem; padding: 0; }
+.chain-list li { padding: 0.35rem 0; border-bottom: 1px solid var(--border); }
+.chain-list li:last-child { border-bottom: none; }
+.chain-open { background: var(--highlight-bg, rgba(255, 196, 0, 0.12)); border-radius: 8px; padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; }
+.chain-open p { margin: 0 0 0.25rem; }
+.chain-open ul { margin: 0; padding-left: 1.2rem; }

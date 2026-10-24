@@ -970,6 +970,52 @@ await check('Disposition plant Einsätze wie Teamleiter, meldet aber nicht erled
   await admin.from('team_members').delete().match({ team_id: T1, day: '2026-11-20' })
 })
 
+await check('Folgeauftrag: übernimmt Kunde und offene Positionen, Kette sichtbar', async () => {
+  const dispo = await user('dispo2', 'disposition')
+  const { data: src } = await dispo.c.from('tickets').insert({
+    ticket_type: 'restarbeit', title: 'Fenster', customer_number: 'K-1', customer_name: 'Kette',
+    customer_street: 'Weg', customer_house_no: '1', customer_zip: '54570', customer_city: 'Ort',
+  }).select().single()
+  await admin.from('ticket_positions').insert([
+    { ticket_id: src.id, sort: 0, position_number: '1', description: 'A' },
+    { ticket_id: src.id, sort: 1, position_number: '2', description: 'B' },
+    { ticket_id: src.id, sort: 2, position_number: '3', description: 'C' },
+  ])
+  const { data: pos } = await admin.from('ticket_positions').select('id, sort').eq('ticket_id', src.id).order('sort')
+  await admin.from('ticket_positions').update({ state: 'erledigt' }).eq('id', pos[0].id)
+  await admin.from('ticket_positions').update({ state: 'nicht_erledigt', reason: 'Teil fehlt' }).eq('id', pos[1].id)
+  await admin.from('ticket_positions').update({ state: 'nicht_erledigt', reason: 'Kunde nicht da' }).eq('id', pos[2].id)
+
+  let r = await m1.c.rpc('create_followup', { p_ticket_id: src.id })
+  assert.match(r.error?.message ?? '', /Disposition/)
+  r = await dispo.c.rpc('create_followup', { p_ticket_id: src.id })
+  assert.ifError(r.error)
+  const childId = r.data
+  const { data: child } = await admin.from('tickets').select('*').eq('id', childId).single()
+  assert.equal(child.parent_id, src.id)
+  assert.equal(child.status, 'neu')
+  assert.equal(child.customer_number, 'K-1')
+  assert.equal(child.site_address, src.site_address)
+  const { data: cpos } = await admin.from('ticket_positions').select('description, state').eq('ticket_id', childId).order('sort')
+  assert.deepEqual(cpos.map((p) => p.description + p.state), ['Boffen', 'Coffen'])
+
+  r = await dispo.c.rpc('create_followup', { p_ticket_id: childId })
+  const grandId = r.data
+  r = await dispo.c.from('tickets').update({ parent_id: null }).eq('id', childId)
+  assert.equal((await admin.from('tickets').select('parent_id').eq('id', childId).single()).data.parent_id, src.id)
+  r = await dispo.c.from('tickets').insert({ ticket_type: 'restarbeit', title: 'x', parent_id: src.id }).select().single()
+  assert.equal(r.data.parent_id, null)
+  await admin.from('tickets').delete().eq('id', r.data.id)
+
+  const chain = await dispo.c.rpc('ticket_chain', { p_ticket_id: grandId })
+  assert.ifError(chain.error)
+  assert.deepEqual(chain.data.map((x) => [x.id, x.depth]), [[src.id, 0], [childId, 1], [grandId, 2]])
+  assert.equal(chain.data[0].not_done, 2)
+  const hidden = await m4.c.rpc('ticket_chain', { p_ticket_id: grandId })
+  assert.equal(hidden.data.length, 0)
+  await admin.from('tickets').delete().in('id', [grandId, childId, src.id])
+})
+
 // Testteams wieder entfernen, damit sie nicht im Kalender auftauchen
 await admin.from('tickets').update({ team_id: null }).in('team_id', [T1, T2])
 await admin.from('teams').delete().in('id', [T1, T2])

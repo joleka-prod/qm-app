@@ -5,6 +5,7 @@ import { PhotoGallery } from '../components/PhotoGallery'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { PositionPhotos } from '../components/PositionPhotos'
 import { PositionsEditor, isEmptyPosition, newPositionDraft, type PositionDraft } from '../components/PositionsEditor'
+import { OrderChain } from '../components/OrderChain'
 import { SignaturePad, canvasToBlob } from '../components/SignaturePad'
 import { TeamSelect } from '../components/TeamSelect'
 import { AppointmentCard } from '../components/AppointmentCard'
@@ -46,6 +47,8 @@ import { useProfiles } from '../lib/useProfiles'
 
 const EVENT_LABEL: Record<string, string> = {
   erstellt: 'Erstellt',
+  folgeauftrag: 'Folgeauftrag erstellt:',
+  aus_auftrag: 'Als Folgeauftrag erstellt aus',
   eingeplant: 'Eingeplant:',
   zur_berechnung: 'Zur Berechnung weitergeleitet',
   berechnet: 'Berechnet:',
@@ -778,6 +781,8 @@ export function TicketDetail() {
         />
       )}
 
+      {einsatz && <OrderChain ticket={ticket} canCreate={isPlanner} />}
+
       {einsatz && !timeOnTop && timeCard}
 
       {einsatz && (
@@ -1044,6 +1049,13 @@ export function TicketDetail() {
                 {ev.kind === 'berechnet' && <> {ev.details}</>}
                 {ev.kind === 'erstellt' && <> ({TYPE_LABEL[ticket.ticket_type]})</>}
                 {ev.kind === 'unterschrift' && <> {ev.details}</>}
+                {ev.kind === 'folgeauftrag' && <> <Link to={`/ticket/${ev.details}`}>{ticketNo(Number(ev.details), ticket.ticket_type)}</Link></>}
+                {ev.kind === 'aus_auftrag' && (
+                  <>
+                    {' '}<Link to={`/ticket/${ev.details.split(':')[0]}`}>{ticketNo(Number(ev.details.split(':')[0]), ticket.ticket_type)}</Link>
+                    {' '}({ev.details.split(':')[1] ?? 0} {ev.details.split(':')[1] === '1' ? 'Position' : 'Positionen'} übernommen)
+                  </>
+                )}
                 {ev.kind === 'bereich' && <> „{AREA_LABEL[ev.details as ServiceArea] ?? ev.details}"</>}
                 {ev.actor && <span className="muted"> · {displayName(byId[ev.actor])}</span>}
               </span>
