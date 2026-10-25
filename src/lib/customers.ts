@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 import type { CustomerData } from '../components/AddressFields'
 
-export type CustomerGroup = 'privat' | 'bautraeger' | 'architekt' | 'oeffentlich'
+export type CustomerGroup = 'privat' | 'bautraeger' | 'generalunternehmer' | 'architekt' | 'oeffentlich'
 export type NoteKind = 'telefon' | 'email' | 'termin' | 'brief' | 'notiz'
 
 export interface Customer {
@@ -56,6 +56,7 @@ export interface CustomerNote {
 export const GROUP_LABEL: Record<CustomerGroup, string> = {
   privat: 'Privatkunde',
   bautraeger: 'Bauträger',
+  generalunternehmer: 'Generalunternehmer',
   architekt: 'Architekt',
   oeffentlich: 'Öffentlicher Auftraggeber',
 }
@@ -63,6 +64,7 @@ export const GROUP_LABEL: Record<CustomerGroup, string> = {
 export const GROUP_PLURAL: Record<CustomerGroup, string> = {
   privat: 'Privatkunden',
   bautraeger: 'Bauträger',
+  generalunternehmer: 'Generalunternehmer',
   architekt: 'Architekten',
   oeffentlich: 'Öffentliche Auftraggeber',
 }

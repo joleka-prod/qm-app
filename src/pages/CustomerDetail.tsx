@@ -46,6 +46,7 @@ const emptyForm: CustomerForm = {
 const NAME_LABEL: Record<CustomerGroup, [string, string]> = {
   privat: ['Name *', 'z. B. Familie Müller'],
   bautraeger: ['Firma *', 'z. B. Eifel Bau GmbH'],
+  generalunternehmer: ['Firma *', 'z. B. Mosel Hochbau GmbH'],
   architekt: ['Büro / Name *', 'z. B. Architekturbüro Schmitz'],
   oeffentlich: ['Behörde / Einrichtung *', 'z. B. Verbandsgemeinde Gerolstein'],
 }

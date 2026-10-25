@@ -529,6 +529,7 @@ button.link.danger { color: #b42318; }
 .group-tag { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 999px; white-space: nowrap; }
 .group-tag.group-privat { background: #e0f2fe; color: #075985; }
 .group-tag.group-bautraeger { background: #fef0c7; color: #93370d; }
+.group-tag.group-generalunternehmer { background: #fee4e2; color: #b42318; }
 .group-tag.group-architekt { background: #f4ebff; color: #6941c6; }
 .group-tag.group-oeffentlich { background: #dcfae6; color: #067647; }
 .ticket-row.inactive { opacity: 0.6; }
