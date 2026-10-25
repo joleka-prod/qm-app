@@ -1,5 +1,5 @@
 export type Role = 'mitarbeiter' | 'teamleiter' | 'disposition' | 'monteur' | 'admin'
-export type TicketType = 'qm' | 'restarbeit' | 'beanstandung' | 'reparatur'
+export type TicketType = 'qm' | 'montageauftrag' | 'restarbeit' | 'beanstandung' | 'reparatur'
 export type ServiceArea = 'kundendienst' | 'montage'
 export type TicketStatus = 'neu' | 'zugewiesen' | 'in_bearbeitung' | 'zur_pruefung' | 'abgeschlossen'
 export type AppointmentState = 'offen' | 'angemeldet' | 'bestaetigt'
@@ -29,6 +29,8 @@ export interface Ticket {
   installer_id: string | null
   team_id: number | null
   montage_date: string | null
+  // Einplanung: Montag der Kalenderwoche, für die der Auftrag grob vorgemerkt ist
+  planned_week?: string | null
   montage_time: string | null
   customer_name: string
   customer_email: string
@@ -179,6 +181,7 @@ export function statusLabel(
 
 export const TYPE_LABEL: Record<TicketType, string> = {
   qm: 'QM-Ticket',
+  montageauftrag: 'Montageauftrag',
   restarbeit: 'Restarbeit',
   beanstandung: 'Beanstandung',
   reparatur: 'Reparaturauftrag',
@@ -186,6 +189,7 @@ export const TYPE_LABEL: Record<TicketType, string> = {
 
 const TYPE_PREFIX: Record<TicketType, string> = {
   qm: 'QM',
+  montageauftrag: 'MA',
   restarbeit: 'RA',
   beanstandung: 'BE',
   reparatur: 'RP',
@@ -199,7 +203,7 @@ export const AREA_LABEL: Record<ServiceArea, string> = {
 export const SERVICE_AREAS = Object.keys(AREA_LABEL) as ServiceArea[]
 
 export function defaultArea(type: TicketType): ServiceArea {
-  return type === 'restarbeit' ? 'montage' : 'kundendienst'
+  return type === 'restarbeit' || type === 'montageauftrag' ? 'montage' : 'kundendienst'
 }
 
 // QM-Tickets gibt es nicht mehr (2026-10-24); der Typ bleibt nur für alte Daten in der Datenbank
@@ -282,6 +286,10 @@ export function formatDay(s: string) {
 
 export function formatTime(t: string | null) {
   return t ? t.slice(0, 5) : ''
+}
+
+export function weekLabel(iso: string) {
+  return `KW ${weekNumber(new Date(iso + 'T00:00'))}`
 }
 
 export function weekNumber(d: Date) {

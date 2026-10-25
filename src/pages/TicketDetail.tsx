@@ -8,6 +8,7 @@ import { PositionsEditor, isEmptyPosition, newPositionDraft, type PositionDraft 
 import { OrderChain } from '../components/OrderChain'
 import { SignaturePad, canvasToBlob } from '../components/SignaturePad'
 import { TeamSelect } from '../components/TeamSelect'
+import { WeekSelect } from '../components/WeekSelect'
 import { AppointmentCard } from '../components/AppointmentCard'
 import { BillingCard } from '../components/BillingCard'
 import { SelfCostCard } from '../components/SelfCostCard'
@@ -30,6 +31,7 @@ import {
   isEmail,
   formatDay,
   formatTime,
+  weekLabel,
   isEinsatz,
   orderRef,
   statusLabel,
@@ -57,6 +59,7 @@ const EVENT_LABEL: Record<string, string> = {
   position_ergaenzt: 'Position ergänzt:',
   aus_auftrag: 'Als Folgeauftrag erstellt aus',
   eingeplant: 'Eingeplant:',
+  kw_vorgemerkt: 'Vorgemerkt für',
   zur_berechnung: 'Zur Berechnung weitergeleitet',
   berechnet: 'Berechnet:',
   berechnung_geoeffnet: 'Berechnung wieder geöffnet',
@@ -115,6 +118,7 @@ export function TicketDetail() {
   const [jobsiteAddr, setJobsiteAddr] = useState<AltAddress>(emptyAddress)
   const [teamId, setTeamId] = useState('')
   const [montageDate, setMontageDate] = useState('')
+  const [plannedWeek, setPlannedWeek] = useState('')
   const [montageTime, setMontageTime] = useState('')
   const [report, setReport] = useState('')
   const loadedReport = useRef('')
@@ -171,6 +175,7 @@ export function TicketDetail() {
       setCrewLead('')
     }
     setMontageDate(tk.montage_date ?? '')
+    setPlannedWeek(tk.planned_week ?? '')
     setMontageTime(formatTime(tk.montage_time))
     // Ungespeicherten Bericht nicht überschreiben, wenn z. B. nur eine Position abgehakt wurde
     setReport((cur) => (cur === loadedReport.current ? tk.work_report : cur))
@@ -214,7 +219,8 @@ export function TicketDetail() {
     teamId !== (ticket.team_id ? String(ticket.team_id) : '') ||
     montageDate !== (ticket.montage_date ?? '') ||
     montageTime !== formatTime(ticket.montage_time) ||
-    area !== (ticket.service_area ?? '')
+    area !== (ticket.service_area ?? '') ||
+    plannedWeek !== (ticket.planned_week ?? '')
   const canEditPositions =
     einsatz && (isAdmin || (isPlanner && !closed) || (ticket.created_by === profile.id && ticket.status === 'neu'))
   const canCheckPositions = einsatz && !closed && (isInstaller || canEditPositions)
@@ -764,6 +770,10 @@ export function TicketDetail() {
                 </div>
               </div>
               <label>
+                Vorgemerkt für (Einplanung)
+                <WeekSelect value={plannedWeek} onChange={setPlannedWeek} />
+              </label>
+              <label>
                 Team
                 <TeamSelect
                   teams={teams}
@@ -802,6 +812,8 @@ export function TicketDetail() {
                       montage_date: montageDate || null,
                       montage_time: montageTime || null,
                       ...(area ? { service_area: area } : {}),
+                      // erst senden, wenn geändert (Spalte gibt es erst nach dem SQL-Update)
+                      ...(plannedWeek !== (ticket.planned_week ?? '') ? { planned_week: plannedWeek || null } : {}),
                     })
                   }}
                 >
@@ -809,12 +821,13 @@ export function TicketDetail() {
                 </button>
               </div>
             </div>
-          ) : ticket.team_id || ticket.montage_date ? (
+          ) : ticket.team_id || ticket.montage_date || ticket.planned_week ? (
             <p>
               <AreaBadge area={ticket.service_area} />{' '}
               {ticket.team_id ? teamById[ticket.team_id]?.name : 'Kein Team'}
               {ticket.montage_date && <> · {formatDay(ticket.montage_date)}</>}
               {ticket.montage_time && <> · {formatTime(ticket.montage_time)} Uhr</>}
+              {ticket.planned_week && !ticket.montage_date && <> · vorgemerkt {weekLabel(ticket.planned_week)}</>}
             </p>
           ) : (
             <p className="muted">Noch nicht eingeplant.</p>
@@ -1105,7 +1118,7 @@ export function TicketDetail() {
                   {ev.kind === 'status' && <> „{statusLabel(ticket.ticket_type, ev.details as TicketStatus)}"</>}
                   {ev.kind === 'zugewiesen' && <> {ev.details || '–'}</>}
                   {(ev.kind === 'pruefhinweis' || ev.kind === 'loeschantrag') && <> {ev.details}</>}
-                  {(ev.kind === 'auftrag' || ev.kind === 'eingeplant' || ev.kind.startsWith('termin_')) && <> {ev.details || '–'}</>}
+                  {(ev.kind === 'auftrag' || ev.kind === 'eingeplant' || ev.kind === 'kw_vorgemerkt' || ev.kind.startsWith('termin_')) && <> {ev.details || '–'}</>}
                   {(ev.kind === 'berechnet' || ev.kind === 'selbstkosten' || ev.kind === 'position_ergaenzt') && <> {ev.details}</>}
                   {ev.kind === 'erstellt' && <> ({TYPE_LABEL[ticket.ticket_type]})</>}
                   {ev.kind === 'unterschrift' && <> {ev.details}</>}

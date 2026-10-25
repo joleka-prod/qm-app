@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { formatTime, ticketNo, type Ticket } from '../lib/types'
+import { formatTime, ticketNo, weekLabel, type Ticket } from '../lib/types'
 import { jobAddress } from './AddressFields'
 import { AreaBadge, TypeBadge } from './StatusBadge'
 
@@ -7,10 +7,12 @@ interface Props {
   ticket: Ticket
   draggable?: boolean
   showAddress?: boolean
+  // Grobplanung (Einplanung) anzeigen
+  showWeek?: boolean
 }
 
 // Ein Einsatz im Kalender. Planer können ihn per Ziehen auf einen anderen Tag/Monteur verschieben.
-export function JobCard({ ticket: t, draggable, showAddress }: Props) {
+export function JobCard({ ticket: t, draggable, showAddress, showWeek }: Props) {
   const done = t.status === 'abgeschlossen'
   return (
     <Link
@@ -38,6 +40,7 @@ export function JobCard({ ticket: t, draggable, showAddress }: Props) {
           {t.appointment_state === 'bestaetigt' ? '✓ Kunde hat bestätigt' : '☎ beim Kunden angemeldet'}
         </div>
       )}
+      {showWeek && t.planned_week && <div className="job-week">Vorgemerkt {weekLabel(t.planned_week)}</div>}
       {t.customer_name && <div className="job-sub">{t.customer_name}</div>}
       {!!t.ticket_positions?.[0]?.count && <div className="job-sub">{t.ticket_positions[0].count} Pos.</div>}
       {showAddress && jobAddress(t) && <div className="job-sub pre">{jobAddress(t)}</div>}

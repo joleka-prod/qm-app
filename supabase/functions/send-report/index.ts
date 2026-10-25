@@ -12,11 +12,12 @@ const cors = {
 }
 
 const TYPE_LABEL: Record<string, string> = {
+  montageauftrag: 'Montageauftrag',
   restarbeit: 'Restarbeit',
   beanstandung: 'Beanstandung',
   reparatur: 'Reparaturauftrag',
 }
-const TYPE_PREFIX: Record<string, string> = { restarbeit: 'RA', beanstandung: 'BE', reparatur: 'RP' }
+const TYPE_PREFIX: Record<string, string> = { montageauftrag: 'MA', restarbeit: 'RA', beanstandung: 'BE', reparatur: 'RP' }
 const MAX_PHOTOS = 20
 
 function reply(status: number, body: Record<string, unknown>) {

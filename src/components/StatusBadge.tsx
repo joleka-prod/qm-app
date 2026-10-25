@@ -17,7 +17,7 @@ export function StatusBadge({
 }
 
 export function TypeBadge({ type }: { type: TicketType }) {
-  return <span className={`type-tag type-${type}`}>{({ qm: 'QM', restarbeit: 'Restarbeit', beanstandung: 'Beanstandung', reparatur: 'Reparatur' })[type]}</span>
+  return <span className={`type-tag type-${type}`}>{({ qm: 'QM', montageauftrag: 'Montage', restarbeit: 'Restarbeit', beanstandung: 'Beanstandung', reparatur: 'Reparatur' })[type]}</span>
 }
 
 export function AreaBadge({ area }: { area: ServiceArea | null }) {

@@ -195,6 +195,7 @@ fieldset.plan legend { font-weight: 600; padding: 0 0.3rem; }
 fieldset.plan label { display: flex; flex-direction: column; gap: 0.3rem; font-weight: 500; }
 .type-tag { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 0.05rem 0.4rem; border-radius: 4px; vertical-align: middle; }
 .type-qm { background: #e0eaff; color: #2d31a6; }
+.type-montageauftrag { background: #ebe9fe; color: #5925dc; }
 .type-restarbeit { background: #fef0c7; color: #93370d; }
 .type-beanstandung { background: #fee4e2; color: #b42318; }
 .type-reparatur { background: #dcfae6; color: #067647; }
@@ -226,6 +227,7 @@ fieldset.plan label { display: flex; flex-direction: column; gap: 0.3rem; font-w
 .job { display: block; text-decoration: none; color: var(--text); background: var(--card); border: 1px solid var(--border); border-left-width: 4px; border-radius: 6px; padding: 0.3rem 0.4rem; margin-bottom: 0.3rem; font-size: 0.82rem; cursor: pointer; }
 .job[draggable='true'] { cursor: grab; }
 .job:hover { border-color: var(--primary); }
+.job-montageauftrag { border-left-color: #7a5af8; }
 .job-restarbeit { border-left-color: #f79009; }
 .job-beanstandung { border-left-color: #d92d20; }
 .job-reparatur { border-left-color: #12b76a; }
@@ -614,3 +616,19 @@ button.link.danger-link { color: var(--danger); }
   .window-drawing { max-height: 70vh; }
   .wd-glass, .wd-field.active .wd-glass { fill: #fff; stroke: #000; stroke-width: 3; }
 }
+
+/* Einplanung (Grobplanung nach Kalenderwoche) */
+.view-switch { margin-bottom: 0.5rem; }
+@media (min-width: 700px) { .segmented.two.view-switch { grid-template-columns: repeat(2, minmax(0, 15rem)); } }
+.cal-weeks { min-width: 52rem; }
+.cal-weeks td { min-width: 8rem; }
+.week-count { font-size: 0.75rem; font-weight: 600; color: var(--muted); margin: 0.1rem 0 0.3rem; }
+.job-week { font-size: 0.75rem; font-weight: 600; color: #b54708; }
+@media (prefers-color-scheme: dark) { .job-week { color: #fdb022; } }
+.week-range { display: block; font-size: 0.72rem; font-weight: 500; color: var(--muted); }
+.cal-weeks .job-top { flex-wrap: wrap; }
+.week-stack { display: flex; flex-direction: column; order: -1; }
+.week-stack .card { margin-bottom: 0.6rem; }
+.week-stack h3 { text-transform: none; letter-spacing: 0; }
+.week-table { display: none; }
+@media (min-width: 900px) { .week-stack { display: none; } .week-table { display: block; } }

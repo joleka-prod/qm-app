@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, type DragEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { JobCard } from '../components/JobCard'
+import { WeekPlanning } from '../components/WeekPlanning'
 import { holidayName } from '../lib/holidays'
 import { supabase } from '../lib/supabase'
 import { loadMembers, useTeams, type Team, type TeamMember } from '../lib/teams'
@@ -47,6 +48,22 @@ export function PlanningCalendar() {
       return false
     }
   })
+  // Ansicht: taggenau (Montage & Kundendienst) oder Grobplanung nach Woche (Einplanung)
+  const [view, setView] = useState<'tage' | 'einplanung'>(() => {
+    try {
+      return localStorage.getItem('cal-view') === 'einplanung' ? 'einplanung' : 'tage'
+    } catch {
+      return 'tage'
+    }
+  })
+  function changeView(v: 'tage' | 'einplanung') {
+    setView(v)
+    try {
+      localStorage.setItem('cal-view', v)
+    } catch {
+      /* egal */
+    }
+  }
   function toggleTransposed() {
     setTransposed((v) => {
       try {
@@ -75,7 +92,8 @@ export function PlanningCalendar() {
       loadMembers(from, to),
     ])
     setPlanned(((p.data ?? []) as Ticket[]).filter((t) => t.team_id))
-    setUnplanned((u.data ?? []) as Ticket[])
+    // vorgemerkte Wochen zuerst, danach nach Eingang
+    setUnplanned(((u.data ?? []) as Ticket[]).sort((a, b) => (a.planned_week ?? '9').localeCompare(b.planned_week ?? '9')))
     setMembers(m)
   }, [weekStart])
 
@@ -249,15 +267,25 @@ export function PlanningCalendar() {
   return (
     <div className="calendar-page">
       <div className="page-head">
-        <h1>Kalender</h1>
+        <h1>{view === 'einplanung' ? 'Einplanung' : 'Kalender'}</h1>
         <div className="week-nav">
           <button onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Vorige Woche">←</button>
           <button onClick={() => setWeekStart(startOfWeek(new Date()))}>KW {weekNumber(weekStart)}</button>
           <button onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Nächste Woche">→</button>
-          <button onClick={toggleTransposed} title="Zeilen und Spalten tauschen">
-            {transposed ? '⇄ Teams als Zeilen' : '⇄ Teams oben'}
-          </button>
+          {view === 'tage' && (
+            <button onClick={toggleTransposed} title="Zeilen und Spalten tauschen">
+              {transposed ? '⇄ Teams als Zeilen' : '⇄ Teams oben'}
+            </button>
+          )}
         </div>
+      </div>
+      <div className="segmented two view-switch" role="radiogroup" aria-label="Kalender">
+        <button role="radio" aria-checked={view === 'tage'} className={view === 'tage' ? 'active' : ''} onClick={() => changeView('tage')}>
+          Montage &amp; Kundendienst
+        </button>
+        <button role="radio" aria-checked={view === 'einplanung'} className={view === 'einplanung' ? 'active' : ''} onClick={() => changeView('einplanung')}>
+          Einplanung
+        </button>
       </div>
       <div className="segmented three area-filter" role="radiogroup" aria-label="Bereich">
         {(['', ...SERVICE_AREAS] as const).map((a) => (
@@ -272,93 +300,99 @@ export function PlanningCalendar() {
           </button>
         ))}
       </div>
-      {error && <p className="error">{error}</p>}
-      {info && <p className="info">{info}</p>}
-      {installers.length === 0 && (
-        <p className="info">
-          Noch keine Monteure angelegt. Lege unter „Benutzer“ Personen mit der Rolle „Monteur“ an.
-        </p>
-      )}
+      {view === 'einplanung' ? (
+        <WeekPlanning weekStart={weekStart} areaFilter={areaFilter} />
+      ) : (
+        <>
+          {error && <p className="error">{error}</p>}
+          {info && <p className="info">{info}</p>}
+          {installers.length === 0 && (
+            <p className="info">
+              Noch keine Monteure angelegt. Lege unter „Benutzer“ Personen mit der Rolle „Monteur“ an.
+            </p>
+          )}
 
-      <div className="calendar-layout">
-        <section
-          className={`card unplanned ${dropTarget === 'unplanned' ? 'cal-drop' : ''}`}
-          {...dropProps('unplanned', null, null)}
-        >
-          <h2>Ungeplant ({unplanned.length})</h2>
-          <p className="muted small">
-            Am PC: Einsatz auf ein Team und einen Tag ziehen. Am Handy: Einsatz öffnen und unter „Einsatzplanung“ Team und
-            Datum wählen. Ein Team braucht dafür an dem Tag einen verantwortlichen Monteur (★).
-          </p>
-          <div className="unplanned-list">
-            {unplanned.filter((t) => !areaFilter || t.service_area === areaFilter).map((t) => (
-              <div key={t.id}>
-                <JobCard ticket={t} draggable />
-                {t.montage_date && !t.team_id && <div className="muted small">nur Datum: {formatDay(t.montage_date)}</div>}
-              </div>
-            ))}
-            {unplanned.length === 0 && <p className="muted">Alles eingeplant.</p>}
-          </div>
-        </section>
-
-        <div className="cal-scroll">
-          {transposed ? (
-            <table className="cal cal-transposed" style={{ minWidth: `${7.5 + visibleTeams.length * 10}rem` }}>
-              <thead>
-                {!areaFilter && (
-                  <tr className="cal-group">
-                    <th className="cal-corner" />
-                    {areaGroups.map((g, i) => (
-                      <th key={i} colSpan={g.count} className={`area-${g.area}`}>{AREA_LABEL[g.area]}</th>
-                    ))}
-                  </tr>
-                )}
-                <tr>
-                  <th className="cal-corner">Tag</th>
-                  {visibleTeams.map((team) => (
-                    <th key={team.id} className={`cal-team-${team.area}`}>{team.name}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {days.map((d) => (
-                  <tr key={d}>
-                    <th className={`cal-name ${d === today ? 'cal-today' : ''} ${holidayName(d) ? 'cal-holiday' : ''}`}>{dayLabel(d)}</th>
-                    {visibleTeams.map((team) => cell(team, d))}
-                  </tr>
+          <div className="calendar-layout">
+            <section
+              className={`card unplanned ${dropTarget === 'unplanned' ? 'cal-drop' : ''}`}
+              {...dropProps('unplanned', null, null)}
+            >
+              <h2>Ungeplant ({unplanned.length})</h2>
+              <p className="muted small">
+                Am PC: Einsatz auf ein Team und einen Tag ziehen. Am Handy: Einsatz öffnen und unter „Einsatzplanung“ Team und
+                Datum wählen. Ein Team braucht dafür an dem Tag einen verantwortlichen Monteur (★).
+              </p>
+              <div className="unplanned-list">
+                {unplanned.filter((t) => !areaFilter || t.service_area === areaFilter).map((t) => (
+                  <div key={t.id}>
+                    <JobCard ticket={t} draggable showWeek />
+                    {t.montage_date && !t.team_id && <div className="muted small">nur Datum: {formatDay(t.montage_date)}</div>}
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          ) : (
-            <table className="cal">
-              <thead>
-                <tr>
-                  <th className="cal-corner">Team</th>
-                  {days.map((d) => (
-                    <th key={d} className={`${d === today ? 'cal-today' : ''} ${holidayName(d) ? 'cal-holiday' : ''}`}>{dayLabel(d)}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {visibleTeams.map((team, i) => (
-                  <Fragment key={team.id}>
-                    {!areaFilter && (i === 0 || visibleTeams[i - 1].area !== team.area) && (
+                {unplanned.length === 0 && <p className="muted">Alles eingeplant.</p>}
+              </div>
+            </section>
+
+            <div className="cal-scroll">
+              {transposed ? (
+                <table className="cal cal-transposed" style={{ minWidth: `${7.5 + visibleTeams.length * 10}rem` }}>
+                  <thead>
+                    {!areaFilter && (
                       <tr className="cal-group">
-                        <th colSpan={DAYS + 1} className={`area-${team.area}`}>{AREA_LABEL[team.area]}</th>
+                        <th className="cal-corner" />
+                        {areaGroups.map((g, i) => (
+                          <th key={i} colSpan={g.count} className={`area-${g.area}`}>{AREA_LABEL[g.area]}</th>
+                        ))}
                       </tr>
                     )}
                     <tr>
-                      <th className={`cal-name cal-team-${team.area}`}>{team.name}</th>
-                      {days.map((d) => cell(team, d))}
+                      <th className="cal-corner">Tag</th>
+                      {visibleTeams.map((team) => (
+                        <th key={team.id} className={`cal-team-${team.area}`}>{team.name}</th>
+                      ))}
                     </tr>
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+                  </thead>
+                  <tbody>
+                    {days.map((d) => (
+                      <tr key={d}>
+                        <th className={`cal-name ${d === today ? 'cal-today' : ''} ${holidayName(d) ? 'cal-holiday' : ''}`}>{dayLabel(d)}</th>
+                        {visibleTeams.map((team) => cell(team, d))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <table className="cal">
+                  <thead>
+                    <tr>
+                      <th className="cal-corner">Team</th>
+                      {days.map((d) => (
+                        <th key={d} className={`${d === today ? 'cal-today' : ''} ${holidayName(d) ? 'cal-holiday' : ''}`}>{dayLabel(d)}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleTeams.map((team, i) => (
+                      <Fragment key={team.id}>
+                        {!areaFilter && (i === 0 || visibleTeams[i - 1].area !== team.area) && (
+                          <tr className="cal-group">
+                            <th colSpan={DAYS + 1} className={`area-${team.area}`}>{AREA_LABEL[team.area]}</th>
+                          </tr>
+                        )}
+                        <tr>
+                          <th className={`cal-name cal-team-${team.area}`}>{team.name}</th>
+                          {days.map((d) => cell(team, d))}
+                        </tr>
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
 
-      </div>
+          </div>
+        </>
+      )}
 
       {installers.length > 0 && (
         <section className="card">
