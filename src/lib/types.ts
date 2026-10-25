@@ -32,6 +32,8 @@ export interface Ticket {
   montage_time: string | null
   customer_name: string
   customer_email: string
+  customer_phone: string
+  customer_mobile: string
   report_by_email: boolean
   report_sent_at: string | null
   report_send_error: string

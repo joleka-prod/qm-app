@@ -137,6 +137,8 @@ export interface CustomerData {
   customer_city: string
   customer_country: string
   customer_email: string
+  customer_phone: string
+  customer_mobile: string
 }
 
 export const emptyCustomer: CustomerData = {
@@ -149,6 +151,8 @@ export const emptyCustomer: CustomerData = {
   customer_city: '',
   customer_country: DEFAULT_COUNTRY,
   customer_email: '',
+  customer_phone: '',
+  customer_mobile: '',
 }
 
 export function customerOf(t: Ticket): CustomerData {
@@ -162,14 +166,28 @@ export function customerOf(t: Ticket): CustomerData {
     customer_city: t.customer_city,
     customer_country: t.customer_country || DEFAULT_COUNTRY,
     customer_email: t.customer_email,
+    customer_phone: t.customer_phone ?? '',
+    customer_mobile: t.customer_mobile ?? '',
   }
 }
 
-// customer_id nur mitschicken, wenn verknüpft (Aufheben einer Verknüpfung schickt der Aufrufer selbst)
+// customer_id und Telefonnummern nur mitschicken, wenn gefüllt (Leeren schickt der Aufrufer selbst, siehe customerClears)
 export function customerColumns(c: CustomerData) {
   const { customer_id, ...rest } = c
-  const row = Object.fromEntries(Object.entries(rest).map(([k, v]) => [k, v.trim()])) as Omit<CustomerData, 'customer_id'>
-  return customer_id ? { ...row, customer_id } : row
+  const row: Record<string, string | number> = Object.fromEntries(Object.entries(rest).map(([k, v]) => [k, v.trim()]))
+  if (!row.customer_phone) delete row.customer_phone
+  if (!row.customer_mobile) delete row.customer_mobile
+  if (customer_id) row.customer_id = customer_id
+  return row
+}
+
+// Felder, die beim Bearbeiten geleert wurden
+export function customerClears(before: CustomerData, after: CustomerData) {
+  const clear: Record<string, null | string> = {}
+  if (before.customer_id && !after.customer_id) clear.customer_id = null
+  if (before.customer_phone && !after.customer_phone.trim()) clear.customer_phone = ''
+  if (before.customer_mobile && !after.customer_mobile.trim()) clear.customer_mobile = ''
+  return clear
 }
 
 // Daten eines Kunden aus dem Kundenstamm in den Auftrag übernehmen
@@ -184,6 +202,8 @@ export function customerFromMaster(c: Customer): CustomerData {
     customer_city: c.city,
     customer_country: c.country || DEFAULT_COUNTRY,
     customer_email: c.email,
+    customer_phone: c.phone,
+    customer_mobile: c.mobile,
   }
 }
 
@@ -193,6 +213,12 @@ export function CustomerFields({ value, onChange, crm }: { value: CustomerData; 
   const [typing, setTyping] = useState(false)
   const [typingName, setTypingName] = useState(false)
   const [matches, setMatches] = useState<Customer[]>([])
+  // Verknüpfte Kunden werden eingeklappt angezeigt
+  const [expanded, setExpanded] = useState(!value.customer_id)
+  // Kunde von außen gesetzt (z. B. /neu?kunde=…): einklappen
+  useEffect(() => {
+    if (value.customer_id) setExpanded(false)
+  }, [value.customer_id])
   const searchText = crm && typingName && !value.customer_id ? `${value.customer_number || value.customer_name}` : ''
 
   useEffect(() => {
@@ -214,6 +240,7 @@ export function CustomerFields({ value, onChange, crm }: { value: CustomerData; 
   const pick = (c: Customer) => {
     setTypingName(false)
     setMatches([])
+    setExpanded(false)
     onChange(customerFromMaster(c))
   }
 
@@ -230,48 +257,70 @@ export function CustomerFields({ value, onChange, crm }: { value: CustomerData; 
     </ul>
   )
 
+  const linked = crm && !!value.customer_id
+  const summary = [`${value.customer_street} ${value.customer_house_no}`.trim(), `${value.customer_zip} ${value.customer_city}`.trim(),
+    value.customer_country === DEFAULT_COUNTRY ? '' : value.customer_country].filter(Boolean).join(', ')
+
+  // Aus dem Kundenstamm übernommen: kompakte Zusammenfassung statt Eingabefelder
+  if (linked && !expanded) {
+    return (
+      <fieldset className="billing-address customer-box">
+        <legend>Kunde</legend>
+        <div className="customer-summary">
+          <div>
+            <Link to={`/kunden/${value.customer_id}`} className="customer-summary-name">
+              {value.customer_number} · {value.customer_name}
+            </Link>
+            {summary && <div className="small">{summary}</div>}
+            {(value.customer_phone || value.customer_mobile || value.customer_email) && (
+              <div className="small muted">
+                {[value.customer_phone && `☎ ${value.customer_phone}`, value.customer_mobile && `📱 ${value.customer_mobile}`, value.customer_email]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </div>
+            )}
+          </div>
+          <div className="customer-summary-actions">
+            <button type="button" className="link" onClick={() => setExpanded(true)}>Ändern</button>
+            <button type="button" className="link" onClick={() => { onChange(emptyCustomer); setExpanded(true) }}>Anderer Kunde</button>
+          </div>
+        </div>
+      </fieldset>
+    )
+  }
+
   return (
-    <fieldset className="billing-address">
+    <fieldset className="billing-address customer-box">
       <legend>Kunde</legend>
-      {crm && (
-        <p className="small muted customer-link">
-          {value.customer_id ? (
-            <>
-              Verknüpft mit <Link to={`/kunden/${value.customer_id}`}>Kundenakte {value.customer_number}</Link>
-              {' · '}
-              <button type="button" className="link" onClick={() => set({ customer_id: null })}>Verknüpfung lösen</button>
-            </>
-          ) : (
-            'Name oder Kundennummer eintippen, um einen Kunden aus dem Kundenstamm zu übernehmen. Neue Kunden werden beim Speichern angelegt.'
-          )}
-        </p>
-      )}
-      <label>
-        Kundennummer
-        <input
-          value={value.customer_number}
-          maxLength={30}
-          autoComplete="off"
-          onChange={(e) => {
-            setTypingName(true)
-            set({ customer_number: e.target.value })
-          }}
-          onBlur={() => setTypingName(false)}
-        />
-      </label>
-      <label>
-        Name
-        <input
-          value={value.customer_name}
-          maxLength={150}
-          autoComplete="off"
-          onChange={(e) => {
-            setTypingName(true)
-            set({ customer_name: e.target.value })
-          }}
-          onBlur={() => setTypingName(false)}
-        />
-      </label>
+      <div className="row cust-name-row">
+        <label>
+          Kundennr.
+          <input
+            value={value.customer_number}
+            maxLength={30}
+            autoComplete="off"
+            onChange={(e) => {
+              setTypingName(true)
+              set({ customer_number: e.target.value })
+            }}
+            onBlur={() => setTypingName(false)}
+          />
+        </label>
+        <label>
+          Name
+          <input
+            value={value.customer_name}
+            maxLength={150}
+            autoComplete="off"
+            placeholder={crm && !linked ? 'Tippen für Vorschläge aus dem Kundenstamm' : ''}
+            onChange={(e) => {
+              setTypingName(true)
+              set({ customer_name: e.target.value })
+            }}
+            onBlur={() => setTypingName(false)}
+          />
+        </label>
+      </div>
       {suggestions}
       <div className="row street-row">
         <label>
@@ -288,7 +337,7 @@ export function CustomerFields({ value, onChange, crm }: { value: CustomerData; 
           />
         </label>
         <label>
-          Hausnummer
+          Nr.
           <input value={value.customer_house_no} maxLength={20} onChange={(e) => set({ customer_house_no: e.target.value })} />
         </label>
       </div>
@@ -306,7 +355,7 @@ export function CustomerFields({ value, onChange, crm }: { value: CustomerData; 
           })
         }}
       />
-      <div className="row zip-row">
+      <div className="row cust-place-row">
         <label>
           PLZ
           <input inputMode="numeric" value={value.customer_zip} maxLength={10} onChange={(e) => set({ customer_zip: e.target.value })} />
@@ -315,8 +364,18 @@ export function CustomerFields({ value, onChange, crm }: { value: CustomerData; 
           Ort
           <input value={value.customer_city} maxLength={100} onChange={(e) => set({ customer_city: e.target.value })} />
         </label>
+        <CountryInput value={value.customer_country} onChange={(customer_country) => set({ customer_country })} />
       </div>
-      <CountryInput value={value.customer_country} onChange={(customer_country) => set({ customer_country })} />
+      <div className="row">
+        <label>
+          Telefon
+          <input type="tel" value={value.customer_phone} maxLength={50} onChange={(e) => set({ customer_phone: e.target.value })} />
+        </label>
+        <label>
+          Mobil
+          <input type="tel" value={value.customer_mobile} maxLength={50} onChange={(e) => set({ customer_mobile: e.target.value })} />
+        </label>
+      </div>
       <label>
         E-Mail
         <input
@@ -329,6 +388,12 @@ export function CustomerFields({ value, onChange, crm }: { value: CustomerData; 
           placeholder="name@beispiel.de"
         />
       </label>
+      {linked && (
+        <p className="small muted customer-link">
+          Aus <Link to={`/kunden/${value.customer_id}`}>Kundenakte {value.customer_number}</Link>; Änderungen gelten nur für diesen Auftrag.{' '}
+          <button type="button" className="link" onClick={() => setExpanded(false)}>Einklappen</button>
+        </p>
+      )}
     </fieldset>
   )
 }

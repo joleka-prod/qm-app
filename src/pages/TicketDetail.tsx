@@ -14,7 +14,7 @@ import { SelfCostCard } from '../components/SelfCostCard'
 import { TimeCard } from '../components/TimeCard'
 import { DistanceLine } from '../components/DistanceLine'
 import { confirmAddresses } from '../lib/addressCheck'
-import { AddressFields, CustomerFields, addressesToCheck, addressColumns, customerColumns, customerOf, emptyCustomer, type CustomerData, addressComplete, addressLine, addressOf, emptyAddress, jobAddress, type AltAddress } from '../components/AddressFields'
+import { AddressFields, CustomerFields, customerClears, addressesToCheck, addressColumns, customerColumns, customerOf, emptyCustomer, type CustomerData, addressComplete, addressLine, addressOf, emptyAddress, jobAddress, type AltAddress } from '../components/AddressFields'
 import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { deletePhoto, signedUrls, uploadPhotos, uploadSignature } from '../lib/photos'
 import { sendReport } from '../lib/reportMail'
@@ -458,7 +458,7 @@ export function TicketDetail() {
                     if (!(await confirmAddresses(addressesToCheck(cust, jobsiteAddr, billingAddr), before))) return
                   }
                   const linked = einsatz && canEditBase && canUseCrm(profile.role) ? await ensureCustomer(cust) : cust
-                  const unlink = ticket.customer_id && !linked.customer_id ? { customer_id: null } : {}
+                  const unlink = customerClears(customerOf(ticket), linked)
                   const site = einsatz ? { ...customerColumns(linked), ...unlink, ...addressColumns(billingAddr, 'billing'), ...addressColumns(jobsiteAddr, 'jobsite') } : {}
                   const patch = canEditBase ? { ...base, ...site } : ref
                   if (await update(patch)) setEditing(false)
@@ -476,7 +476,7 @@ export function TicketDetail() {
                 {[ticket.customer_number && `Kundennr. ${ticket.customer_number}`, orderRef(ticket)].filter(Boolean).join(' · ')}
               </p>
             )}
-            {einsatz && (ticket.customer_name || ticket.site_address || ticket.customer_email) && (
+            {einsatz && (ticket.customer_name || ticket.site_address || ticket.customer_email || ticket.customer_phone || ticket.customer_mobile) && (
               <p className="small">
                 <span className="muted">Kunde: </span>
                 {ticket.customer_name}
@@ -490,6 +490,12 @@ export function TicketDetail() {
                     {ticket.site_address.replace(/\s*\n\s*/g, ', ')}
                   </a>
                 )}
+                {[ticket.customer_phone, ticket.customer_mobile].filter(Boolean).map((tel) => (
+                  <span key={tel}>
+                    {' · '}
+                    <a href={`tel:${tel.replace(/[^\d+]/g, '')}`}>{tel === ticket.customer_mobile ? '📱' : '☎'} {tel}</a>
+                  </span>
+                ))}
                 {ticket.customer_email && (
                   <>
                     {' · '}

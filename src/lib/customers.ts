@@ -122,6 +122,8 @@ export async function ensureCustomer(c: CustomerData): Promise<CustomerData> {
       city: c.customer_city.trim(),
       country: c.customer_country.trim(),
       email: c.customer_email.trim(),
+      phone: c.customer_phone.trim(),
+      mobile: c.customer_mobile.trim(),
     })
     .select('id, customer_number')
     .single()
