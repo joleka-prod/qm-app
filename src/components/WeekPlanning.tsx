@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react'
+import { holidayName } from '../lib/holidays'
 import { supabase } from '../lib/supabase'
 import { AREA_LABEL, addDays, formatManDays, manDays, isoDate, startOfWeek, weekNumber, type ServiceArea, type Ticket } from '../lib/types'
 import { JobCard } from './JobCard'
@@ -6,19 +7,22 @@ import { weekRange } from './WeekSelect'
 
 const WEEKS = 6
 
-// Kalender "Einplanung" (Kapazitätsplanung, nur Montage): ungeplante Montageaufträge grob einer
+// Kalender "Vorplanung" (Kapazitätsplanung, nur Montage): ungeplante Montageaufträge grob einer
 // Kalenderwoche vormerken. Taggenau eingeplant wird danach im Kalender Montage & Kundendienst.
 export function WeekPlanning({ weekStart }: { weekStart: Date }) {
   const [open, setOpen] = useState<Ticket[]>([])
   const [scheduled, setScheduled] = useState<Ticket[]>([])
   const [error, setError] = useState('')
+  // verfügbare Manntage je Werktag (Monteure in der Montage abzüglich genehmigter Abwesenheit)
+  const [capacity, setCapacity] = useState<{ day: string; installers: number; available: number }[] | null>(null)
   const [dropTarget, setDropTarget] = useState('')
 
   const weeks = useMemo(() => Array.from({ length: WEEKS }, (_, i) => isoDate(addDays(weekStart, i * 7))), [weekStart])
   const thisWeek = isoDate(startOfWeek(new Date()))
 
   const load = useCallback(async () => {
-    const [o, s] = await Promise.all([
+    const last = isoDate(addDays(new Date(weeks[WEEKS - 1] + 'T00:00'), 6))
+    const [o, s, c] = await Promise.all([
       supabase.from('tickets').select('*, ticket_positions(count)').neq('ticket_type', 'qm').eq('service_area', 'montage').eq('status', 'neu').order('created_at'),
       supabase
         .from('tickets')
@@ -28,8 +32,11 @@ export function WeekPlanning({ weekStart }: { weekStart: Date }) {
         .not('team_id', 'is', null)
         .gte('montage_date', weeks[0])
         .lt('montage_date', isoDate(addDays(new Date(weeks[WEEKS - 1] + 'T00:00'), 7))),
+      supabase.rpc('montage_capacity', { p_from: weeks[0], p_to: last }),
     ])
     setOpen((o.data ?? []) as Ticket[])
+    // ohne SQL-Update gibt es die Funktion noch nicht: dann keine Kapazität anzeigen
+    setCapacity(c.error ? null : (c.data as typeof capacity))
     setScheduled((s.data ?? []) as typeof scheduled)
   }, [weeks])
 
@@ -43,7 +50,7 @@ export function WeekPlanning({ weekStart }: { weekStart: Date }) {
       .from('tickets')
       .update({ planned_week: week, ...(area ? { service_area: area } : {}) })
       .eq('id', ticketId)
-    if (error) setError(error.message.includes('planned_week') ? 'Bitte zuerst das SQL-Update für die Einplanung ausführen.' : error.message)
+    if (error) setError(error.message.includes('planned_week') ? 'Bitte zuerst das SQL-Update für die Vorplanung ausführen.' : error.message)
     load()
   }
 
@@ -74,6 +81,11 @@ export function WeekPlanning({ weekStart }: { weekStart: Date }) {
   }
   // Kapazität: Summe der kalkulierten Manntage
   const sumMd = (list: Ticket[]) => list.reduce((n, t) => n + (manDays(t.calc_men, Number(t.calc_days)) ?? 0), 0)
+  const available = (week: string) => {
+    const end = isoDate(addDays(new Date(week + 'T00:00'), 7))
+    return (capacity ?? []).filter((c) => c.day >= week && c.day < end && !holidayName(c.day)).reduce((n, c) => n + c.available, 0)
+  }
+  const booked = (week: string) => sumMd([...jobsIn(week, 'montage'), ...scheduledIn(week, 'montage')])
   const mdText = (list: Ticket[]) => (sumMd(list) > 0 ? ` · ${formatManDays(sumMd(list))}` : '')
 
   return (
@@ -114,6 +126,7 @@ export function WeekPlanning({ weekStart }: { weekStart: Date }) {
               <h2>
                 KW {weekNumber(new Date(w + 'T00:00'))} <span className="muted small">{weekRange(new Date(w + 'T00:00'))}</span>
               </h2>
+              <Capacity booked={booked(w)} available={capacity ? available(w) : null} />
               {areas.map((a) => {
                 const jobs = jobsIn(w, a)
                 const done = scheduledIn(w, a)
@@ -142,9 +155,7 @@ export function WeekPlanning({ weekStart }: { weekStart: Date }) {
                   <th key={w} className={w === thisWeek ? 'cal-today' : ''}>
                     KW {weekNumber(new Date(w + 'T00:00'))}
                     <span className="week-range">{weekRange(new Date(w + 'T00:00'))}</span>
-                    {sumMd([...jobsIn(w, 'montage'), ...scheduledIn(w, 'montage')]) > 0 && (
-                      <span className="week-total">Gesamt {formatManDays(sumMd([...jobsIn(w, 'montage'), ...scheduledIn(w, 'montage')]))}</span>
-                    )}
+                    <Capacity booked={booked(w)} available={capacity ? available(w) : null} />
                   </th>
                 ))}
               </tr>
@@ -174,5 +185,21 @@ export function WeekPlanning({ weekStart }: { weekStart: Date }) {
         </div>
       </div>
     </>
+  )
+}
+
+// Auslastung einer Woche: verplante gegen verfügbare Manntage
+function Capacity({ booked, available }: { booked: number; available: number | null }) {
+  const fmt = (n: number) => n.toLocaleString('de-DE', { maximumFractionDigits: 1 })
+  if (available === null) return booked > 0 ? <span className="week-total">Gesamt {formatManDays(booked)}</span> : null
+  const over = booked > available
+  const pct = available > 0 ? Math.min(100, (booked / available) * 100) : booked > 0 ? 100 : 0
+  return (
+    <span className={`capacity ${over ? 'over' : ''}`} title="Verplante Manntage (vorgemerkt und taggenau) von verfügbaren Manntagen">
+      <span className="capacity-text">
+        {fmt(booked)} / {fmt(available)} MT{over && ` · ${fmt(booked - available)} zu viel`}
+      </span>
+      <span className="capacity-bar"><span style={{ width: `${pct}%` }} /></span>
+    </span>
   )
 }

@@ -48,7 +48,7 @@ export function PlanningCalendar() {
       return false
     }
   })
-  // Ansicht: taggenau (Montage & Kundendienst) oder Grobplanung nach Woche (Einplanung)
+  // Ansicht: taggenau (Montage & Kundendienst) oder Grobplanung nach Woche (Vorplanung)
   const [view, setView] = useState<'tage' | 'einplanung'>(() => {
     try {
       return localStorage.getItem('cal-view') === 'einplanung' ? 'einplanung' : 'tage'
@@ -267,7 +267,7 @@ export function PlanningCalendar() {
   return (
     <div className="calendar-page">
       <div className="page-head">
-        <h1>{view === 'einplanung' ? 'Einplanung' : 'Kalender'}</h1>
+        <h1>{view === 'einplanung' ? 'Vorplanung' : 'Kalender'}</h1>
         <div className="week-nav">
           <button onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Vorige Woche">←</button>
           <button onClick={() => setWeekStart(startOfWeek(new Date()))}>KW {weekNumber(weekStart)}</button>
@@ -284,7 +284,7 @@ export function PlanningCalendar() {
           Montage &amp; Kundendienst
         </button>
         <button role="radio" aria-checked={view === 'einplanung'} className={view === 'einplanung' ? 'active' : ''} onClick={() => changeView('einplanung')}>
-          Einplanung
+          Vorplanung
         </button>
       </div>
       {view === 'tage' && (

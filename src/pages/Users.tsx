@@ -20,12 +20,12 @@ export function Users() {
   const [password, setPw] = useState(generatePassword)
   const [busy, setBusy] = useState(false)
 
-  const [edit, setEdit] = useState<{ id: string; full_name: string; email: string; role: Role; active: boolean; supervisor_id: string; vacation_days: string; weekly_hours: string; overtime_start: string; overtime_opening: string } | null>(null)
+  const [edit, setEdit] = useState<{ id: string; full_name: string; email: string; role: Role; active: boolean; supervisor_id: string; vacation_days: string; weekly_hours: string; overtime_start: string; overtime_opening: string; montage_capacity: boolean } | null>(null)
 
   function startEdit(p: Profile) {
     setError('')
     setNotice('')
-    setEdit({ id: p.id, full_name: p.full_name, email: p.email, role: p.role, active: p.active, supervisor_id: p.supervisor_id ?? '', vacation_days: String(p.vacation_days ?? 0), weekly_hours: String(p.weekly_hours ?? 40).replace('.', ','), overtime_start: p.overtime_start ?? '', overtime_opening: String(p.overtime_opening ?? 0).replace('.', ',') })
+    setEdit({ id: p.id, full_name: p.full_name, email: p.email, role: p.role, active: p.active, supervisor_id: p.supervisor_id ?? '', vacation_days: String(p.vacation_days ?? 0), weekly_hours: String(p.weekly_hours ?? 40).replace('.', ','), overtime_start: p.overtime_start ?? '', overtime_opening: String(p.overtime_opening ?? 0).replace('.', ','), montage_capacity: p.montage_capacity ?? true })
   }
 
   async function saveEdit(e: FormEvent, p: Profile) {
@@ -51,6 +51,7 @@ export function Users() {
       if (opening !== Number(p.overtime_opening)) change.overtime_opening = opening
       if (!edit.overtime_start) throw new Error('Bitte ein Startdatum für das Stundenkonto eintragen.')
       if (edit.overtime_start !== p.overtime_start) change.overtime_start = edit.overtime_start
+      if (edit.montage_capacity !== (p.montage_capacity ?? true)) change.montage_capacity = edit.montage_capacity
       if (Object.keys(change).length > 0) {
         const { error } = await supabase.from('profiles').update(change).eq('id', p.id)
         if (error) throw error
@@ -219,6 +220,16 @@ export function Users() {
                     <input inputMode="decimal" value={edit.overtime_opening} onChange={(e) => setEdit({ ...edit, overtime_opening: e.target.value })} />
                   </label>
                 </div>
+                {edit.role === 'monteur' && (
+                  <label className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={edit.montage_capacity}
+                      onChange={(e) => setEdit({ ...edit, montage_capacity: e.target.checked })}
+                    />
+                    Zählt bei der Kapazitätsplanung Montage mit
+                  </label>
+                )}
                 <label className="checkbox-row">
                   <input
                     type="checkbox"
@@ -246,6 +257,7 @@ export function Users() {
                 <div className="small">
                   {ROLE_LABEL[p.role]}
                   {!p.active && <span className="muted"> · deaktiviert</span>}
+                  {p.role === 'monteur' && p.montage_capacity === false && <span className="muted"> · nicht in der Montage-Kapazität</span>}
                 </div>
                 <div className="small muted">
                   Vorgesetzte(r): {p.supervisor_id ? displayName(byId[p.supervisor_id]) : '–'} · Urlaub: {Number(p.vacation_days)} Tage/Jahr · {Number(p.weekly_hours).toLocaleString('de-DE')} Std./Woche

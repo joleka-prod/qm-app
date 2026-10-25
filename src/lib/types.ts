@@ -14,6 +14,8 @@ export interface Profile {
   supervisor_id: string | null
   vacation_days: number
   weekly_hours: number
+  // zählt bei der Kapazitätsplanung Montage mit (nur Monteure)
+  montage_capacity?: boolean
   overtime_start: string
   overtime_opening: number
   created_at: string
@@ -29,7 +31,7 @@ export interface Ticket {
   installer_id: string | null
   team_id: number | null
   montage_date: string | null
-  // Einplanung: Montag der Kalenderwoche, für die der Auftrag grob vorgemerkt ist
+  // Vorplanung: Montag der Kalenderwoche, für die der Auftrag grob vorgemerkt ist
   planned_week?: string | null
   // kalkulierte Montagezeit (Montageauftrag): Anzahl Monteure und Tage
   calc_men?: number | null

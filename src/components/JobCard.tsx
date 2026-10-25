@@ -7,7 +7,7 @@ interface Props {
   ticket: Ticket
   draggable?: boolean
   showAddress?: boolean
-  // Grobplanung (Einplanung) anzeigen
+  // Grobplanung (Vorplanung) anzeigen
   showWeek?: boolean
 }
 

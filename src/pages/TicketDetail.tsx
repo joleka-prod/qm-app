@@ -784,7 +784,7 @@ export function TicketDetail() {
               )}
               {(area === 'montage' || plannedWeek) && (
                 <label>
-                  Vorgemerkt für (Einplanung Montage)
+                  Vorgemerkt für (Vorplanung Montage)
                   <WeekSelect value={plannedWeek} onChange={setPlannedWeek} />
                 </label>
               )}

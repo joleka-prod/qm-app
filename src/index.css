@@ -617,7 +617,7 @@ button.link.danger-link { color: var(--danger); }
   .wd-glass, .wd-field.active .wd-glass { fill: #fff; stroke: #000; stroke-width: 3; }
 }
 
-/* Einplanung (Grobplanung nach Kalenderwoche) */
+/* Vorplanung (Grobplanung nach Kalenderwoche) */
 .view-switch { margin-bottom: 0.5rem; }
 @media (min-width: 700px) { .segmented.two.view-switch { grid-template-columns: repeat(2, minmax(0, 15rem)); } }
 .cal-weeks { min-width: 52rem; }
@@ -634,3 +634,9 @@ button.link.danger-link { color: var(--danger); }
 @media (min-width: 900px) { .week-stack { display: none; } .week-table { display: block; } }
 .week-total { display: block; font-size: 0.75rem; font-weight: 700; color: #5925dc; }
 @media (prefers-color-scheme: dark) { .week-total { color: #bdb4fe; } }
+.capacity { display: block; margin-top: 0.3rem; font-size: 0.75rem; font-weight: 700; color: #067647; }
+.capacity.over { color: var(--danger); }
+.capacity-bar { display: block; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; margin-top: 0.15rem; }
+.capacity-bar span { display: block; height: 100%; background: #12b76a; }
+.capacity.over .capacity-bar span { background: var(--danger); }
+@media (prefers-color-scheme: dark) { .capacity { color: #75e0a7; } }
