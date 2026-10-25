@@ -1,6 +1,6 @@
 import { OPENING_SHORT, type Opening, type WindowDesign } from '../lib/windows'
 
-// Ansicht von innen, Maße in mm. Öffnungssymbole nach DIN: die Spitze des Dreiecks zeigt zur Bandseite.
+// Ansicht von innen, Maße in mm. Öffnungssymbole: die Spitze des Dreiecks zeigt zur Griffseite (Kipp: nach oben).
 const FRAME = 60
 const SASH = 50
 
@@ -85,9 +85,9 @@ function Field({
       <rect x={f.x} y={f.y} width={f.w} height={f.h} className="wd-frame" />
       {movable && <rect x={g.x} y={g.y} width={g.w} height={g.h} className="wd-sash" />}
       <rect x={glass.x} y={glass.y} width={glass.w} height={glass.h} className="wd-glass" />
-      {hingeLeft && <polyline points={`${s.x + s.w},${s.y} ${s.x},${midY} ${s.x + s.w},${s.y + s.h}`} className="wd-symbol" />}
-      {hingeRight && <polyline points={`${s.x},${s.y} ${s.x + s.w},${midY} ${s.x},${s.y + s.h}`} className="wd-symbol" />}
-      {tilt && <polyline points={`${s.x},${s.y} ${s.x + s.w / 2},${s.y + s.h} ${s.x + s.w},${s.y}`} className="wd-symbol" />}
+      {hingeLeft && <polyline points={`${s.x},${s.y} ${s.x + s.w},${midY} ${s.x},${s.y + s.h}`} className="wd-symbol" />}
+      {hingeRight && <polyline points={`${s.x + s.w},${s.y} ${s.x},${midY} ${s.x + s.w},${s.y + s.h}`} className="wd-symbol" />}
+      {tilt && <polyline points={`${s.x},${s.y + s.h} ${s.x + s.w / 2},${s.y} ${s.x + s.w},${s.y + s.h}`} className="wd-symbol" />}
       {/* Griff gegenüber der Bandseite, beim reinen Kippflügel oben */}
       {hingeLeft && <rect x={s.x + s.w - SASH / 2 - handle / 2} y={midY - handle * 2} width={handle} height={handle * 4} className="wd-handle" />}
       {hingeRight && <rect x={s.x + SASH / 2 - handle / 2} y={midY - handle * 2} width={handle} height={handle * 4} className="wd-handle" />}
