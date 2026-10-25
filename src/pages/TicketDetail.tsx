@@ -17,7 +17,7 @@ import { TimeCard } from '../components/TimeCard'
 import { DistanceLine } from '../components/DistanceLine'
 import { confirmAddresses } from '../lib/addressCheck'
 import { AddressFields, CustomerFields, customerClears, addressesToCheck, addressColumns, customerColumns, customerOf, emptyCustomer, type CustomerData, addressComplete, addressLine, addressOf, emptyAddress, jobAddress, type AltAddress } from '../components/AddressFields'
-import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
+import { StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { deletePhoto, signedUrls, uploadPhotos, uploadSignature } from '../lib/photos'
 import { sendReport } from '../lib/reportMail'
 import { supabase } from '../lib/supabase'
@@ -418,8 +418,7 @@ export function TicketDetail() {
       <section className="card">
         <div className="ticket-row-top">
           <span className="ticket-no">
-            {ticketNo(ticket.id, ticket.ticket_type)} <TypeBadge type={ticket.ticket_type} />{' '}
-            <AreaBadge area={ticket.service_area} />
+            {ticketNo(ticket.id, ticket.ticket_type)} <TypeBadge type={ticket.ticket_type} />
           </span>
           <StatusBadge status={ticket.status} type={ticket.ticket_type} appointment={ticket.appointment_state} billing={ticket.billing_state} />
         </div>
