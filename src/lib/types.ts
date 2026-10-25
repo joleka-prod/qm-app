@@ -31,6 +31,9 @@ export interface Ticket {
   montage_date: string | null
   // Einplanung: Montag der Kalenderwoche, für die der Auftrag grob vorgemerkt ist
   planned_week?: string | null
+  // kalkulierte Montagezeit (Montageauftrag): Anzahl Monteure und Tage
+  calc_men?: number | null
+  calc_days?: number | null
   montage_time: string | null
   customer_name: string
   customer_email: string
@@ -286,6 +289,14 @@ export function formatDay(s: string) {
 
 export function formatTime(t: string | null) {
   return t ? t.slice(0, 5) : ''
+}
+
+export function manDays(men: number | null | undefined, days: number | null | undefined) {
+  return men && days ? men * days : null
+}
+
+export function formatManDays(n: number) {
+  return `${n.toLocaleString('de-DE', { maximumFractionDigits: 1 })} ${n === 1 ? 'Manntag' : 'Manntage'}`
 }
 
 export function weekLabel(iso: string) {

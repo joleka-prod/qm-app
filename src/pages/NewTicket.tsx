@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { confirmAddresses } from '../lib/addressCheck'
+import { CalcTimeFields, calcTimeColumns } from '../components/CalcTimeFields'
 import { AddressFields, CustomerFields, customerFromMaster, addressesToCheck, addressColumns, customerColumns, emptyAddress, emptyCustomer, type AltAddress, type CustomerData } from '../components/AddressFields'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { TeamSelect } from '../components/TeamSelect'
@@ -53,6 +54,8 @@ export function NewTicket() {
   const [teamId, setTeamId] = useState(params.get('team') ?? '')
   const [montageDate, setMontageDate] = useState(params.get('datum') ?? '')
   const [montageTime, setMontageTime] = useState('')
+  const [calcMen, setCalcMen] = useState('')
+  const [calcDays, setCalcDays] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -116,6 +119,8 @@ export function NewTicket() {
         team_id: einsatz && canPlan && teamId ? Number(teamId) : null,
         montage_date: einsatz && canPlan && montageDate ? montageDate : null,
         montage_time: einsatz && canPlan && montageTime ? montageTime : null,
+        // nur senden, wenn ausgefüllt (Spalten gibt es erst nach dem SQL-Update)
+        ...(type === 'montageauftrag' && (calcMen || calcDays) ? calcTimeColumns(calcMen, calcDays) : {}),
       })
       .select('id')
       .single()
@@ -182,6 +187,7 @@ export function NewTicket() {
           {crm && <ProjectPicker value={project} onChange={setProject} customerId={cust.customer_id} allowAuto />}
         </>
       )}
+      {type === 'montageauftrag' && <CalcTimeFields men={calcMen} days={calcDays} onMen={setCalcMen} onDays={setCalcDays} />}
       <div className="row">
         <label>
           Auftragsnummer

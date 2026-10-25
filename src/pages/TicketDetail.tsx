@@ -9,6 +9,7 @@ import { OrderChain } from '../components/OrderChain'
 import { SignaturePad, canvasToBlob } from '../components/SignaturePad'
 import { TeamSelect } from '../components/TeamSelect'
 import { WeekSelect } from '../components/WeekSelect'
+import { CalcTimeFields, calcTimeColumns } from '../components/CalcTimeFields'
 import { AppointmentCard } from '../components/AppointmentCard'
 import { BillingCard } from '../components/BillingCard'
 import { SelfCostCard } from '../components/SelfCostCard'
@@ -30,7 +31,9 @@ import {
   formatDate,
   isEmail,
   formatDay,
+  formatManDays,
   formatTime,
+  manDays,
   weekLabel,
   isEinsatz,
   orderRef,
@@ -119,6 +122,8 @@ export function TicketDetail() {
   const [teamId, setTeamId] = useState('')
   const [montageDate, setMontageDate] = useState('')
   const [plannedWeek, setPlannedWeek] = useState('')
+  const [calcMen, setCalcMen] = useState('')
+  const [calcDays, setCalcDays] = useState('')
   const [montageTime, setMontageTime] = useState('')
   const [report, setReport] = useState('')
   const loadedReport = useRef('')
@@ -176,6 +181,8 @@ export function TicketDetail() {
     }
     setMontageDate(tk.montage_date ?? '')
     setPlannedWeek(tk.planned_week ?? '')
+    setCalcMen(tk.calc_men ? String(tk.calc_men) : '')
+    setCalcDays(tk.calc_days ? String(tk.calc_days) : '')
     setMontageTime(formatTime(tk.montage_time))
     // Ungespeicherten Bericht nicht überschreiben, wenn z. B. nur eine Position abgehakt wurde
     setReport((cur) => (cur === loadedReport.current ? tk.work_report : cur))
@@ -215,12 +222,15 @@ export function TicketDetail() {
     isAdmin || (einsatz && isPlanner && !closed) || (ticket.created_by === profile.id && ticket.status === 'neu')
   const canRequestDeletion = ticket.created_by === profile.id || isLead || isPlanner
   const canEditRef = canEditBase || (isLead && !closed)
+  const calc = calcTimeColumns(calcMen, calcDays)
+  const calcChanged = calc.calc_men !== (ticket.calc_men ?? null) || calc.calc_days !== (ticket.calc_days == null ? null : Number(ticket.calc_days))
   const planDirty =
     teamId !== (ticket.team_id ? String(ticket.team_id) : '') ||
     montageDate !== (ticket.montage_date ?? '') ||
     montageTime !== formatTime(ticket.montage_time) ||
     area !== (ticket.service_area ?? '') ||
-    plannedWeek !== (ticket.planned_week ?? '')
+    plannedWeek !== (ticket.planned_week ?? '') ||
+    calcChanged
   const canEditPositions =
     einsatz && (isAdmin || (isPlanner && !closed) || (ticket.created_by === profile.id && ticket.status === 'neu'))
   const canCheckPositions = einsatz && !closed && (isInstaller || canEditPositions)
@@ -769,6 +779,9 @@ export function TicketDetail() {
                   ))}
                 </div>
               </div>
+              {ticket.ticket_type === 'montageauftrag' && (
+                <CalcTimeFields men={calcMen} days={calcDays} onMen={setCalcMen} onDays={setCalcDays} />
+              )}
               {(area === 'montage' || plannedWeek) && (
                 <label>
                   Vorgemerkt für (Einplanung Montage)
@@ -816,6 +829,7 @@ export function TicketDetail() {
                       ...(area ? { service_area: area } : {}),
                       // erst senden, wenn geändert (Spalte gibt es erst nach dem SQL-Update)
                       ...(plannedWeek !== (ticket.planned_week ?? '') ? { planned_week: plannedWeek || null } : {}),
+                      ...(calcChanged ? calc : {}),
                     })
                   }}
                 >
@@ -833,6 +847,12 @@ export function TicketDetail() {
             </p>
           ) : (
             <p className="muted">Noch nicht eingeplant.</p>
+          )}
+          {!canPlan && !!manDays(ticket.calc_men, ticket.calc_days) && (
+            <p>
+              Kalkulierte Montagezeit: {ticket.calc_men} Mann × {Number(ticket.calc_days).toLocaleString('de-DE')} Tage ={' '}
+              <strong>{formatManDays(manDays(ticket.calc_men, Number(ticket.calc_days))!)}</strong>
+            </p>
           )}
           {ticket.team_id && ticket.montage_date && (
             <p className="small">

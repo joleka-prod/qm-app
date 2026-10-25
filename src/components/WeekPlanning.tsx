@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react'
 import { supabase } from '../lib/supabase'
-import { AREA_LABEL, addDays, isoDate, startOfWeek, weekNumber, type ServiceArea, type Ticket } from '../lib/types'
+import { AREA_LABEL, addDays, formatManDays, manDays, isoDate, startOfWeek, weekNumber, type ServiceArea, type Ticket } from '../lib/types'
 import { JobCard } from './JobCard'
 import { weekRange } from './WeekSelect'
 
@@ -10,7 +10,7 @@ const WEEKS = 6
 // Kalenderwoche vormerken. Taggenau eingeplant wird danach im Kalender Montage & Kundendienst.
 export function WeekPlanning({ weekStart }: { weekStart: Date }) {
   const [open, setOpen] = useState<Ticket[]>([])
-  const [scheduled, setScheduled] = useState<Pick<Ticket, 'id' | 'montage_date' | 'service_area'>[]>([])
+  const [scheduled, setScheduled] = useState<Ticket[]>([])
   const [error, setError] = useState('')
   const [dropTarget, setDropTarget] = useState('')
 
@@ -22,7 +22,7 @@ export function WeekPlanning({ weekStart }: { weekStart: Date }) {
       supabase.from('tickets').select('*, ticket_positions(count)').neq('ticket_type', 'qm').eq('service_area', 'montage').eq('status', 'neu').order('created_at'),
       supabase
         .from('tickets')
-        .select('id, montage_date, service_area')
+        .select('*')
         .neq('ticket_type', 'qm')
         .eq('service_area', 'montage')
         .not('team_id', 'is', null)
@@ -70,8 +70,11 @@ export function WeekPlanning({ weekStart }: { weekStart: Date }) {
   const jobsIn = (week: string, area: ServiceArea) => open.filter((t) => t.planned_week === week && t.service_area === area)
   const scheduledIn = (week: string, area: ServiceArea) => {
     const end = isoDate(addDays(new Date(week + 'T00:00'), 7))
-    return scheduled.filter((t) => t.service_area === area && t.montage_date! >= week && t.montage_date! < end).length
+    return scheduled.filter((t) => t.service_area === area && t.montage_date! >= week && t.montage_date! < end)
   }
+  // Kapazität: Summe der kalkulierten Manntage
+  const sumMd = (list: Ticket[]) => list.reduce((n, t) => n + (manDays(t.calc_men, Number(t.calc_days)) ?? 0), 0)
+  const mdText = (list: Ticket[]) => (sumMd(list) > 0 ? ` · ${formatManDays(sumMd(list))}` : '')
 
   return (
     <>
@@ -117,7 +120,8 @@ export function WeekPlanning({ weekStart }: { weekStart: Date }) {
                 return (
                   <div key={a} className="week-stack-area">
                     <h3>
-                      {AREA_LABEL[a]}: {jobs.length} vorgemerkt{done > 0 && `, ${done} taggenau eingeplant`}
+                      {AREA_LABEL[a]}: {jobs.length} vorgemerkt{mdText(jobs)}
+                      {done.length > 0 && `, ${done.length} taggenau eingeplant${mdText(done)}`}
                     </h3>
                     {jobs.map((t) => (
                       <JobCard key={t.id} ticket={t} />
@@ -138,6 +142,9 @@ export function WeekPlanning({ weekStart }: { weekStart: Date }) {
                   <th key={w} className={w === thisWeek ? 'cal-today' : ''}>
                     KW {weekNumber(new Date(w + 'T00:00'))}
                     <span className="week-range">{weekRange(new Date(w + 'T00:00'))}</span>
+                    {sumMd([...jobsIn(w, 'montage'), ...scheduledIn(w, 'montage')]) > 0 && (
+                      <span className="week-total">Gesamt {formatManDays(sumMd([...jobsIn(w, 'montage'), ...scheduledIn(w, 'montage')]))}</span>
+                    )}
                   </th>
                 ))}
               </tr>
@@ -152,11 +159,11 @@ export function WeekPlanning({ weekStart }: { weekStart: Date }) {
                     const done = scheduledIn(w, a)
                     return (
                       <td key={key} className={`${w === thisWeek ? 'cal-today' : ''} ${dropTarget === key ? 'cal-drop' : ''}`} {...dropProps(key, w, a)}>
-                        {jobs.length > 0 && <div className="week-count">{jobs.length} vorgemerkt</div>}
+                        {jobs.length > 0 && <div className="week-count">{jobs.length} vorgemerkt{mdText(jobs)}</div>}
                         {jobs.map((t) => (
                           <JobCard key={t.id} ticket={t} draggable />
                         ))}
-                        {done > 0 && <div className="week-count muted">{done} taggenau eingeplant</div>}
+                        {done.length > 0 && <div className="week-count muted">{done.length} taggenau eingeplant{mdText(done)}</div>}
                       </td>
                     )
                   })}

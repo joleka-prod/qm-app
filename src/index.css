@@ -632,3 +632,5 @@ button.link.danger-link { color: var(--danger); }
 .week-stack h3 { text-transform: none; letter-spacing: 0; }
 .week-table { display: none; }
 @media (min-width: 900px) { .week-stack { display: none; } .week-table { display: block; } }
+.week-total { display: block; font-size: 0.75rem; font-weight: 700; color: #5925dc; }
+@media (prefers-color-scheme: dark) { .week-total { color: #bdb4fe; } }
