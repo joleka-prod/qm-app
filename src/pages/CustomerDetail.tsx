@@ -48,7 +48,6 @@ const NAME_LABEL: Record<CustomerGroup, [string, string]> = {
   bautraeger: ['Firma *', 'z. B. Eifel Bau GmbH'],
   architekt: ['Büro / Name *', 'z. B. Architekturbüro Schmitz'],
   oeffentlich: ['Behörde / Einrichtung *', 'z. B. Verbandsgemeinde Gerolstein'],
-  grossprojekt: ['Projekt / Bauherr *', 'z. B. Neubau Seniorenresidenz Daun'],
 }
 
 function formOf(c: Customer): CustomerForm {

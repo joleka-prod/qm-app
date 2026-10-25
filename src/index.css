@@ -531,7 +531,6 @@ button.link.danger { color: #b42318; }
 .group-tag.group-bautraeger { background: #fef0c7; color: #93370d; }
 .group-tag.group-architekt { background: #f4ebff; color: #6941c6; }
 .group-tag.group-oeffentlich { background: #dcfae6; color: #067647; }
-.group-tag.group-grossprojekt { background: #fee4e2; color: #b42318; }
 .ticket-row.inactive { opacity: 0.6; }
 .customer-name2 { margin: 0 0 0.4rem; }
 .customer-notes { background: var(--bg); border-radius: 8px; padding: 0.5rem 0.7rem; }
