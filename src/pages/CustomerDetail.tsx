@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { AddressSuggest } from '../components/AddressSuggest'
 import { CustomerProjectsCard, type CustomerProject } from '../components/CustomerProjectsCard'
-import { StatusBadge, TypeBadge } from '../components/StatusBadge'
 import {
   CUSTOMER_GROUPS,
   GROUP_LABEL,
@@ -258,7 +257,7 @@ export function CustomerDetail() {
 
       <ContactsCard customerId={customer.id} contacts={contacts} onChanged={load} />
 
-      <CustomerProjectsCard customerId={customer.id} rows={projects} />
+      <CustomerProjectsCard customerId={customer.id} rows={projects} tickets={tickets} />
 
       <NotesCard
         customerId={customer.id}
@@ -272,32 +271,6 @@ export function CustomerDetail() {
         isAdmin={profile.role === 'admin'}
         onChanged={load}
       />
-
-      <section className="card">
-        <div className="card-head">
-          <h2>Aufträge ({tickets.length})</h2>
-          <Link className="button" to={`/neu?kunde=${customer.id}`}>+ Neuer Auftrag</Link>
-        </div>
-        {tickets.length === 0 ? (
-          <p className="muted">Noch keine Aufträge.</p>
-        ) : (
-          <ul className="history">
-            {tickets.map((t) => (
-              <li key={t.id}>
-                <span className="customer-ticket">
-                  <Link to={`/ticket/${t.id}`}>{ticketNo(t.id, t.ticket_type)}</Link> <TypeBadge type={t.ticket_type} />{' '}
-                  <StatusBadge status={t.status} type={t.ticket_type} appointment={t.appointment_state} billing={t.billing_state} />
-                </span>
-                <span>{t.title}</span>
-                <span className="muted small">
-                  Angelegt {formatDay(t.created_at.slice(0, 10))}
-                  {t.montage_date && ` · Termin ${formatDay(t.montage_date)}`}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
 
       {error && <p className="error">{error}</p>}
       {profile.role === 'admin' && (
