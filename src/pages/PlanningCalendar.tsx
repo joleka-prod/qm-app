@@ -287,21 +287,23 @@ export function PlanningCalendar() {
           Einplanung
         </button>
       </div>
-      <div className="segmented three area-filter" role="radiogroup" aria-label="Bereich">
-        {(['', ...SERVICE_AREAS] as const).map((a) => (
-          <button
-            key={a || 'alle'}
-            role="radio"
-            aria-checked={areaFilter === a}
-            className={`${areaFilter === a ? 'active' : ''} ${a ? `area-btn-${a}` : ''}`}
-            onClick={() => setAreaFilter(a)}
-          >
-            {a ? AREA_LABEL[a] : 'Alle'}
-          </button>
-        ))}
-      </div>
+      {view === 'tage' && (
+        <div className="segmented three area-filter" role="radiogroup" aria-label="Bereich">
+          {(['', ...SERVICE_AREAS] as const).map((a) => (
+            <button
+              key={a || 'alle'}
+              role="radio"
+              aria-checked={areaFilter === a}
+              className={`${areaFilter === a ? 'active' : ''} ${a ? `area-btn-${a}` : ''}`}
+              onClick={() => setAreaFilter(a)}
+            >
+              {a ? AREA_LABEL[a] : 'Alle'}
+            </button>
+          ))}
+        </div>
+      )}
       {view === 'einplanung' ? (
-        <WeekPlanning weekStart={weekStart} areaFilter={areaFilter} />
+        <WeekPlanning weekStart={weekStart} />
       ) : (
         <>
           {error && <p className="error">{error}</p>}

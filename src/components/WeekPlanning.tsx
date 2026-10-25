@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react'
 import { supabase } from '../lib/supabase'
-import { AREA_LABEL, SERVICE_AREAS, addDays, isoDate, startOfWeek, weekNumber, type ServiceArea, type Ticket } from '../lib/types'
+import { AREA_LABEL, addDays, isoDate, startOfWeek, weekNumber, type ServiceArea, type Ticket } from '../lib/types'
 import { JobCard } from './JobCard'
 import { weekRange } from './WeekSelect'
 
 const WEEKS = 6
 
-// Kalender "Einplanung": ungeplante Aufträge grob einer Kalenderwoche vormerken.
-// Taggenau eingeplant wird danach im Kalender Montage/Kundendienst.
-export function WeekPlanning({ weekStart, areaFilter }: { weekStart: Date; areaFilter: ServiceArea | '' }) {
+// Kalender "Einplanung" (Kapazitätsplanung, nur Montage): ungeplante Montageaufträge grob einer
+// Kalenderwoche vormerken. Taggenau eingeplant wird danach im Kalender Montage & Kundendienst.
+export function WeekPlanning({ weekStart }: { weekStart: Date }) {
   const [open, setOpen] = useState<Ticket[]>([])
   const [scheduled, setScheduled] = useState<Pick<Ticket, 'id' | 'montage_date' | 'service_area'>[]>([])
   const [error, setError] = useState('')
@@ -19,11 +19,12 @@ export function WeekPlanning({ weekStart, areaFilter }: { weekStart: Date; areaF
 
   const load = useCallback(async () => {
     const [o, s] = await Promise.all([
-      supabase.from('tickets').select('*, ticket_positions(count)').neq('ticket_type', 'qm').eq('status', 'neu').order('created_at'),
+      supabase.from('tickets').select('*, ticket_positions(count)').neq('ticket_type', 'qm').eq('service_area', 'montage').eq('status', 'neu').order('created_at'),
       supabase
         .from('tickets')
         .select('id, montage_date, service_area')
         .neq('ticket_type', 'qm')
+        .eq('service_area', 'montage')
         .not('team_id', 'is', null)
         .gte('montage_date', weeks[0])
         .lt('montage_date', isoDate(addDays(new Date(weeks[WEEKS - 1] + 'T00:00'), 7))),
@@ -62,8 +63,8 @@ export function WeekPlanning({ weekStart, areaFilter }: { weekStart: Date; areaF
     }
   }
 
-  const areas = SERVICE_AREAS.filter((a) => !areaFilter || a === areaFilter)
-  const inArea = (t: Ticket) => !areaFilter || t.service_area === areaFilter
+  const areas: ServiceArea[] = ['montage']
+  const inArea = (t: Ticket) => t.service_area === 'montage'
   const notMarked = open.filter((t) => !t.planned_week && inArea(t))
   const overdue = open.filter((t) => t.planned_week && t.planned_week < thisWeek && inArea(t))
   const jobsIn = (week: string, area: ServiceArea) => open.filter((t) => t.planned_week === week && t.service_area === area)
@@ -80,7 +81,7 @@ export function WeekPlanning({ weekStart, areaFilter }: { weekStart: Date; areaF
           <h2>Nicht vorgemerkt ({notMarked.length})</h2>
           <p className="muted small">
             Am PC: Auftrag auf eine Kalenderwoche ziehen. Am Handy: Auftrag öffnen und unter „Einsatzplanung“ die Woche wählen.
-            Taggenau eingeplant wird danach unter „Montage & Kundendienst“.
+            Hier stehen nur Montage-Aufträge. Taggenau eingeplant wird danach unter „Montage & Kundendienst“.
           </p>
           {overdue.length > 0 && (
             <>
