@@ -11,7 +11,6 @@ import { uploadPhotos } from '../lib/photos'
 import { useTeams } from '../lib/teams'
 import { supabase } from '../lib/supabase'
 import {
-  AREA_LABEL,
   SERVICE_AREAS,
   TICKET_TYPES,
   TYPE_LABEL,
@@ -205,25 +204,6 @@ export function NewTicket() {
           <span>Positionen</span>
           <PositionsEditor positions={positions} onChange={setPositions} withPhotos />
         </div>
-      )}
-      {einsatz && (
-        <>
-          <div className="field">
-            <span>Bereich</span>
-            <div className="segmented two">
-              {SERVICE_AREAS.map((a) => (
-                <button
-                  type="button"
-                  key={a}
-                  className={(area ?? defaultArea(type)) === a ? 'active' : ''}
-                  onClick={() => setArea(a)}
-                >
-                  {AREA_LABEL[a]}
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
       )}
       {!einsatz && (
         <label>

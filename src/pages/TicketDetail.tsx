@@ -24,7 +24,6 @@ import { supabase } from '../lib/supabase'
 import { useTeams } from '../lib/teams'
 import {
   AREA_LABEL,
-  SERVICE_AREAS,
   appointmentMoveWarning,
   TYPE_LABEL,
   displayName,
@@ -769,16 +768,7 @@ export function TicketDetail() {
           <h2>Einsatzplanung</h2>
           {canPlan ? (
             <div className="form">
-              <div className="field">
-                <span>Bereich</span>
-                <div className="segmented two">
-                  {SERVICE_AREAS.map((a) => (
-                    <button type="button" key={a} className={area === a ? 'active' : ''} onClick={() => setArea(a)}>
-                      {AREA_LABEL[a]}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {/* Bereich ergibt sich aus dem Team (Zuordnung im Kalender), Fabian 2026-10-25 */}
               {ticket.ticket_type === 'montageauftrag' && (
                 <CalcTimeFields men={calcMen} days={calcDays} onMen={setCalcMen} onDays={setCalcDays} />
               )}
@@ -839,7 +829,6 @@ export function TicketDetail() {
             </div>
           ) : ticket.team_id || ticket.montage_date || ticket.planned_week ? (
             <p>
-              <AreaBadge area={ticket.service_area} />{' '}
               {ticket.team_id ? teamById[ticket.team_id]?.name : 'Kein Team'}
               {ticket.montage_date && <> · {formatDay(ticket.montage_date)}</>}
               {ticket.montage_time && <> · {formatTime(ticket.montage_time)} Uhr</>}
