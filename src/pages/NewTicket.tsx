@@ -152,6 +152,7 @@ export function NewTicket() {
           placeholder={einsatz ? 'z. B. Fenster schließt nicht, Griff tauschen' : 'z. B. Kratzer an Gehäuse Charge 4711'}
         />
       </label>
+      {einsatz && <CustomerFields value={cust} onChange={setCust} crm={crm} />}
       <div className="row">
         <label>
           Auftragsnummer
@@ -187,7 +188,6 @@ export function NewTicket() {
               ))}
             </div>
           </div>
-          <CustomerFields value={cust} onChange={setCust} crm={crm} />
           <AddressFields kind="jobsite" value={jobsiteAddr} onChange={setJobsiteAddr} />
           <AddressFields kind="billing" value={billingAddr} onChange={setBillingAddr} />
         </>
