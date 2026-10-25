@@ -15,6 +15,7 @@ export function Layout() {
         <NavLink to="/" className="brand">JOLEKA - Einfach besonders!</NavLink>
         <nav>
           {canUseCrm(profile?.role) && <NavLink to="/kunden">Kunden</NavLink>}
+          {canUseCrm(profile?.role) && <NavLink to="/bauvorhaben">Bauvorhaben</NavLink>}
           {profile?.role === 'monteur' ? (
             <>
               <NavLink to="/" end>Mein Kalender</NavLink>
@@ -24,7 +25,6 @@ export function Layout() {
             <NavLink to="/" end>Aufträge</NavLink>
           )}
           {isPlanner && <NavLink to="/kalender">Kalender</NavLink>}
-          {canUseCrm(profile?.role) && <NavLink to="/bauvorhaben">Bauvorhaben</NavLink>}
           <NavLink to="/zeiterfassung">Zeiterfassung</NavLink>
           {profile?.role === 'admin' && <NavLink to="/fenster">Fenster</NavLink>}
           {profile?.role === 'admin' && <NavLink to="/artikel">Artikel</NavLink>}
