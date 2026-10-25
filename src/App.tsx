@@ -18,6 +18,7 @@ import { TicketDetail } from './pages/TicketDetail'
 import { TicketList } from './pages/TicketList'
 import { Timesheet } from './pages/Timesheet'
 import { Users } from './pages/Users'
+import { Windows } from './pages/Windows'
 
 function Routed() {
   const { session, profile, loading, needsPassword } = useAuth()
@@ -48,6 +49,7 @@ function Routed() {
         <Route path="stundenzettel" element={<Navigate to="/zeiterfassung" replace />} />
         {profile.role === 'admin' && <Route path="benutzer" element={<Users />} />}
         {profile.role === 'admin' && <Route path="artikel" element={<Articles />} />}
+        {profile.role === 'admin' && <Route path="fenster" element={<Windows />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

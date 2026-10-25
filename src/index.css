@@ -579,3 +579,38 @@ button.link.danger-link { color: var(--danger); }
 .project-tickets { list-style: none; margin: 0.4rem 0 0; padding: 0 0 0 0.9rem; border-left: 3px solid var(--border); display: flex; flex-direction: column; gap: 0.45rem; }
 .project-tickets li { display: flex; flex-direction: column; gap: 0.1rem; }
 .project-empty, .project-more { margin: 0.35rem 0 0 0.9rem; }
+
+/* Fenster-Konstruktor */
+.window-layout { display: grid; gap: 0 1rem; }
+@media (min-width: 900px) { .window-layout { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: start; } }
+.window-preview { position: sticky; top: 4.5rem; }
+.window-drawing { display: block; width: 100%; max-height: 60vh; }
+.wd-frame { fill: var(--card); stroke: var(--text); stroke-width: 6; }
+.wd-sash { fill: var(--card); stroke: var(--text); stroke-width: 4; }
+.wd-glass { fill: #dbeafe; stroke: var(--text); stroke-width: 3; }
+.wd-field.active .wd-glass { fill: #bfdbfe; stroke: var(--primary); stroke-width: 8; }
+.wd-symbol { fill: none; stroke: var(--text); stroke-width: 4; }
+.wd-handle { fill: var(--text); }
+.wd-label { fill: var(--muted); font-weight: 700; }
+.wd-dim line { stroke: var(--muted); stroke-width: 3; }
+.wd-dim text { fill: var(--text); }
+.window-spec { width: 100%; border-collapse: collapse; margin-top: 0.6rem; font-size: 0.9rem; }
+.window-spec th { text-align: left; color: var(--muted); font-weight: 500; padding: 0.25rem 0.75rem 0.25rem 0; vertical-align: top; white-space: nowrap; }
+.window-spec td { padding: 0.25rem 0; }
+.window-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0.6rem; }
+.window-row input[readonly] { color: var(--muted); }
+.window-list { list-style: none; margin: 0 0 0.5rem; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.5rem; }
+.window-item { width: 100%; justify-content: flex-start; gap: 0.75rem; text-align: left; }
+.window-item.active { border-color: var(--primary); }
+.window-item .window-drawing { width: 64px; height: 64px; flex: 0 0 64px; }
+.print-only { display: none; }
+@media (prefers-color-scheme: dark) { .wd-glass { fill: #1e3a5f; } .wd-field.active .wd-glass { fill: #24497a; } }
+@media print {
+  .topbar, .app-version, .no-print { display: none !important; }
+  .print-only { display: block; }
+  body, :root { background: #fff; color: #000; }
+  .window-layout { display: block; }
+  .window-preview { position: static; border: none; padding: 0; }
+  .window-drawing { max-height: 70vh; }
+  .wd-glass, .wd-field.active .wd-glass { fill: #fff; stroke: #000; stroke-width: 3; }
+}

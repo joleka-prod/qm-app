@@ -8,7 +8,7 @@ export function Layout() {
   const path = useLocation().pathname
   const isPlanner = isPlannerRole(profile?.role)
   // Kalender und die Startseite der Planer (mit Spalte "Dringender Handlungsbedarf") nutzen die volle Breite
-  const wide = path === '/kalender' || (isPlanner && (path === '/' || path === '/tickets'))
+  const wide = path === '/kalender' || path === '/fenster' || (isPlanner && (path === '/' || path === '/tickets'))
   return (
     <div className="app">
       <header className="topbar">
@@ -26,6 +26,7 @@ export function Layout() {
           {canUseCrm(profile?.role) && <NavLink to="/bauvorhaben">Bauvorhaben</NavLink>}
           {canUseCrm(profile?.role) && <NavLink to="/kunden">Kunden</NavLink>}
           <NavLink to="/zeiterfassung">Zeiterfassung</NavLink>
+          {profile?.role === 'admin' && <NavLink to="/fenster">Fenster</NavLink>}
           {profile?.role === 'admin' && <NavLink to="/artikel">Artikel</NavLink>}
           {profile?.role === 'admin' && <NavLink to="/benutzer">Benutzer</NavLink>}
           <NavLink to="/profil" title={profile ? ROLE_LABEL[profile.role] : ''}>
