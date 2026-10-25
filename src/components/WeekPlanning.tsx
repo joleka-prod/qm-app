@@ -7,7 +7,7 @@ import { weekRange } from './WeekSelect'
 
 const WEEKS = 6
 
-// Kalender "Vorplanung" (Kapazitätsplanung, nur Montage): ungeplante Montageaufträge grob einer
+// Kalender "Vorplanung" (Kapazitätsplanung, nur Auftragsart Montageauftrag): ungeplante Montageaufträge grob einer
 // Kalenderwoche vormerken. Taggenau eingeplant wird danach im Kalender Montage & Kundendienst.
 export function WeekPlanning({ weekStart }: { weekStart: Date }) {
   const [open, setOpen] = useState<Ticket[]>([])
@@ -23,12 +23,11 @@ export function WeekPlanning({ weekStart }: { weekStart: Date }) {
   const load = useCallback(async () => {
     const last = isoDate(addDays(new Date(weeks[WEEKS - 1] + 'T00:00'), 6))
     const [o, s, c] = await Promise.all([
-      supabase.from('tickets').select('*, ticket_positions(count)').neq('ticket_type', 'qm').eq('service_area', 'montage').eq('status', 'neu').order('created_at'),
+      supabase.from('tickets').select('*, ticket_positions(count)').eq('ticket_type', 'montageauftrag').eq('status', 'neu').order('created_at'),
       supabase
         .from('tickets')
         .select('*')
-        .neq('ticket_type', 'qm')
-        .eq('service_area', 'montage')
+        .eq('ticket_type', 'montageauftrag')
         .not('team_id', 'is', null)
         .gte('montage_date', weeks[0])
         .lt('montage_date', isoDate(addDays(new Date(weeks[WEEKS - 1] + 'T00:00'), 7))),
@@ -44,17 +43,17 @@ export function WeekPlanning({ weekStart }: { weekStart: Date }) {
     load()
   }, [load])
 
-  async function mark(ticketId: number, week: string | null, area: ServiceArea | null) {
+  async function mark(ticketId: number, week: string | null) {
     setError('')
     const { error } = await supabase
       .from('tickets')
-      .update({ planned_week: week, ...(area ? { service_area: area } : {}) })
+      .update({ planned_week: week })
       .eq('id', ticketId)
     if (error) setError(error.message.includes('planned_week') ? 'Bitte zuerst das SQL-Update für die Vorplanung ausführen.' : error.message)
     load()
   }
 
-  function dropProps(key: string, week: string | null, area: ServiceArea | null) {
+  function dropProps(key: string, week: string | null) {
     return {
       onDragOver: (e: DragEvent) => {
         e.preventDefault()
@@ -65,19 +64,19 @@ export function WeekPlanning({ weekStart }: { weekStart: Date }) {
         e.preventDefault()
         setDropTarget('')
         const id = Number(e.dataTransfer.getData('text/ticket-id'))
-        if (id) mark(id, week, area)
+        if (id) mark(id, week)
       },
     }
   }
 
   const areas: ServiceArea[] = ['montage']
-  const inArea = (t: Ticket) => t.service_area === 'montage'
+  const inArea = (t: Ticket) => t.ticket_type === 'montageauftrag'
   const notMarked = open.filter((t) => !t.planned_week && inArea(t))
   const overdue = open.filter((t) => t.planned_week && t.planned_week < thisWeek && inArea(t))
-  const jobsIn = (week: string, area: ServiceArea) => open.filter((t) => t.planned_week === week && t.service_area === area)
+  const jobsIn = (week: string, area: ServiceArea) => open.filter((t) => t.planned_week === week && !!area)
   const scheduledIn = (week: string, area: ServiceArea) => {
     const end = isoDate(addDays(new Date(week + 'T00:00'), 7))
-    return scheduled.filter((t) => t.service_area === area && t.montage_date! >= week && t.montage_date! < end)
+    return scheduled.filter((t) => !!area && t.montage_date! >= week && t.montage_date! < end)
   }
   // Kapazität: Summe der kalkulierten Manntage
   const sumMd = (list: Ticket[]) => list.reduce((n, t) => n + (manDays(t.calc_men, Number(t.calc_days)) ?? 0), 0)
@@ -92,11 +91,11 @@ export function WeekPlanning({ weekStart }: { weekStart: Date }) {
     <>
       {error && <p className="error">{error}</p>}
       <div className="calendar-layout">
-        <section className={`card unplanned ${dropTarget === 'none' ? 'cal-drop' : ''}`} {...dropProps('none', null, null)}>
+        <section className={`card unplanned ${dropTarget === 'none' ? 'cal-drop' : ''}`} {...dropProps('none', null)}>
           <h2>Nicht vorgemerkt ({notMarked.length})</h2>
           <p className="muted small">
             Am PC: Auftrag auf eine Kalenderwoche ziehen. Am Handy: Auftrag öffnen und unter „Einsatzplanung“ die Woche wählen.
-            Hier stehen nur Montage-Aufträge. Taggenau eingeplant wird danach unter „Montage & Kundendienst“.
+            Hier stehen nur Montageaufträge. Taggenau eingeplant wird danach unter „Montage & Kundendienst“.
           </p>
           {overdue.length > 0 && (
             <>
@@ -169,7 +168,7 @@ export function WeekPlanning({ weekStart }: { weekStart: Date }) {
                     const jobs = jobsIn(w, a)
                     const done = scheduledIn(w, a)
                     return (
-                      <td key={key} className={`${w === thisWeek ? 'cal-today' : ''} ${dropTarget === key ? 'cal-drop' : ''}`} {...dropProps(key, w, a)}>
+                      <td key={key} className={`${w === thisWeek ? 'cal-today' : ''} ${dropTarget === key ? 'cal-drop' : ''}`} {...dropProps(key, w)}>
                         {jobs.length > 0 && <div className="week-count">{jobs.length} vorgemerkt{mdText(jobs)}</div>}
                         {jobs.map((t) => (
                           <JobCard key={t.id} ticket={t} draggable />

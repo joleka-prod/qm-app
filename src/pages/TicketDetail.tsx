@@ -771,7 +771,7 @@ export function TicketDetail() {
               {ticket.ticket_type === 'montageauftrag' && (
                 <CalcTimeFields men={calcMen} days={calcDays} onMen={setCalcMen} onDays={setCalcDays} />
               )}
-              {(area === 'montage' || plannedWeek) && (
+              {(ticket.ticket_type === 'montageauftrag' || plannedWeek) && (
                 <label>
                   Vorgemerkt für (Vorplanung Montage)
                   <WeekSelect value={plannedWeek} onChange={setPlannedWeek} />
