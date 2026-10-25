@@ -42,6 +42,7 @@ export interface CustomerNote {
   customer_id: number
   contact_id: number | null
   ticket_id: number | null
+  project_id: number | null
   kind: NoteKind
   subject: string
   body: string

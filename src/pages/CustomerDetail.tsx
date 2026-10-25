@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { AddressSuggest } from '../components/AddressSuggest'
-import { EndCustomersCard } from '../components/EndCustomersCard'
+import { CustomerProjectsCard, type CustomerProject } from '../components/CustomerProjectsCard'
 import { StatusBadge, TypeBadge } from '../components/StatusBadge'
 import {
   CUSTOMER_GROUPS,
@@ -20,6 +20,7 @@ import { supabase } from '../lib/supabase'
 import { displayName, formatDate, formatDay, isEmail, isoDate, ticketNo, type Ticket } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 import { GroupBadge } from './Customers'
+import type { Project } from '../lib/projects'
 
 type CustomerForm = Pick<
   Customer,
@@ -70,6 +71,7 @@ export function CustomerDetail() {
   const [contacts, setContacts] = useState<CustomerContact[]>([])
   const [notes, setNotes] = useState<CustomerNote[]>([])
   const [tickets, setTickets] = useState<Ticket[]>([])
+  const [projects, setProjects] = useState<CustomerProject[]>([])
   const [notFound, setNotFound] = useState(false)
   const newForm = () => ({ ...emptyForm, customer_group: CUSTOMER_GROUPS.find((g) => g === params.get('gruppe')) ?? 'privat' })
   const [form, setForm] = useState<CustomerForm | null>(isNew ? newForm : null)
@@ -78,17 +80,26 @@ export function CustomerDetail() {
 
   const load = useCallback(async () => {
     if (isNew) return
-    const [c, p, n, t] = await Promise.all([
+    const [c, p, n, t, pr] = await Promise.all([
       supabase.from('customers').select('*').eq('id', customerId).maybeSingle(),
       supabase.from('customer_contacts').select('*').eq('customer_id', customerId).order('name'),
       supabase.from('customer_notes').select('*').eq('customer_id', customerId).order('created_at', { ascending: false }),
       supabase.from('tickets').select('*').eq('customer_id', customerId).order('created_at', { ascending: false }),
+      supabase
+        .from('project_customers')
+        .select('role, projects(*, project_customers(role, customer_id, customers(id, name, customer_number)), tickets(count))')
+        .eq('customer_id', customerId),
     ])
     if (!c.data) return setNotFound(true)
     setCustomer(c.data as Customer)
     setContacts((p.data ?? []) as CustomerContact[])
     setNotes((n.data ?? []) as CustomerNote[])
     setTickets((t.data ?? []) as Ticket[])
+    setProjects(
+      ((pr.data ?? []) as unknown as CustomerProject[])
+        .filter((r) => r.projects)
+        .sort((a, b) => (a.projects.status === b.projects.status ? b.projects.id - a.projects.id : a.projects.status === 'aktiv' ? -1 : 1)),
+    )
   }, [isNew, customerId])
 
   useEffect(() => {
@@ -247,10 +258,11 @@ export function CustomerDetail() {
 
       <ContactsCard customerId={customer.id} contacts={contacts} onChanged={load} />
 
-      <EndCustomersCard key={customer.id} customer={customer} tickets={tickets} />
+      <CustomerProjectsCard customerId={customer.id} rows={projects} />
 
       <NotesCard
         customerId={customer.id}
+        projects={projects.map((r) => r.projects)}
         me={profile.id}
         notes={notes}
         contacts={contacts}
@@ -473,8 +485,13 @@ function ContactsCard({ customerId, contacts, onChanged }: { customerId: number;
 
 // --- Kommunikation ---
 
+// Auf der Kundenakte: customerId fest, Bauvorhaben wählbar (projects).
+// Auf dem Bauvorhaben: projectId fest, Kunde aus den Beteiligten wählbar (customers).
 interface NotesProps {
-  customerId: number
+  customerId?: number
+  projectId?: number
+  customers?: Pick<Customer, 'id' | 'name' | 'customer_number'>[]
+  projects?: Pick<Project, 'id' | 'name' | 'project_number'>[]
   me: string
   notes: CustomerNote[]
   contacts: CustomerContact[]
@@ -485,8 +502,10 @@ interface NotesProps {
   onChanged: () => Promise<void>
 }
 
-function NotesCard({ customerId, me, notes, contacts, tickets, profiles, byId, isAdmin, onChanged }: NotesProps) {
+export function NotesCard({ customerId, projectId, customers = [], projects = [], me, notes, contacts, tickets, profiles, byId, isAdmin, onChanged }: NotesProps) {
   const [kind, setKind] = useState<NoteKind>('telefon')
+  const [pickCustomer, setPickCustomer] = useState('')
+  const [pickProject, setPickProject] = useState('')
   const [contactId, setContactId] = useState('')
   const [ticketId, setTicketId] = useState('')
   const [subject, setSubject] = useState('')
@@ -506,6 +525,8 @@ function NotesCard({ customerId, me, notes, contacts, tickets, profiles, byId, i
     setBody('')
     setFollowUp('')
     setFollowUser(me)
+    setPickCustomer('')
+    setPickProject('')
     setOpen(false)
   }
 
@@ -514,7 +535,8 @@ function NotesCard({ customerId, me, notes, contacts, tickets, profiles, byId, i
     setBusy(true)
     setError('')
     const { error } = await supabase.from('customer_notes').insert({
-      customer_id: customerId,
+      customer_id: customerId ?? Number(pickCustomer),
+      project_id: projectId ?? (pickProject ? Number(pickProject) : null),
       kind,
       contact_id: contactId ? Number(contactId) : null,
       ticket_id: ticketId ? Number(ticketId) : null,
@@ -546,6 +568,8 @@ function NotesCard({ customerId, me, notes, contacts, tickets, profiles, byId, i
   }
 
   const contactById = Object.fromEntries(contacts.map((c) => [c.id, c]))
+  const customerById = Object.fromEntries(customers.map((c) => [c.id, c]))
+  const projectById = Object.fromEntries(projects.map((p) => [p.id, p]))
   const today = isoDate(new Date())
   const visible = notes.filter((n) => !kindFilter || n.kind === kindFilter)
 
@@ -564,12 +588,34 @@ function NotesCard({ customerId, me, notes, contacts, tickets, profiles, byId, i
               </button>
             ))}
           </div>
+          {!customerId && (
+            <label>
+              Kunde *
+              <select required value={pickCustomer} onChange={(e) => setPickCustomer(e.target.value)}>
+                <option value="">– bitte wählen –</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>{c.customer_number} {c.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          {!projectId && projects.length > 0 && (
+            <label>
+              Bauvorhaben
+              <select value={pickProject} onChange={(e) => setPickProject(e.target.value)}>
+                <option value="">–</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.project_number} {p.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <div className="row">
             <label>
               Ansprechpartner
               <select value={contactId} onChange={(e) => setContactId(e.target.value)}>
                 <option value="">–</option>
-                {contacts.map((c) => (
+                {contacts.filter((c) => !pickCustomer || c.customer_id === Number(pickCustomer)).map((c) => (
                   <option key={c.id} value={c.id}>{c.name}{c.position && ` (${c.position})`}</option>
                 ))}
               </select>
@@ -612,7 +658,7 @@ function NotesCard({ customerId, me, notes, contacts, tickets, profiles, byId, i
           {error && <p className="error">{error}</p>}
           <div className="actions">
             <button type="button" disabled={busy} onClick={reset}>Abbrechen</button>
-            <button className="primary" disabled={busy || (!subject.trim() && !body.trim())}>Eintrag speichern</button>
+            <button className="primary" disabled={busy || (!subject.trim() && !body.trim()) || (!customerId && !pickCustomer)}>Eintrag speichern</button>
           </div>
         </form>
       )}
@@ -643,6 +689,16 @@ function NotesCard({ customerId, me, notes, contacts, tickets, profiles, byId, i
                     {formatDate(n.created_at)} · {n.created_by ? displayName(byId[n.created_by]) : '–'}
                   </span>
                 </div>
+                {projectId && customerById[n.customer_id] && (
+                  <div className="small">
+                    <Link to={`/kunden/${n.customer_id}`}>{customerById[n.customer_id].name}</Link>
+                  </div>
+                )}
+                {!projectId && n.project_id && projectById[n.project_id] && (
+                  <div className="small">
+                    Bauvorhaben <Link to={`/bauvorhaben/${n.project_id}`}>{projectById[n.project_id].project_number} {projectById[n.project_id].name}</Link>
+                  </div>
+                )}
                 {(contact || ticket) && (
                   <div className="small muted">
                     {contact && <>mit {contact.name}</>}

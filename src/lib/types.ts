@@ -39,6 +39,7 @@ export interface Ticket {
   report_send_error: string
   parent_id: number | null
   customer_id: number | null
+  project_id: number | null
   distance_km: number | null
   distance_minutes: number | null
   distance_address: string

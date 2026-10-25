@@ -1,7 +1,7 @@
 -- JOLEKA Service Dashboard: Datenbank leeren und neue Testdaten anlegen (2026-10-24)
 --
 -- 1. Löscht ALLE Aufträge mit Positionen, Fotos-Einträgen, Verlauf, Löschanträgen und Auftragszeiten,
---    außerdem alle Stempelzeiten, Urlaubsanträge und Team-Besetzungen. Auftragsnummern beginnen wieder bei 1.
+--    außerdem alle Stempelzeiten, Urlaubsanträge, Team-Besetzungen, Kunden und Bauvorhaben. Auftragsnummern beginnen wieder bei 1.
 --    Erhalten bleiben: Benutzer (inkl. Vorgesetzte und Urlaubsanspruch), Teams und Artikel.
 --    ACHTUNG: Das lässt sich nicht rückgängig machen.
 -- 2. Legt je 15 Restarbeiten, Beanstandungen und Reparaturaufträge an (Titel beginnen mit "[TEST]").
@@ -18,8 +18,15 @@ truncate table
   public.tickets,
   public.attendance,
   public.vacation_requests,
-  public.team_members
-restart identity;
+  public.team_members,
+  public.ticket_costs,
+  public.attendance_requests,
+  public.customer_notes,
+  public.customer_contacts,
+  public.project_customers,
+  public.projects,
+  public.customers
+restart identity cascade;
 
 do $$
 declare

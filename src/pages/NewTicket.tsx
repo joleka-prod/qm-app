@@ -22,6 +22,8 @@ import {
   canUseCrm,
 } from '../lib/types'
 import { ensureCustomer, type Customer } from '../lib/customers'
+import { ProjectPicker } from '../components/ProjectPicker'
+import type { Project } from '../lib/projects'
 import { useProfiles } from '../lib/useProfiles'
 
 export function NewTicket() {
@@ -69,6 +71,25 @@ export function NewTicket() {
       .then(({ data }) => data && setCust(customerFromMaster(data as Customer)))
   }, [fromCustomer])
 
+  // Aus dem Bauvorhaben: /neu?bv=<id> übernimmt das Bauvorhaben und (wenn eindeutig) den Bauherrn als Kunden
+  const [project, setProject] = useState<Project | null>(null)
+  const fromProject = params.get('bv')
+  useEffect(() => {
+    if (!fromProject) return
+    supabase
+      .from('projects')
+      .select('*, project_customers(role, customers(*))')
+      .eq('id', Number(fromProject))
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return
+        const { project_customers: pcs, ...p } = data as Project & { project_customers: { role: string; customers: Customer | null }[] }
+        setProject(p)
+        const owners = pcs.filter((x) => x.role === 'bauherr' && x.customers)
+        if (owners.length === 1) setCust((c) => (c.customer_id || c.customer_name ? c : customerFromMaster(owners[0].customers!)))
+      })
+  }, [fromProject])
+
   async function submit(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
@@ -87,6 +108,7 @@ export function NewTicket() {
         order_number: orderNumber.trim(),
         position_number: einsatz ? '' : positionNumber.trim(),
         ...customerColumns(einsatz ? (crm ? await ensureCustomer(cust) : cust) : emptyCustomer),
+        ...(einsatz && project ? { project_id: project.id } : {}),
         site_address: '',
         ...addressColumns(einsatz ? billingAddr : emptyAddress, 'billing'),
         ...addressColumns(einsatz ? jobsiteAddr : emptyAddress, 'jobsite'),
@@ -157,6 +179,7 @@ export function NewTicket() {
           <CustomerFields value={cust} onChange={setCust} crm={crm} />
           <AddressFields kind="jobsite" value={jobsiteAddr} onChange={setJobsiteAddr} />
           <AddressFields kind="billing" value={billingAddr} onChange={setBillingAddr} />
+          {crm && <ProjectPicker value={project} onChange={setProject} customerId={cust.customer_id} allowAuto />}
         </>
       )}
       <div className="row">

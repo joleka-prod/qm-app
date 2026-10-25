@@ -6,6 +6,8 @@ import { canUseCrm, isPlannerRole } from './lib/types'
 import { Articles } from './pages/Articles'
 import { CustomerDetail } from './pages/CustomerDetail'
 import { Customers } from './pages/Customers'
+import { ProjectDetail } from './pages/ProjectDetail'
+import { Projects } from './pages/Projects'
 import { InstallerCalendar } from './pages/InstallerCalendar'
 import { Login } from './pages/Login'
 import { NewTicket } from './pages/NewTicket'
@@ -39,6 +41,8 @@ function Routed() {
         <Route path="ticket/:id" element={<TicketDetail />} />
         {canUseCrm(profile.role) && <Route path="kunden" element={<Customers />} />}
         {canUseCrm(profile.role) && <Route path="kunden/:id" element={<CustomerDetail />} />}
+        {canUseCrm(profile.role) && <Route path="bauvorhaben" element={<Projects />} />}
+        {canUseCrm(profile.role) && <Route path="bauvorhaben/:id" element={<ProjectDetail />} />}
         <Route path="profil" element={<ProfilePage />} />
         <Route path="zeiterfassung" element={<Timesheet />} />
         <Route path="stundenzettel" element={<Navigate to="/zeiterfassung" replace />} />

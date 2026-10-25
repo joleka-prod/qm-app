@@ -569,3 +569,5 @@ button.link.danger-link { color: var(--danger); }
 .customer-summary-actions { display: flex; flex-direction: column; align-items: flex-end; }
 .project-group + .project-group { margin-top: 0.75rem; }
 .project-name { font-size: 0.95rem; margin: 0.25rem 0 0; padding-bottom: 0.25rem; border-bottom: 2px solid var(--border); }
+.tel-link { margin-right: 1rem; }
+.history.stacked li { flex-direction: column; gap: 0.1rem; }

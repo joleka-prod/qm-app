@@ -46,6 +46,8 @@ import {
   canUseCrm,
 } from '../lib/types'
 import { ensureCustomer } from '../lib/customers'
+import { ProjectPicker } from '../components/ProjectPicker'
+import { projectLabel, type Project } from '../lib/projects'
 import { useProfiles } from '../lib/useProfiles'
 
 const EVENT_LABEL: Record<string, string> = {
@@ -123,6 +125,8 @@ export function TicketDetail() {
   const [signatureUrl, setSignatureUrl] = useState('')
   const signatureCanvas = useRef<HTMLCanvasElement>(null)
   const [positions, setPositions] = useState<TicketPosition[]>([])
+  const [project, setProject] = useState<Project | null>(null)
+  const [projectDraft, setProjectDraft] = useState<Project | null>(null)
   const [positionDrafts, setPositionDrafts] = useState<PositionDraft[] | null>(null)
   // Monteure ergänzen nur neue Positionen, bestehende bleiben unverändert
   const [appendOnly, setAppendOnly] = useState(false)
@@ -179,7 +183,12 @@ export function TicketDetail() {
     setEvents((e.data ?? []) as TicketEvent[])
     setDeletion(d.data as DeletionRequest | null)
     setPositions((pos.data ?? []) as TicketPosition[])
-  }, [ticketId])
+    if (tk.project_id && canUseCrm(profile?.role)) {
+      const { data: pr } = await supabase.from('projects').select('*').eq('id', tk.project_id).maybeSingle()
+      setProject(pr as Project | null)
+      setProjectDraft(pr as Project | null)
+    }
+  }, [ticketId, profile?.role])
 
   useEffect(() => {
     load()
@@ -424,6 +433,9 @@ export function TicketDetail() {
                 <CustomerFields value={cust} onChange={setCust} crm={canUseCrm(profile.role)} />
                 <AddressFields kind="jobsite" value={jobsiteAddr} onChange={setJobsiteAddr} />
                 <AddressFields kind="billing" value={billingAddr} onChange={setBillingAddr} />
+                {canUseCrm(profile.role) && project && (
+                  <ProjectPicker value={projectDraft} onChange={(p) => p && setProjectDraft(p)} customerId={cust.customer_id} />
+                )}
               </>
             )}
             {canEditBase && !einsatz && (
@@ -443,6 +455,7 @@ export function TicketDetail() {
                   setCust(customerOf(ticket))
                   setBillingAddr(addressOf(ticket, 'billing'))
                   setJobsiteAddr(addressOf(ticket, 'jobsite'))
+                  setProjectDraft(project)
                 }}
               >
                 Abbrechen
@@ -460,7 +473,8 @@ export function TicketDetail() {
                   const linked = einsatz && canEditBase && canUseCrm(profile.role) ? await ensureCustomer(cust) : cust
                   const unlink = customerClears(customerOf(ticket), linked)
                   const site = einsatz ? { ...customerColumns(linked), ...unlink, ...addressColumns(billingAddr, 'billing'), ...addressColumns(jobsiteAddr, 'jobsite') } : {}
-                  const patch = canEditBase ? { ...base, ...site } : ref
+                  const moved = einsatz && projectDraft && projectDraft.id !== ticket.project_id ? { project_id: projectDraft.id } : {}
+                  const patch = canEditBase ? { ...base, ...site, ...moved } : ref
                   if (await update(patch)) setEditing(false)
                 }}
               >
@@ -508,6 +522,12 @@ export function TicketDetail() {
                     <Link to={`/kunden/${ticket.customer_id}`}>Kundenakte</Link>
                   </>
                 )}
+              </p>
+            )}
+            {einsatz && project && (
+              <p className="small">
+                <span className="muted">Bauvorhaben: </span>
+                <Link to={`/bauvorhaben/${project.id}`}>{projectLabel(project)}</Link>
               </p>
             )}
             {einsatz && ticket.jobsite_address_different && (

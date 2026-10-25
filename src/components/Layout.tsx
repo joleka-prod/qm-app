@@ -23,6 +23,7 @@ export function Layout() {
             <NavLink to="/" end>Aufträge</NavLink>
           )}
           {isPlanner && <NavLink to="/kalender">Kalender</NavLink>}
+          {canUseCrm(profile?.role) && <NavLink to="/bauvorhaben">Bauvorhaben</NavLink>}
           {canUseCrm(profile?.role) && <NavLink to="/kunden">Kunden</NavLink>}
           <NavLink to="/zeiterfassung">Zeiterfassung</NavLink>
           {profile?.role === 'admin' && <NavLink to="/artikel">Artikel</NavLink>}
