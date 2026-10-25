@@ -1018,6 +1018,22 @@ await check('Kunden & CRM: Nummer automatisch, Monteur ohne Zugriff, Verlauf unv
   assert.ifError((await qm.c.from('customers').delete().eq('id', c.id)).error)
 })
 
+await check('Endkunden: nur bei Bauträger/GU/Architekt, Projekt oder Auftrag Pflicht, Monteur ohne Zugriff', async () => {
+  const { data: gu } = await lead.c.from('customers').insert({ name: 'GU Test', customer_group: 'generalunternehmer' }).select().single()
+  const { data: pk } = await lead.c.from('customers').insert({ name: 'Familie Endkunde' }).select().single()
+  let r = await worker.c.from('customer_end_customers').insert({ partner_id: gu.id, end_customer_id: pk.id })
+  assert.match(r.error?.message ?? '', /Projekt oder Auftrag/)
+  r = await worker.c.from('customer_end_customers').insert({ partner_id: pk.id, end_customer_id: gu.id, project: 'X' })
+  assert.match(r.error?.message ?? '', /nur Bauträgern/)
+  r = await m1.c.from('customer_end_customers').insert({ partner_id: gu.id, end_customer_id: pk.id, project: 'X' })
+  assert.ok(r.error)
+  const { data, error } = await worker.c.from('customer_end_customers').insert({ partner_id: gu.id, end_customer_id: pk.id, project: ' Wohnpark ' }).select().single()
+  assert.ifError(error)
+  assert.equal(data.project, 'Wohnpark')
+  assert.equal(data.created_by, worker.id)
+  await admin.from('customers').delete().in('id', [gu.id, pk.id])
+})
+
 // Testteams wieder entfernen, damit sie nicht im Kalender auftauchen
 await admin.from('tickets').update({ team_id: null }).in('team_id', [T1, T2])
 await admin.from('teams').delete().in('id', [T1, T2])

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { AddressSuggest } from '../components/AddressSuggest'
+import { EndCustomersCard } from '../components/EndCustomersCard'
 import { StatusBadge, TypeBadge } from '../components/StatusBadge'
 import {
   CUSTOMER_GROUPS,
@@ -245,6 +246,8 @@ export function CustomerDetail() {
       )}
 
       <ContactsCard customerId={customer.id} contacts={contacts} onChanged={load} />
+
+      <EndCustomersCard key={customer.id} customer={customer} tickets={tickets} />
 
       <NotesCard
         customerId={customer.id}
