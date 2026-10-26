@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { TerminalAdmin } from '../components/TerminalAdmin'
-import { createUser, deleteUser, generatePassword, setPassword, updateEmail } from '../lib/adminUsers'
+import { deleteUser, generatePassword, setPassword, updateEmail } from '../lib/adminUsers'
 import { formatBadge, nfcSupported, normalizeBadge, startNfc } from '../lib/nfc'
 import { supabase } from '../lib/supabase'
 import { ROLE_LABEL, displayName, type Profile, type Role } from '../lib/types'
@@ -16,11 +16,6 @@ export function Users() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
-  const [showForm, setShowForm] = useState(false)
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [role, setRole] = useState<Role>('mitarbeiter')
-  const [password, setPw] = useState(generatePassword)
   const [busy, setBusy] = useState(false)
 
   const [edit, setEdit] = useState<{ id: string; full_name: string; email: string; role: Role; active: boolean; supervisor_id: string; vacation_days: string; weekly_hours: string; overtime_start: string; overtime_opening: string; montage_capacity: boolean; hr_access: boolean; badge: string; pin: string; removePin: boolean } | null>(null)
@@ -58,6 +53,7 @@ export function Users() {
 
   // aus der Personalakte: /personal?ansicht=benutzer&bearbeiten=<id> öffnet den Benutzer direkt
   const [params] = useSearchParams()
+  const navigate = useNavigate()
   const opened = useRef(false)
   useEffect(() => {
     const id = params.get('bearbeiten')
@@ -127,24 +123,29 @@ export function Users() {
     setBusy(false)
   }
 
-  async function submit(e: FormEvent) {
-    e.preventDefault()
+  // App-Benutzer gibt es nur zu einem Mitarbeiter (Fabian, 2026-10-26): Benutzer ohne Akte bekommen eine
+  const [files, setFiles] = useState<Record<string, number>>({})
+  const loadFiles = useCallback(async () => {
+    const { data } = await supabase.from('employees').select('id, user_id').not('user_id', 'is', null)
+    setFiles(Object.fromEntries((data ?? []).map((r) => [r.user_id as string, r.id as number])))
+  }, [])
+  useEffect(() => {
+    loadFiles()
+  }, [loadFiles])
+
+  async function createFile(p: Profile) {
+    const parts = (p.full_name || '').trim().split(/\s+/)
+    const last = parts.length > 1 ? parts.pop()! : ''
     setBusy(true)
     setError('')
-    setNotice('')
-    try {
-      await createUser({ email: email.trim(), full_name: name.trim(), role, password })
-      setNotice(`${name.trim()} wurde angelegt. Zugangsdaten zum Weitergeben: E-Mail ${email.trim()} · Passwort ${password}`)
-      setName('')
-      setEmail('')
-      setRole('mitarbeiter')
-      setPw(generatePassword())
-      setShowForm(false)
-      reload()
-    } catch (err) {
-      setError((err as Error).message)
-    }
+    const { data, error } = await supabase
+      .from('employees')
+      .insert({ user_id: p.id, first_name: parts.join(' '), last_name: last, status: p.active ? 'Aktiv' : 'nicht aktiv', vacation_days: p.vacation_days ?? null })
+      .select('id')
+      .single()
     setBusy(false)
+    if (error) return setError(error.message)
+    navigate(`/personal/${data.id}`)
   }
 
   async function resetPassword(p: Profile) {
@@ -180,44 +181,8 @@ export function Users() {
     <div>
       <div className="page-head">
         <h1>App-Benutzer</h1>
-        {!showForm && <button className="primary" onClick={() => setShowForm(true)}>+ Neuer Benutzer</button>}
       </div>
-
-      {showForm && (
-        <form className="card form" onSubmit={submit}>
-          <h2>Neuen Benutzer anlegen</h2>
-          <label>
-            Name
-            <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Vorname Nachname" />
-          </label>
-          <label>
-            E-Mail
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-          </label>
-          <label>
-            Rolle
-            <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-              {ROLES.map((r) => (
-                <option key={r} value={r}>{ROLE_LABEL[r]}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Startpasswort
-            <div className="input-with-button">
-              <input required minLength={8} value={password} onChange={(e) => setPw(e.target.value)} />
-              <button type="button" onClick={() => setPw(generatePassword())}>Neu</button>
-            </div>
-          </label>
-          <p className="muted small">
-            Gib der Person E-Mail und Startpasswort weiter. Sie kann das Passwort danach unter „Mein Profil“ ändern.
-          </p>
-          <div className="actions">
-            <button type="button" onClick={() => setShowForm(false)} disabled={busy}>Abbrechen</button>
-            <button className="primary" disabled={busy}>{busy ? 'Legt an…' : 'Anlegen'}</button>
-          </div>
-        </form>
-      )}
+      <p className="muted small">Neue App-Benutzer legst du in der Personalakte des Mitarbeiters an (Personal → Mitarbeiter → „App-Benutzer anlegen“).</p>
 
       {notice && <p className="info notice">{notice}</p>}
       {error && <p className="error">{error}</p>}
@@ -354,7 +319,17 @@ export function Users() {
             <li key={p.id} id={`user-${p.id}`} className={`card user-row ${p.active ? '' : 'inactive'}`}>
               <div>
                 <div className="ticket-title">{p.full_name || <span className="muted">(kein Name)</span>}</div>
-                <div className="muted small">{p.email}</div>
+                <div className="muted small">
+                  {p.email} ·{' '}
+                  {files[p.id] ? (
+                    <Link to={`/personal/${files[p.id]}`}>Personalakte</Link>
+                  ) : (
+                    <>
+                      <span style={{ color: 'var(--danger)' }}>keine Personalakte</span>{' '}
+                      <button type="button" className="link" disabled={busy} onClick={() => createFile(p)}>anlegen</button>
+                    </>
+                  )}
+                </div>
                 <div className="small">
                   {ROLE_LABEL[p.role]}
                   {!p.active && <span className="muted"> · deaktiviert</span>}
