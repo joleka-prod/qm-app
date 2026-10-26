@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-// Testseite (nur Admin, ohne Menüpunkt): prüft am Android-Handy in Chrome, ob vorhandene Chips
+// Testseite (ohne Anmeldung, ohne Menüpunkt): prüft am Android-Handy in Chrome, ob vorhandene Chips
 // (z. B. SimonsVoss mit MIFARE) über Web NFC gelesen werden und welche Seriennummer sie liefern.
 
 interface NdefReader {

@@ -24,6 +24,13 @@ import { NfcTest } from './pages/NfcTest'
 function Routed() {
   const { session, profile, loading, needsPassword } = useAuth()
 
+  // NFC-Test ist ohne Anmeldung erreichbar (liest nur den Chip, keine Daten)
+  if (window.location.pathname === '/nfc-test')
+    return (
+      <main className="content">
+        <NfcTest />
+      </main>
+    )
   if (loading) return <p className="center muted">Lädt…</p>
   if (!session) return <Login />
   if (needsPassword) return <SetPassword />
@@ -51,7 +58,6 @@ function Routed() {
         {profile.role === 'admin' && <Route path="benutzer" element={<Users />} />}
         {profile.role === 'admin' && <Route path="artikel" element={<Articles />} />}
         {profile.role === 'admin' && <Route path="fenster" element={<Windows />} />}
-        {profile.role === 'admin' && <Route path="nfc-test" element={<NfcTest />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
