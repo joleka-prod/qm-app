@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { createUser, generatePassword } from '../lib/adminUsers'
 import { normalizeBadge } from '../lib/nfc'
+import { PERSONNEL_FIELDS } from '../lib/personnel'
 import { supabase } from '../lib/supabase'
 import { ROLE_LABEL, type Role } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
@@ -79,6 +80,8 @@ function guessRole(v: string): Role {
 
 interface Planned {
   key: string
+  row: NinoxRow
+  existingId: string | null
   name: string
   email: string
   role: Role
@@ -96,6 +99,7 @@ interface Done {
   password: string
   error: string
   noLogin: boolean
+  fileOnly?: boolean
 }
 
 export function UserImport() {
@@ -111,6 +115,9 @@ export function UserImport() {
   const [roleMap, setRoleMap] = useState<Record<string, Role>>({})
   const [skip, setSkip] = useState<Set<string>>(new Set())
   const [terminalOnly, setTerminalOnly] = useState(true)
+  // Personalakte: Ninox-Spalte je Feld; alles Übrige landet unter "Weitere Angaben"
+  const [pmap, setPmap] = useState<Record<string, string>>({})
+  const [withFile, setWithFile] = useState(true)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState('')
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
@@ -173,6 +180,12 @@ export function UserImport() {
       // Vor- und Nachname getrennt vorhanden: kein vollständiger Name nötig
       if (m.vorname && m.nachname && m.name && /mitarbeiter/i.test(m.name)) delete m.name
       setMap(m)
+      const pm: Record<string, string> = {}
+      for (const f of PERSONNEL_FIELDS) {
+        const c = cols.find((c) => f.guess.test(c) && !Object.values(pm).includes(c))
+        if (c) pm[f.key] = c
+      }
+      setPmap(pm)
       setSkip(new Set())
     })
   }, [table])
@@ -191,7 +204,7 @@ export function UserImport() {
 
   const planned: Planned[] = useMemo(() => {
     if (!rows) return []
-    const emails = new Set(profiles.map((p) => p.email.toLowerCase()))
+    const emails = new Map(profiles.map((p) => [p.email.toLowerCase(), p.id]))
     const names = new Set(profiles.map((p) => p.full_name.trim().toLowerCase()).filter(Boolean))
     const seen = new Set<string>()
     return rows.map((r) => {
@@ -200,6 +213,8 @@ export function UserImport() {
       const roleText = val(r, 'rolle')
       const p: Planned = {
         key: r.id,
+        row: r,
+        existingId: email ? emails.get(email) ?? null : null,
         name,
         email,
         role: roleText ? roleMap[roleText] ?? guessRole(roleText) : 'mitarbeiter',
@@ -212,7 +227,8 @@ export function UserImport() {
       }
       if (!name) [p.status, p.problem] = ['fehler', 'Name fehlt']
       else if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) [p.status, p.problem] = ['fehler', `E-Mail ungültig: ${email}`]
-      else if (email && (emails.has(email) || seen.has(email))) [p.status, p.problem] = ['vorhanden', 'E-Mail gibt es schon']
+      else if (email && emails.has(email)) [p.status, p.problem] = ['vorhanden', withFile ? 'Benutzer gibt es schon – nur Personalakte ergänzen' : 'E-Mail gibt es schon']
+      else if (email && seen.has(email)) [p.status, p.problem] = ['fehler', 'E-Mail doppelt in Ninox']
       else if (!email && !terminalOnly) [p.status, p.problem] = ['fehler', 'Keine E-Mail']
       else if (names.has(name.toLowerCase())) [p.status, p.problem] = ['name-vorhanden', 'Gleicher Name gibt es schon']
       if (p.weekly !== null && (p.weekly < 0 || p.weekly > 60)) p.weekly = null
@@ -221,12 +237,39 @@ export function UserImport() {
       if (email) seen.add(email)
       return p
     })
-  }, [rows, map, roleMap, profiles, terminalOnly])
+  }, [rows, map, roleMap, profiles, terminalOnly, withFile])
 
   // Neue werden angelegt; bei gleichem Namen nur, wenn ausdrücklich angehakt
   const isChosen = (p: Planned) =>
     p.status === 'neu' ? !skip.has(p.key) : p.status === 'name-vorhanden' ? skip.has(p.key) : false
   const chosen = planned.filter(isChosen)
+  // Bereits vorhandene Benutzer (gleiche E-Mail): nur Personalakte ergänzen, wenn noch keine da ist
+  const fileOnly = withFile ? planned.filter((p) => p.status === 'vorhanden' && p.existingId && !skip.has(p.key)) : []
+
+  function personnelRow(userId: string, r: NinoxRow) {
+    const row: Record<string, unknown> = { user_id: userId, source: r.fields }
+    // Spalten, die schon Feldern der Akte oder des Benutzers zugeordnet sind, nicht doppelt unter "Weitere Angaben"
+    const used = new Set([...Object.values(pmap), ...Object.values(map)])
+    for (const f of PERSONNEL_FIELDS) {
+      const col = pmap[f.key]
+      if (!col) continue
+      const v = text(r.fields[col])
+      row[f.key] = f.type === 'date' ? date(v) : f.type === 'number' ? number(v) : f.key === 'iban' ? v.replace(/\s+/g, '').toUpperCase() : v
+    }
+    row.extra = Object.fromEntries(
+      Object.entries(r.fields)
+        .filter(([k, v]) => !used.has(k) && text(v) !== '')
+        .map(([k, v]) => [k, text(v)]),
+    )
+    return row
+  }
+
+  async function saveFile(userId: string, r: NinoxRow, onlyIfMissing: boolean) {
+    const { error } = await supabase
+      .from('personnel_files')
+      .upsert(personnelRow(userId, r), { onConflict: 'user_id', ignoreDuplicates: onlyIfMissing })
+    if (error) throw new Error(`Personalakte nicht übernommen: ${error.message.includes('number_idx') ? 'Personalnummer doppelt' : error.message}`)
+  }
 
   function toggle(p: Planned) {
     setSkip((s) => {
@@ -238,9 +281,9 @@ export function UserImport() {
   }
 
   async function runImport() {
-    if (!confirm(`${chosen.length} Benutzer anlegen?`)) return
+    if (!confirm(`${chosen.length} Benutzer anlegen${fileOnly.length ? ` und ${fileOnly.length} Personalakten für vorhandene Benutzer ergänzen` : ''}?`)) return
     setError('')
-    setProgress({ done: 0, total: chosen.length })
+    setProgress({ done: 0, total: chosen.length + fileOnly.length })
     const out: Done[] = []
     for (const p of chosen) {
       const password = generatePassword()
@@ -260,11 +303,21 @@ export function UserImport() {
           const { error } = await supabase.rpc('set_terminal_badge', { p_user: id, p_badge: p.chip })
           if (error) throw new Error(`angelegt, aber Chip nicht übernommen: ${error.message}`)
         }
+        if (withFile) await saveFile(id, p.row, false).catch((err) => { throw new Error(`angelegt, aber ${err.message}`) })
         out.push({ name: p.name, email: noLogin ? '' : email, password: noLogin ? '' : password, error: '', noLogin })
       } catch (err) {
         out.push({ name: p.name, email: p.email, password: '', error: (err as Error).message, noLogin })
       }
-      setProgress({ done: out.length, total: chosen.length })
+      setProgress({ done: out.length, total: chosen.length + fileOnly.length })
+    }
+    for (const p of fileOnly) {
+      try {
+        await saveFile(p.existingId!, p.row, true)
+        out.push({ name: p.name, email: p.email, password: '', error: '', noLogin: false, fileOnly: true })
+      } catch (err) {
+        out.push({ name: p.name, email: p.email, password: '', error: (err as Error).message, noLogin: false, fileOnly: true })
+      }
+      setProgress({ done: out.length, total: chosen.length + fileOnly.length })
     }
     setDone(out)
     setProgress(null)
@@ -275,7 +328,7 @@ export function UserImport() {
     if (!done) return
     const q = (s: string) => `"${s.replace(/"/g, '""')}"`
     const lines = ['Name;E-Mail;Startpasswort;Hinweis', ...done.map((d) =>
-      [d.name, d.email, d.password, d.error || (d.noLogin ? 'nur Stempel-Terminal' : '')].map(q).join(';'))]
+      [d.name, d.email, d.password, d.error || (d.noLogin ? 'nur Stempel-Terminal' : d.fileOnly ? 'schon vorhanden, Personalakte ergänzt' : '')].map(q).join(';'))]
     const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
@@ -285,7 +338,8 @@ export function UserImport() {
   }
 
   if (done) {
-    const ok = done.filter((d) => !d.error)
+    const ok = done.filter((d) => !d.error && !d.fileOnly)
+    const created = done.filter((d) => !d.fileOnly)
     return (
       <div>
         <div className="page-head">
@@ -294,7 +348,8 @@ export function UserImport() {
         </div>
         <section className="card">
           <p>
-            {ok.length} von {done.length} Benutzern angelegt. Lade die Zugangsdaten jetzt herunter: Die Startpasswörter werden nur
+            {ok.length} von {created.length} Benutzern angelegt
+            {done.length > created.length && `, ${done.filter((d) => d.fileOnly && !d.error).length} Personalakten für vorhandene Benutzer ergänzt`}. Lade die Zugangsdaten jetzt herunter: Die Startpasswörter werden nur
             hier angezeigt.
           </p>
           <div className="actions">
@@ -310,7 +365,7 @@ export function UserImport() {
                   <tr key={i} className={d.error ? 'import-error' : ''}>
                     <td>{d.name}</td>
                     <td>{d.noLogin ? <span className="muted">nur Stempel-Terminal</span> : d.email}</td>
-                    <td><code>{d.password}</code></td>
+                    <td>{d.fileOnly ? <span className="muted">schon vorhanden, Personalakte ergänzt</span> : <code>{d.password}</code>}</td>
                     <td className="small">{d.error}</td>
                   </tr>
                 ))}
@@ -390,6 +445,30 @@ export function UserImport() {
                 </div>
               </>
             )}
+            <h3>Personalakte</h3>
+            <label className="checkbox-row">
+              <input type="checkbox" checked={withFile} onChange={(e) => setWithFile(e.target.checked)} />
+              Alle Daten in die Personalakte übernehmen (auch für Benutzer, die es schon gibt und noch keine Akte haben)
+            </label>
+            {withFile && (
+              <>
+                <p className="muted small">
+                  Zugeordnete Spalten kommen in die passenden Felder, alle übrigen Spalten unter „Weitere Angaben“. Der
+                  vollständige Ninox-Datensatz wird zusätzlich gespeichert.
+                </p>
+                <div className="import-map">
+                  {PERSONNEL_FIELDS.map((f) => (
+                    <label key={f.key}>
+                      {f.label}
+                      <select value={pmap[f.key] ?? ''} onChange={(e) => setPmap({ ...pmap, [f.key]: e.target.value })}>
+                        <option value="">– nicht zuordnen –</option>
+                        {columns.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
             <label className="checkbox-row">
               <input type="checkbox" checked={terminalOnly} onChange={(e) => setTerminalOnly(e.target.checked)} />
               Mitarbeiter ohne E-Mail trotzdem anlegen (nur Stempel-Terminal mit Chip/PIN, keine Anmeldung in der App)
@@ -415,8 +494,8 @@ export function UserImport() {
                       <td>
                         <input
                           type="checkbox"
-                          checked={isChosen(p)}
-                          disabled={p.status === 'fehler' || p.status === 'vorhanden'}
+                          checked={isChosen(p) || (p.status === 'vorhanden' && withFile && !!p.existingId && !skip.has(p.key))}
+                          disabled={p.status === 'fehler' || (p.status === 'vorhanden' && !withFile)}
                           onChange={() => toggle(p)}
                         />
                       </td>
@@ -437,8 +516,8 @@ export function UserImport() {
               {progress ? (
                 <span>Lege an… {progress.done} / {progress.total}</span>
               ) : (
-                <button className="primary" disabled={chosen.length === 0} onClick={runImport}>
-                  {chosen.length} Benutzer anlegen
+                <button className="primary" disabled={chosen.length + fileOnly.length === 0} onClick={runImport}>
+                  {chosen.length} Benutzer anlegen{fileOnly.length > 0 && ` + ${fileOnly.length} Akten ergänzen`}
                 </button>
               )}
             </div>
