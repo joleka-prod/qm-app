@@ -684,3 +684,34 @@ button.link.danger-link { color: var(--danger); }
 .terminal-creds legend { font-weight: 600; padding: 0 0.3rem; }
 .terminal-list { list-style: none; padding: 0; margin: 0 0 0.75rem; }
 .terminal-list li { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+
+/* Personal (Aufbau wie die Ninox-Mitarbeiterdatenbank) */
+.import-map { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.6rem; }
+.import-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.import-table th, .import-table td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.import-table th.num, .import-table td.num { text-align: right; }
+.import-table tr.import-error td { color: var(--danger); }
+.import-table tr.clickable { cursor: pointer; }
+.import-table tr.clickable:hover td { background: var(--info-bg); }
+.emp-tabs { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.emp-tabs button { border-radius: 6px; }
+.emp-tabs button.active { background: var(--text); color: var(--card); border-color: var(--text); font-weight: 600; }
+.emp-section + .emp-section { margin-top: 1rem; }
+.emp-heading { text-align: center; text-transform: none; letter-spacing: 0; font-size: 1rem; color: var(--text); padding-bottom: 0.3rem; border-bottom: 3px dotted var(--text); margin: 1.2rem 0 0.75rem; }
+.emp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0.6rem 0.9rem; align-items: end; }
+.emp-grid label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.85rem; min-width: 0; }
+.emp-grid label.wide { grid-column: span 2; }
+.emp-grid input[readonly] { background: var(--bg); }
+.emp-sub { margin-top: 0.8rem; }
+.emp-sub-title { font-size: 0.85rem; color: var(--muted); margin-bottom: 0.25rem; }
+.emp-table { border: 1px solid var(--border); border-radius: 6px; }
+.emp-edit-row > td { background: var(--info-bg); padding: 0.6rem !important; }
+.emp-edit-row .card-head-actions { margin-top: 0.6rem; }
+.emp-savebar { position: sticky; bottom: 0.5rem; display: flex; gap: 0.5rem; align-items: center; justify-content: flex-end; flex-wrap: wrap; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.75rem; margin-top: 0.75rem; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12); }
+.emp-savebar span { margin-right: auto; font-weight: 600; }
+.wage-top { align-items: end; margin-bottom: 0.5rem; }
+.wage-head { background: #fdb44b; color: #1a2230; text-align: center; text-transform: none; letter-spacing: 0; font-size: 0.95rem; padding: 0.35rem; margin: 1rem 0 0.5rem; border-radius: 2px; }
+.wage-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.4rem 1rem; }
+.wage-or { font-weight: 600; font-size: 0.85rem; margin: 0.6rem 0 0.3rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--border); }
+@media (max-width: 600px) { .emp-grid label.wide { grid-column: auto; } }
+.wage-items .checkbox-row { display: flex; align-items: flex-start; gap: 0.5rem; }

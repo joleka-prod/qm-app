@@ -168,6 +168,8 @@ const QUEUE_RPCS = ['clock_in', 'clock_out', 'start_time_entry', 'stop_time_entr
 
 function classify(url: URL, method: string): Kind {
   const p = url.pathname
+  // Personalakten nie im Handy-Speicher ablegen
+  if (p.startsWith('/rest/v1/employee')) return 'pass'
   if (method === 'GET' && p.startsWith('/rest/v1/')) return 'read'
   if (method !== 'POST' && method !== 'PATCH') return 'pass'
   if (p.startsWith('/storage/v1/object/sign/')) return method === 'POST' ? 'sign' : 'pass'

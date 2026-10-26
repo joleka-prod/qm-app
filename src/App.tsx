@@ -2,7 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth'
 import { Layout } from './components/Layout'
 import { configMissing } from './lib/supabase'
-import { canUseCrm, isPlannerRole } from './lib/types'
+import { canSeePersonnel, canUseCrm, isPlannerRole } from './lib/types'
 import { Articles } from './pages/Articles'
 import { CustomerDetail } from './pages/CustomerDetail'
 import { Customers } from './pages/Customers'
@@ -21,6 +21,9 @@ import { Users } from './pages/Users'
 import { Windows } from './pages/Windows'
 import { NfcTest } from './pages/NfcTest'
 import { Terminal } from './pages/Terminal'
+import { Personnel } from './pages/Personnel'
+import { PersonnelDetail } from './pages/PersonnelDetail'
+import { EmployeeImport } from './pages/EmployeeImport'
 
 function Routed() {
   const { session, profile, loading, needsPassword } = useAuth()
@@ -59,6 +62,9 @@ function Routed() {
         <Route path="zeiterfassung" element={<Timesheet />} />
         <Route path="stundenzettel" element={<Navigate to="/zeiterfassung" replace />} />
         {profile.role === 'admin' && <Route path="benutzer" element={<Users />} />}
+        {canSeePersonnel(profile) && <Route path="personal" element={<Personnel />} />}
+        {canSeePersonnel(profile) && <Route path="personal/:id" element={<PersonnelDetail />} />}
+        {profile.role === 'admin' && <Route path="personal/import" element={<EmployeeImport />} />}
         {profile.role === 'admin' && <Route path="artikel" element={<Articles />} />}
         {profile.role === 'admin' && <Route path="fenster" element={<Windows />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
