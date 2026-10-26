@@ -1048,6 +1048,29 @@ await check('Bauvorhaben: Pflicht, automatisch aus Adresse, Wiederverwendung, Ku
   await admin.from('customers').delete().in('id', [c.id, gu.id])
 })
 
+await check('Offline: Stempeln mit Uhrzeit vom Handy, nicht in der Zukunft, höchstens 7 Tage alt', async () => {
+  const ago = (min) => new Date(Date.now() - min * 60000).toISOString()
+  assert.ifError((await worker.c.rpc('clock_out')).error)
+  await admin.from('attendance').delete().eq('installer_id', worker.id)
+  const old = await worker.c.rpc('clock_in', { p_at: ago(8 * 24 * 60) })
+  assert.match(old.error?.message ?? '', /älter als 7 Tage/)
+  const { data: id } = await worker.c.rpc('clock_in', { p_at: ago(120) })
+  assert.ifError((await worker.c.rpc('clock_out', { p_at: ago(30) })).error)
+  const { data: a } = await admin.from('attendance').select('started_at, ended_at').eq('id', id).single()
+  assert.ok(Math.abs(new Date(a.started_at) - new Date(ago(120))) < 5000)
+  assert.ok(Math.abs(new Date(a.ended_at) - new Date(ago(30))) < 5000)
+  const { data: id2 } = await worker.c.rpc('clock_in', { p_at: new Date(Date.now() + 3600000).toISOString() })
+  const { data: b } = await admin.from('attendance').select('started_at').eq('id', id2).single()
+  assert.ok(new Date(b.started_at) <= new Date(Date.now() + 5000), 'Zukunft wird auf jetzt gesetzt')
+  assert.ifError((await worker.c.rpc('clock_out')).error)
+  // nachträglich übertragenes Kommen überschneidet sich nicht mit späteren Zeiten
+  const { data: id3 } = await worker.c.rpc('clock_in', { p_at: ago(60) })
+  const { data: c } = await admin.from('attendance').select('started_at').eq('id', id3).single()
+  assert.ok(new Date(c.started_at) >= new Date(b.started_at))
+  assert.ifError((await worker.c.rpc('clock_out')).error)
+  await admin.from('attendance').delete().in('id', [id, id2, id3])
+})
+
 // Testteams wieder entfernen, damit sie nicht im Kalender auftauchen
 await admin.from('tickets').update({ team_id: null }).in('team_id', [T1, T2])
 await admin.from('teams').delete().in('id', [T1, T2])

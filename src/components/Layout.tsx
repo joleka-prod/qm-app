@@ -1,10 +1,13 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth'
+import { useOfflineState } from '../lib/offline'
 import { supabase } from '../lib/supabase'
+import { OfflineBar } from './OfflineBar'
 import { ROLE_LABEL, canUseCrm, displayName, isPlannerRole } from '../lib/types'
 
 export function Layout() {
   const { profile } = useAuth()
+  const offline = useOfflineState()
   const path = useLocation().pathname
   const isPlanner = isPlannerRole(profile?.role)
   // Kalender und die Startseite der Planer (mit Spalte "Dringender Handlungsbedarf") nutzen die volle Breite
@@ -32,9 +35,19 @@ export function Layout() {
           <NavLink to="/profil" title={profile ? ROLE_LABEL[profile.role] : ''}>
             {displayName(profile)}
           </NavLink>
-          <button className="link" onClick={() => supabase.auth.signOut()}>Abmelden</button>
+          <button
+            className="link"
+            onClick={() =>
+              (offline.pending === 0 ||
+                confirm(`Es warten noch ${offline.pending} Änderungen auf Übertragung. Sie werden übertragen, sobald du dich wieder anmeldest. Trotzdem abmelden?`)) &&
+              supabase.auth.signOut()
+            }
+          >
+            Abmelden
+          </button>
         </nav>
       </header>
+      <OfflineBar />
       <main className={path === '/kalender' ? 'content full' : wide ? 'content wide' : 'content'}>
         <Outlet />
       </main>

@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js'
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
-import { arrivedViaLinkType, supabase } from './lib/supabase'
+import { clearOfflineCache, setOfflineUser } from './lib/offline'
+import { arrivedViaLinkType, storedSession, supabase } from './lib/supabase'
 import type { Profile } from './lib/types'
 
 interface AuthState {
@@ -32,13 +33,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      setSession(data.session)
-      await loadProfile(data.session?.user.id)
+    supabase.auth.getSession().then(async ({ data, error }) => {
+      const s = data.session ?? (error ? storedSession() : null)
+      setSession(s)
+      setOfflineUser(s?.user.id ?? null)
+      await loadProfile(s?.user.id)
       setLoading(false)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
+      const s = next ?? (event === 'SIGNED_OUT' ? null : storedSession())
+      if (event === 'SIGNED_OUT') void clearOfflineCache()
       setSession(s)
+      setOfflineUser(s?.user.id ?? null)
       if (event === 'PASSWORD_RECOVERY') setNeedsPassword(true)
       // Profil außerhalb des Callbacks laden, sonst blockiert supabase-js
       setTimeout(() => loadProfile(s?.user.id), 0)

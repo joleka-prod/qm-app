@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { formatMinutes, notifyClockChanged, useClock, useClockChanged } from '../lib/clock'
+import { formatMinutes, notifyClockChanged, rpcAt, useClock, useClockChanged } from '../lib/clock'
+import { loadTimeEntries } from '../lib/loaders'
+import { pendingRpc, useOfflineSynced } from '../lib/offline'
 import { supabase } from '../lib/supabase'
 import { displayName, formatDate, type Profile, type Ticket } from '../lib/types'
 
@@ -57,6 +59,31 @@ interface Props {
   byId: Record<string, Profile>
 }
 
+// Noch nicht übertragene Starts/Stopps (offline) in Liste und laufende Zeit einrechnen
+export function withPending(entries: TimeEntry[], running: TimeEntry | null, ticketId: number, me: string) {
+  const at = (o: { at: string; args: Record<string, unknown> }) => String(o.args.p_at ?? o.at)
+  const ops = [
+    ...pendingRpc('start_time_entry').map((o) => ({ at: at(o), ticket: Number(o.args.p_ticket_id), kind: o.args.p_kind as TimeKind })),
+    ...pendingRpc('stop_time_entry').map((o) => ({ at: at(o), ticket: 0, kind: null })),
+    ...pendingRpc('clock_out').map((o) => ({ at: at(o), ticket: 0, kind: null })),
+  ].sort((a, b) => a.at.localeCompare(b.at))
+  const list = [...entries]
+  let run = running
+  ops.forEach((op, i) => {
+    if (run) {
+      const ended = { ...run, ended_at: op.at > run.started_at ? op.at : run.started_at }
+      const idx = list.findIndex((e) => e.id === ended.id)
+      if (idx >= 0) list[idx] = ended
+      run = null
+    }
+    if (op.kind) {
+      run = { id: -(i + 1), ticket_id: op.ticket, installer_id: me, kind: op.kind, started_at: op.at, ended_at: null, note: '', edited_by: null }
+      if (op.ticket === ticketId) list.push(run)
+    }
+  })
+  return { entries: list, running: run }
+}
+
 // Auftragszeit: Monteure starten und stoppen die Arbeit am Auftrag (nur eingestempelt),
 // Planer sehen und korrigieren alle Zeiten
 export function TimeCard({ ticket, me, isInstaller, isPlanner, isAdmin, byId }: Props) {
@@ -69,18 +96,17 @@ export function TimeCard({ ticket, me, isInstaller, isPlanner, isAdmin, byId }: 
   const clock = useClock(isInstaller ? me : undefined)
 
   const load = useCallback(async () => {
-    const [list, mine] = await Promise.all([
-      supabase.from('time_entries').select('*').eq('ticket_id', ticket.id).order('started_at'),
-      supabase.from('time_entries').select('*').eq('installer_id', me).is('ended_at', null).maybeSingle(),
-    ])
-    setEntries((list.data ?? []) as TimeEntry[])
-    setRunning((mine.data ?? null) as TimeEntry | null)
+    const [list, mine] = await loadTimeEntries(ticket.id, me)
+    const r = withPending((list.data ?? []) as TimeEntry[], (mine.data ?? null) as TimeEntry | null, ticket.id, me)
+    setEntries(r.entries)
+    setRunning(r.running)
   }, [ticket.id, me])
 
   useEffect(() => {
     load()
   }, [load, ticket.status])
   useClockChanged(load)
+  useOfflineSynced(load)
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30000)
@@ -98,8 +124,8 @@ export function TimeCard({ ticket, me, isInstaller, isPlanner, isAdmin, byId }: 
     setBusy(false)
   }
 
-  const start = (kind: TimeKind) => call(() => supabase.rpc('start_time_entry', { p_ticket_id: ticket.id, p_kind: kind }))
-  const stop = () => call(() => supabase.rpc('stop_time_entry'))
+  const start = (kind: TimeKind) => call(() => rpcAt('start_time_entry', { p_ticket_id: ticket.id, p_kind: kind }))
+  const stop = () => call(() => rpcAt('stop_time_entry'))
 
   async function saveEdit() {
     if (!edit) return

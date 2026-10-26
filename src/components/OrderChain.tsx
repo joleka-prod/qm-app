@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { loadChain } from '../lib/loaders'
 import { supabase } from '../lib/supabase'
 import { formatDay, statusLabel, ticketNo, type Ticket, type TicketStatus, type TicketType } from '../lib/types'
 
@@ -23,7 +24,7 @@ export function OrderChain({ ticket, canCreate }: { ticket: Ticket; canCreate: b
   const [error, setError] = useState('')
 
   useEffect(() => {
-    supabase.rpc('ticket_chain', { p_ticket_id: ticket.id }).then(({ data }) => setChain((data ?? []) as ChainRow[]))
+    loadChain(ticket.id).then(({ data }) => setChain((data ?? []) as ChainRow[]))
   }, [ticket.id, ticket.status])
 
   async function create() {

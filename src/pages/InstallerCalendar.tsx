@@ -3,8 +3,9 @@ import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { JobCard } from '../components/JobCard'
 import { holidayName } from '../lib/holidays'
-import { supabase } from '../lib/supabase'
-import { loadMembers, useTeams, type TeamMember } from '../lib/teams'
+import { loadInstallerWeek, weekDays } from '../lib/loaders'
+import { useOfflineSynced } from '../lib/offline'
+import { useTeams, type TeamMember } from '../lib/teams'
 import { addDays, displayName, formatDay, isoDate, startOfWeek, weekNumber, type Ticket } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 
@@ -28,46 +29,21 @@ export function InstallerCalendar() {
   const { teamById } = useTeams()
   const today = isoDate(new Date())
 
-  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => isoDate(addDays(weekStart, i))), [weekStart])
+  const days = useMemo(() => weekDays(weekStart), [weekStart])
 
   const load = useCallback(async () => {
     if (!installerId) return
     // Einsätze gehören zu Team + Tag; der Monteur sieht die Tage, an denen er im Team eingeteilt ist
-    const since = isoDate(addDays(new Date(), -90))
-    const [week, mine] = await Promise.all([loadMembers(days[0], days[6]), loadMembers(since, days[6], installerId)])
-    const pairs = new Set(mine.map((m) => `${m.team_id}|${m.day}`))
-    const teamIds = [...new Set(mine.map((m) => m.team_id))]
-    const onMyTeam = (t: Ticket) => pairs.has(`${t.team_id}|${t.montage_date}`)
-    if (teamIds.length === 0) {
-      setJobs([])
-      setOverdue([])
-      setMembers(week)
-      return
-    }
-    const [w, o] = await Promise.all([
-      supabase
-        .from('tickets')
-        .select('*, ticket_positions(count)')
-        .in('team_id', teamIds)
-        .gte('montage_date', days[0])
-        .lte('montage_date', days[6]),
-      supabase
-        .from('tickets')
-        .select('*, ticket_positions(count)')
-        .in('team_id', teamIds)
-        .gte('montage_date', since)
-        .lt('montage_date', today)
-        .neq('status', 'abgeschlossen')
-        .order('montage_date'),
-    ])
-    setJobs(((w.data ?? []) as Ticket[]).filter(onMyTeam))
-    setOverdue(((o.data ?? []) as Ticket[]).filter(onMyTeam))
-    setMembers(week)
+    const r = await loadInstallerWeek(installerId, days, today)
+    setJobs(r.jobs)
+    setOverdue(r.overdue)
+    setMembers(r.members)
   }, [installerId, days, today])
 
   useEffect(() => {
     load()
   }, [load])
+  useOfflineSynced(load)
 
   // Leere vergangene Tage und leere Wochenenden ausblenden
   const visibleDays = days.filter(

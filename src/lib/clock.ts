@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { pendingRpc, useOfflineSynced } from './offline'
 import { supabase } from './supabase'
 
 export interface Attendance {
@@ -24,6 +25,25 @@ export function useClockChanged(fn: () => void) {
   }, [fn])
 }
 
+// Stempeln und Auftragszeiten mit der Uhrzeit vom Handy, damit offline erfasste Zeiten bei der
+// späteren Übertragung stimmen. Ältere Datenbank ohne p_at: wie bisher mit Serverzeit.
+export async function rpcAt(fn: string, args: Record<string, unknown> = {}) {
+  const r = await supabase.rpc(fn, { ...args, p_at: new Date().toISOString() })
+  return r.error?.code === 'PGRST202' ? supabase.rpc(fn, args) : r
+}
+
+// Noch nicht übertragene Stempelungen in den Stand einrechnen
+function withPendingClock(running: Attendance | null, userId: string): Attendance | null {
+  const ops = [
+    ...pendingRpc('clock_in').map((o) => ({ on: true, at: String(o.args.p_at ?? o.at) })),
+    ...pendingRpc('clock_out').map((o) => ({ on: false, at: String(o.args.p_at ?? o.at) })),
+  ].sort((a, b) => a.at.localeCompare(b.at))
+  const last = ops[ops.length - 1]
+  if (!last) return running
+  if (!last.on) return null
+  return running ?? { id: -1, installer_id: userId, started_at: last.at, ended_at: null, note: '', edited_by: null }
+}
+
 // Laufende Stempelzeit des angemeldeten Monteurs
 export function useClock(userId: string | undefined) {
   const [running, setRunning] = useState<Attendance | null>(null)
@@ -32,7 +52,7 @@ export function useClock(userId: string | undefined) {
   const reload = useCallback(async () => {
     if (!userId) return
     const { data } = await supabase.from('attendance').select('*').eq('installer_id', userId).is('ended_at', null).maybeSingle()
-    setRunning((data ?? null) as Attendance | null)
+    setRunning(withPendingClock((data ?? null) as Attendance | null, userId))
     setLoaded(true)
   }, [userId])
 
@@ -40,15 +60,16 @@ export function useClock(userId: string | undefined) {
     reload()
   }, [reload])
   useClockChanged(reload)
+  useOfflineSynced(reload)
 
   async function clockIn() {
-    const { error } = await supabase.rpc('clock_in')
+    const { error } = await rpcAt('clock_in')
     notifyClockChanged()
     return error?.message ?? ''
   }
 
   async function clockOut() {
-    const { error } = await supabase.rpc('clock_out')
+    const { error } = await rpcAt('clock_out')
     notifyClockChanged()
     return error?.message ?? ''
   }

@@ -34,6 +34,20 @@ export default defineConfig({
         navigateFallback: '/index.html',
         // Supabase-Anfragen nie aus dem Cache bedienen
         navigateFallbackDenylist: [/^\/auth/, /^\/rest/, /^\/storage/],
+        // Fotos und Unterschriften für den Offline-Modus im Handy behalten. Der Link enthält ein
+        // wechselndes Zugriffstoken, die Datei selbst ändert sich nie: deshalb ohne Token vergleichen.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/storage/v1/object/sign/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'fotos',
+              matchOptions: { ignoreSearch: true },
+              expiration: { maxEntries: 600, maxAgeSeconds: 30 * 24 * 60 * 60 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+        ],
       },
     }),
   ],

@@ -13,13 +13,16 @@ import { CalcTimeFields, calcTimeColumns } from '../components/CalcTimeFields'
 import { AppointmentCard } from '../components/AppointmentCard'
 import { BillingCard } from '../components/BillingCard'
 import { SelfCostCard } from '../components/SelfCostCard'
-import { TimeCard } from '../components/TimeCard'
+import { TimeCard, withPending, type TimeEntry } from '../components/TimeCard'
 import { DistanceLine } from '../components/DistanceLine'
 import { confirmAddresses } from '../lib/addressCheck'
 import { AddressFields, CustomerFields, customerClears, addressesToCheck, addressColumns, customerColumns, customerOf, emptyCustomer, type CustomerData, addressComplete, addressLine, addressOf, emptyAddress, jobAddress, type AltAddress } from '../components/AddressFields'
 import { StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { deletePhoto, signedUrls, uploadPhotos, uploadSignature } from '../lib/photos'
 import { sendReport } from '../lib/reportMail'
+import { loadCrew, loadTicketCore, loadTimeEntries } from '../lib/loaders'
+import { rpcAt } from '../lib/clock'
+import { pendingPhotos, useOfflineSynced } from '../lib/offline'
 import { supabase } from '../lib/supabase'
 import { useTeams } from '../lib/teams'
 import {
@@ -143,13 +146,7 @@ export function TicketDetail() {
   const [reasonText, setReasonText] = useState('')
 
   const load = useCallback(async () => {
-    const [t, p, e, d, pos] = await Promise.all([
-      supabase.from('tickets').select('*').eq('id', ticketId).maybeSingle(),
-      supabase.from('ticket_photos').select('*').eq('ticket_id', ticketId).order('created_at'),
-      supabase.from('ticket_events').select('*').eq('ticket_id', ticketId).order('created_at').order('id'),
-      supabase.from('deletion_requests').select('*').eq('ticket_id', ticketId).maybeSingle(),
-      supabase.from('ticket_positions').select('*').eq('ticket_id', ticketId).order('sort').order('id'),
-    ])
+    const [t, p, e, d, pos] = await loadTicketCore(ticketId)
     if (!t.data) {
       setNotFound(true)
       return
@@ -167,11 +164,7 @@ export function TicketDetail() {
     setJobsiteAddr(addressOf(tk, 'jobsite'))
     setTeamId(tk.team_id ? String(tk.team_id) : '')
     if (tk.team_id && tk.montage_date) {
-      const { data: m } = await supabase
-        .from('team_members')
-        .select('installer_id, lead')
-        .eq('team_id', tk.team_id)
-        .eq('day', tk.montage_date)
+      const { data: m } = await loadCrew(tk.team_id, tk.montage_date)
       setCrew((m ?? []).map((x) => x.installer_id as string))
       setCrewLead((m ?? []).find((x) => x.lead)?.installer_id ?? '')
     } else {
@@ -204,6 +197,7 @@ export function TicketDetail() {
   useEffect(() => {
     load()
   }, [load])
+  useOfflineSynced(load)
 
   if (notFound) return <p>Auftrag nicht gefunden. <Link to="/">Zur Übersicht</Link></p>
   if (!ticket || !profile) return <p className="muted">Lädt…</p>
@@ -304,6 +298,13 @@ export function TicketDetail() {
 
   async function closeJob() {
     const wantsMail = ticket?.report_by_email && !ticket.report_sent_at
+    if (isInstaller && profile) {
+      // laufende Auftragszeit jetzt beenden (offline würde sie sonst erst bei der Übertragung gestoppt)
+      const [, mine] = await loadTimeEntries(ticketId, profile.id)
+      if (withPending([], (mine.data ?? null) as TimeEntry | null, ticketId, profile.id).running?.ticket_id === ticketId) {
+        await rpcAt('stop_time_entry')
+      }
+    }
     if ((await update({ work_report: report, status: 'abgeschlossen' })) && wantsMail) await mailReport(false)
   }
 
@@ -750,6 +751,11 @@ export function TicketDetail() {
           canDelete={canDeletePhoto}
           onDelete={removePhoto}
         />
+        {pendingPhotos(ticketId) > 0 && (
+          <p className="small muted">
+            {pendingPhotos(ticketId)} {pendingPhotos(ticketId) === 1 ? 'Foto wartet' : 'Fotos warten'} auf Übertragung.
+          </p>
+        )}
         {!closed && (
           <div className="add-photos">
             <PhotoPicker files={newFiles} onChange={setNewFiles} />
@@ -910,7 +916,11 @@ export function TicketDetail() {
           <h2>Kundenunterschrift</h2>
           {ticket.signature_path ? (
             <>
-              {signatureUrl && <img className="signature-img" src={signatureUrl} alt="Unterschrift des Kunden" />}
+              {signatureUrl ? (
+                <img className="signature-img" src={signatureUrl} alt="Unterschrift des Kunden" />
+              ) : (
+                !ticket.signed_at && <p className="small muted">Unterschrift ist im Handy gespeichert und wird übertragen, sobald wieder Empfang da ist.</p>
+              )}
               <p className="small">
                 {ticket.signer_name}
                 {ticket.signed_at && <span className="muted"> · {formatDate(ticket.signed_at)}</span>}
