@@ -15,7 +15,7 @@ export function Layout() {
   return (
     <div className="app">
       <header className="topbar">
-        <NavLink to="/" className="brand">JOLEKA - Einfach besonders!</NavLink>
+        <NavLink to="/" className="brand">JOLEKA 360°</NavLink>
         <nav>
           {canUseCrm(profile?.role) && <NavLink to="/kunden">Kunden</NavLink>}
           {canUseCrm(profile?.role) && <NavLink to="/bauvorhaben">Bauvorhaben</NavLink>}

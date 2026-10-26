@@ -16,8 +16,8 @@ export default defineConfig({
       injectRegister: false,
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'JOLEKA - Einfach besonders!',
-        short_name: 'JOLEKA',
+        name: 'JOLEKA 360°',
+        short_name: 'JOLEKA 360°',
         description: 'Aufträge, Monteurplanung und Zeiterfassung',
         lang: 'de',
         theme_color: '#1d4ed8',
