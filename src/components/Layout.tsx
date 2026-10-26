@@ -3,7 +3,7 @@ import { useAuth } from '../auth'
 import { useOfflineState } from '../lib/offline'
 import { supabase } from '../lib/supabase'
 import { OfflineBar } from './OfflineBar'
-import { ROLE_LABEL, canSeePersonnel, canUseCrm, displayName, isPlannerRole } from '../lib/types'
+import { ROLE_LABEL, canUseCrm, displayName, isPlannerRole } from '../lib/types'
 
 export function Layout() {
   const { profile } = useAuth()
@@ -11,7 +11,7 @@ export function Layout() {
   const path = useLocation().pathname
   const isPlanner = isPlannerRole(profile?.role)
   // Kalender und die Startseite der Planer (mit Spalte "Dringender Handlungsbedarf") nutzen die volle Breite
-  const wide = path === '/kalender' || path === '/fenster' || path === '/personal' || path === '/benutzer/import' || (isPlanner && (path === '/' || path === '/tickets'))
+  const wide = path === '/kalender' || path === '/fenster' || (isPlanner && (path === '/' || path === '/tickets'))
   return (
     <div className="app">
       <header className="topbar">
@@ -29,7 +29,6 @@ export function Layout() {
           )}
           {isPlanner && <NavLink to="/kalender">Kalender</NavLink>}
           <NavLink to="/zeiterfassung">Zeiterfassung</NavLink>
-          {canSeePersonnel(profile) && <NavLink to="/personal">Personal</NavLink>}
           {profile?.role === 'admin' && <NavLink to="/fenster">Fenster</NavLink>}
           {profile?.role === 'admin' && <NavLink to="/artikel">Artikel</NavLink>}
           {profile?.role === 'admin' && <NavLink to="/benutzer">Benutzer</NavLink>}

@@ -18,13 +18,7 @@ export interface Profile {
   montage_capacity?: boolean
   overtime_start: string
   overtime_opening: number
-  // darf Personalakten sehen und pflegen (Admin immer)
-  hr_access?: boolean
   created_at: string
-}
-
-export function canSeePersonnel(p: Pick<Profile, 'role' | 'hr_access' | 'active'> | null | undefined) {
-  return !!p && p.active && (p.role === 'admin' || !!p.hr_access)
 }
 
 export interface Ticket {

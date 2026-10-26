@@ -1104,27 +1104,6 @@ await check('Stempel-Terminal: nur der Admin richtet ein, Terminal stempelt per 
   await admin.from('terminal_credentials').delete().eq('user_id', worker.id)
 })
 
-await check('Personalakte: nur Admin und Benutzer mit Personal-Zugriff sehen und pflegen, Verlauf wird geführt', async () => {
-  assert.ifError((await qm.c.from('personnel_files').insert({ user_id: other.id, personnel_number: 'T-' + run, iban: 'DE02120300000000202051' })).error)
-  assert.equal((await worker.c.from('personnel_files').select('user_id').eq('user_id', other.id)).data?.length ?? 0, 0)
-  assert.equal((await other.c.from('personnel_files').select('user_id').eq('user_id', other.id)).data?.length ?? 0, 0, 'auch die eigene Akte nicht')
-  await worker.c.from('personnel_files').update({ iban: 'X' }).eq('user_id', other.id)
-  assert.ok((await worker.c.from('profiles').update({ hr_access: true }).eq('id', worker.id)).error, 'Zugriff vergibt nur der Admin')
-  assert.ifError((await qm.c.from('profiles').update({ hr_access: true }).eq('id', lead.id)).error)
-  const { data: f } = await lead.c.from('personnel_files').select('iban').eq('user_id', other.id).single()
-  assert.equal(f.iban, 'DE02120300000000202051')
-  assert.ifError((await lead.c.from('personnel_files').update({ tax_class: '3' }).eq('user_id', other.id)).error)
-  const { data: log } = await lead.c.from('personnel_log').select('kind, changes').eq('user_id', other.id).order('id')
-  assert.deepEqual(log.map((l) => l.kind), ['angelegt', 'geändert'])
-  assert.equal(log[1].changes.tax_class.neu, '3')
-  assert.equal((await worker.c.from('personnel_log').select('id').eq('user_id', other.id)).data?.length ?? 0, 0)
-  const up = await worker.c.storage.from('personnel-docs').upload(`${other.id}/x.txt`, new Blob(['x']))
-  assert.ok(up.error, 'Mitarbeiter darf keine Personaldokumente hochladen')
-  await qm.c.from('profiles').update({ hr_access: false }).eq('id', lead.id)
-  await admin.from('personnel_log').delete().eq('user_id', other.id)
-  await admin.from('personnel_files').delete().eq('user_id', other.id)
-})
-
 // Testteams wieder entfernen, damit sie nicht im Kalender auftauchen
 await admin.from('tickets').update({ team_id: null }).in('team_id', [T1, T2])
 await admin.from('teams').delete().in('id', [T1, T2])

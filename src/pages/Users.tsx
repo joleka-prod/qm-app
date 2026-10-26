@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { TerminalAdmin } from '../components/TerminalAdmin'
-import { NO_LOGIN_DOMAIN } from './UserImport'
 import { createUser, deleteUser, generatePassword, setPassword, updateEmail } from '../lib/adminUsers'
 import { formatBadge, nfcSupported, normalizeBadge, startNfc } from '../lib/nfc'
 import { supabase } from '../lib/supabase'
@@ -24,7 +22,7 @@ export function Users() {
   const [password, setPw] = useState(generatePassword)
   const [busy, setBusy] = useState(false)
 
-  const [edit, setEdit] = useState<{ id: string; full_name: string; email: string; role: Role; active: boolean; supervisor_id: string; vacation_days: string; weekly_hours: string; overtime_start: string; overtime_opening: string; montage_capacity: boolean; hr_access: boolean; badge: string; pin: string; removePin: boolean } | null>(null)
+  const [edit, setEdit] = useState<{ id: string; full_name: string; email: string; role: Role; active: boolean; supervisor_id: string; vacation_days: string; weekly_hours: string; overtime_start: string; overtime_opening: string; montage_capacity: boolean; badge: string; pin: string; removePin: boolean } | null>(null)
 
   // Stempel-Terminal: Chip und PIN je Benutzer (nur Admin, ohne SQL-Update leer)
   const [creds, setCreds] = useState<Record<string, { badge_uid: string | null; has_pin: boolean; locked_until: string | null }>>({})
@@ -60,7 +58,7 @@ export function Users() {
   function startEdit(p: Profile) {
     setError('')
     setNotice('')
-    setEdit({ id: p.id, full_name: p.full_name, email: p.email, role: p.role, active: p.active, supervisor_id: p.supervisor_id ?? '', vacation_days: String(p.vacation_days ?? 0), weekly_hours: String(p.weekly_hours ?? 40).replace('.', ','), overtime_start: p.overtime_start ?? '', overtime_opening: String(p.overtime_opening ?? 0).replace('.', ','), montage_capacity: p.montage_capacity ?? true, hr_access: p.hr_access ?? false, badge: formatBadge(creds[p.id]?.badge_uid), pin: '', removePin: false })
+    setEdit({ id: p.id, full_name: p.full_name, email: p.email, role: p.role, active: p.active, supervisor_id: p.supervisor_id ?? '', vacation_days: String(p.vacation_days ?? 0), weekly_hours: String(p.weekly_hours ?? 40).replace('.', ','), overtime_start: p.overtime_start ?? '', overtime_opening: String(p.overtime_opening ?? 0).replace('.', ','), montage_capacity: p.montage_capacity ?? true, badge: formatBadge(creds[p.id]?.badge_uid), pin: '', removePin: false })
   }
 
   async function saveEdit(e: FormEvent, p: Profile) {
@@ -87,7 +85,6 @@ export function Users() {
       if (!edit.overtime_start) throw new Error('Bitte ein Startdatum für das Stundenkonto eintragen.')
       if (edit.overtime_start !== p.overtime_start) change.overtime_start = edit.overtime_start
       if (edit.montage_capacity !== (p.montage_capacity ?? true)) change.montage_capacity = edit.montage_capacity
-      if (edit.hr_access !== (p.hr_access ?? false)) change.hr_access = edit.hr_access
       if (Object.keys(change).length > 0) {
         const { error } = await supabase.from('profiles').update(change).eq('id', p.id)
         if (error) throw error
@@ -169,12 +166,7 @@ export function Users() {
     <div>
       <div className="page-head">
         <h1>Benutzer</h1>
-        {!showForm && (
-          <div className="actions">
-            <Link className="button" to="/benutzer/import">Aus Ninox importieren</Link>
-            <button className="primary" onClick={() => setShowForm(true)}>+ Neuer Benutzer</button>
-          </div>
-        )}
+        {!showForm && <button className="primary" onClick={() => setShowForm(true)}>+ Neuer Benutzer</button>}
       </div>
 
       {showForm && (
@@ -281,12 +273,6 @@ export function Users() {
                     Zählt bei der Kapazitätsplanung Montage mit
                   </label>
                 )}
-                {edit.role !== 'admin' && (
-                  <label className="checkbox-row">
-                    <input type="checkbox" checked={edit.hr_access} onChange={(e) => setEdit({ ...edit, hr_access: e.target.checked })} />
-                    Zugriff auf Personalakten (sieht und pflegt alle Personaldaten)
-                  </label>
-                )}
                 <fieldset className="terminal-creds">
                   <legend>Stempel-Terminal</legend>
                   <label>
@@ -348,14 +334,13 @@ export function Users() {
             <li key={p.id} className={`card user-row ${p.active ? '' : 'inactive'}`}>
               <div>
                 <div className="ticket-title">{p.full_name || <span className="muted">(kein Name)</span>}</div>
-                <div className="muted small">{p.email.endsWith(NO_LOGIN_DOMAIN) ? 'kein App-Login (nur Stempel-Terminal)' : p.email}</div>
+                <div className="muted small">{p.email}</div>
                 <div className="small">
                   {ROLE_LABEL[p.role]}
                   {!p.active && <span className="muted"> · deaktiviert</span>}
                   {p.role === 'monteur' && p.montage_capacity === false && <span className="muted"> · nicht in der Montage-Kapazität</span>}
                   {creds[p.id]?.badge_uid && <span className="muted"> · Chip {formatBadge(creds[p.id].badge_uid)}</span>}
                   {creds[p.id]?.has_pin && <span className="muted"> · PIN</span>}
-                  {p.hr_access && p.role !== 'admin' && <span className="muted"> · Personalakten</span>}
                 </div>
                 <div className="small muted">
                   Vorgesetzte(r): {p.supervisor_id ? displayName(byId[p.supervisor_id]) : '–'} · Urlaub: {Number(p.vacation_days)} Tage/Jahr · {Number(p.weekly_hours).toLocaleString('de-DE')} Std./Woche

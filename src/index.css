@@ -684,16 +684,3 @@ button.link.danger-link { color: var(--danger); }
 .terminal-creds legend { font-weight: 600; padding: 0 0.3rem; }
 .terminal-list { list-style: none; padding: 0; margin: 0 0 0.75rem; }
 .terminal-list li { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
-.import-map { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.6rem; }
-.import-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-.import-table th, .import-table td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
-.import-table tr.import-error td { color: var(--danger); }
-.personnel-section h3 { margin: 1rem 0 0.4rem; }
-.personnel-dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.4rem 1rem; margin: 0; }
-.personnel-dl dt { font-size: 0.8rem; color: var(--muted); }
-.personnel-dl dd { margin: 0; overflow-wrap: anywhere; }
-.personnel-table a { font-weight: 600; }
-.personnel-related summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 0.4rem; }
-.personnel-related summary::before { content: '▸'; color: var(--muted); }
-.personnel-related[open] summary::before { content: '▾'; }
-.personnel-related summary h3 { margin: 0; display: inline; }
