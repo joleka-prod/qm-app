@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
 
   const apiKey = Deno.env.get('RESEND_API_KEY')
   const from = Deno.env.get('MAIL_FROM')
-  const company = Deno.env.get('COMPANY_NAME') ?? 'JOLEKA 360°'
+  const company = Deno.env.get('COMPANY_NAME') ?? 'JOLEKA'
   const fail = async (msg: string) => {
     await admin.from('tickets').update({ report_send_error: msg }).eq('id', t.id)
     return reply(502, { error: msg })
