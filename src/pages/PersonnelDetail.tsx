@@ -18,9 +18,11 @@ import {
   type Entry,
   type Field,
   type SubTable,
+  companyEmail,
 } from '../lib/employee'
 import { supabase } from '../lib/supabase'
-import { displayName } from '../lib/types'
+import { ROLE_LABEL, displayName } from '../lib/types'
+import { createUser, generatePassword } from '../lib/adminUsers'
 import { useProfiles } from '../lib/useProfiles'
 
 type Form = Record<string, string | boolean>
@@ -170,7 +172,7 @@ function SubTableView({ table, entries, employeeId, reload }: { table: SubTable;
 export function PersonnelDetail() {
   const { id = '' } = useParams()
   const { profile: me } = useAuth()
-  const { byId } = useProfiles()
+  const { byId, reload: reloadProfiles } = useProfiles()
   const navigate = useNavigate()
   const [emp, setEmp] = useState<Employee | null>(null)
   const [entries, setEntries] = useState<Entry[]>([])
@@ -254,6 +256,32 @@ export function PersonnelDetail() {
     setBusy(false)
   }
 
+  // Login nach Schema vorname.nachname@joleka.de, Startpasswort wird einmal angezeigt
+  async function createAccount() {
+    if (!emp) return
+    const first = String(form.first_name ?? '').trim()
+    const last = String(form.last_name ?? '').trim()
+    if (!first || !last) return setError('Bitte zuerst Vor- und Nachname eintragen und speichern.')
+    const email = companyEmail(first, last)
+    const role = /montage/i.test(String(form.department ?? '')) ? 'monteur' : 'mitarbeiter'
+    if (!confirm(`App-Benutzer ${email} (${ROLE_LABEL[role]}) anlegen?`)) return
+    setBusy(true)
+    setError('')
+    try {
+      const password = generatePassword()
+      const created = (await createUser({ email, full_name: `${first} ${last}`, role, password })) as { id: string }
+      const { error } = await supabase.from('employees').update({ user_id: created.id }).eq('id', emp.id)
+      if (error) throw error
+      if (emp.vacation_days != null) await supabase.from('profiles').update({ vacation_days: emp.vacation_days }).eq('id', created.id)
+      await reloadProfiles()
+      await load()
+      alert(`Benutzer angelegt.\n\nLogin: ${email}\nStartpasswort: ${password}\n\nBitte notieren, das Passwort wird nicht noch einmal angezeigt.`)
+    } catch (e) {
+      setError((e as Error).message)
+    }
+    setBusy(false)
+  }
+
   async function removeEmployee() {
     if (!emp || !confirm(`${employeeName(emp)} mit allen Einträgen endgültig löschen? Ein App-Benutzer bleibt bestehen.`)) return
     const { error } = await supabase.from('employees').delete().eq('id', emp.id)
@@ -293,6 +321,10 @@ export function PersonnelDetail() {
       </div>
       <p className="muted small">
         App-Benutzer: {user ? `${displayName(user)} · ${user.email}` : 'keiner'}
+        {me?.role === 'admin' && user && <> · <Link to={`/personal?ansicht=benutzer&bearbeiten=${user.id}`}>Zugang bearbeiten</Link></>}
+        {me?.role === 'admin' && !emp.user_id && (
+          <> · <button type="button" className="link" disabled={busy} onClick={createAccount}>App-Benutzer anlegen</button></>
+        )}
         {emp.ninox_id ? ' · aus Ninox übernommen' : ''}
       </p>
       <nav className="emp-tabs">

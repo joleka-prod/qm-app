@@ -1,15 +1,34 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { STATUS, employeeName, type Employee } from '../lib/employee'
 import { supabase } from '../lib/supabase'
 import { displayName } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
+import { Users } from './Users'
 
 const fmt = (d: unknown) => (d ? new Date(String(d) + 'T00:00').toLocaleDateString('de-DE') : '–')
 
-// Übersicht Personal (nur Admin und Benutzer mit Zugriff auf Personalakten)
+// Menüpunkt Personal: Personalakten und (nur Admin) App-Benutzer mit Stempel-Terminals
 export function Personnel() {
+  const { profile } = useAuth()
+  const [params, setParams] = useSearchParams()
+  const users = profile?.role === 'admin' && params.get('ansicht') === 'benutzer'
+  return (
+    <div>
+      {profile?.role === 'admin' && (
+        <nav className="emp-tabs">
+          <button type="button" className={users ? '' : 'active'} onClick={() => setParams({})}>Mitarbeiter</button>
+          <button type="button" className={users ? 'active' : ''} onClick={() => setParams({ ansicht: 'benutzer' })}>App-Benutzer &amp; Terminals</button>
+        </nav>
+      )}
+      {users ? <Users /> : <EmployeeList />}
+    </div>
+  )
+}
+
+// Übersicht Personalakten (nur Admin und Benutzer mit Zugriff auf Personalakten)
+function EmployeeList() {
   const { profile } = useAuth()
   const { byId } = useProfiles()
   const navigate = useNavigate()

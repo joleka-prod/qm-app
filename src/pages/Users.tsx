@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { TerminalAdmin } from '../components/TerminalAdmin'
 import { createUser, deleteUser, generatePassword, setPassword, updateEmail } from '../lib/adminUsers'
@@ -54,6 +55,18 @@ export function Users() {
       setError(`NFC lässt sich nicht starten: ${(err as Error).message}`)
     }
   }
+
+  // aus der Personalakte: /personal?ansicht=benutzer&bearbeiten=<id> öffnet den Benutzer direkt
+  const [params] = useSearchParams()
+  const opened = useRef(false)
+  useEffect(() => {
+    const id = params.get('bearbeiten')
+    if (!id || opened.current || !byId[id]) return
+    opened.current = true
+    startEdit(byId[id])
+    setTimeout(() => document.getElementById(`user-${id}`)?.scrollIntoView({ block: 'start' }), 100)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params, byId, creds])
 
   function startEdit(p: Profile) {
     setError('')
@@ -166,7 +179,7 @@ export function Users() {
   return (
     <div>
       <div className="page-head">
-        <h1>Benutzer</h1>
+        <h1>App-Benutzer</h1>
         {!showForm && <button className="primary" onClick={() => setShowForm(true)}>+ Neuer Benutzer</button>}
       </div>
 
@@ -212,7 +225,7 @@ export function Users() {
       <ul className="user-list">
         {profiles.map((p) =>
           edit?.id === p.id ? (
-            <li key={p.id} className="card">
+            <li key={p.id} id={`user-${p.id}`} className="card">
               <form className="form" onSubmit={(e) => saveEdit(e, p)}>
                 <h2>Benutzer bearbeiten</h2>
                 <label>
@@ -338,7 +351,7 @@ export function Users() {
               </form>
             </li>
           ) : (
-            <li key={p.id} className={`card user-row ${p.active ? '' : 'inactive'}`}>
+            <li key={p.id} id={`user-${p.id}`} className={`card user-row ${p.active ? '' : 'inactive'}`}>
               <div>
                 <div className="ticket-title">{p.full_name || <span className="muted">(kein Name)</span>}</div>
                 <div className="muted small">{p.email}</div>

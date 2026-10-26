@@ -17,7 +17,6 @@ import { SetPassword } from './pages/SetPassword'
 import { TicketDetail } from './pages/TicketDetail'
 import { TicketList } from './pages/TicketList'
 import { Timesheet } from './pages/Timesheet'
-import { Users } from './pages/Users'
 import { Windows } from './pages/Windows'
 import { NfcTest } from './pages/NfcTest'
 import { Terminal } from './pages/Terminal'
@@ -61,7 +60,7 @@ function Routed() {
         <Route path="profil" element={<ProfilePage />} />
         <Route path="zeiterfassung" element={<Timesheet />} />
         <Route path="stundenzettel" element={<Navigate to="/zeiterfassung" replace />} />
-        {profile.role === 'admin' && <Route path="benutzer" element={<Users />} />}
+        <Route path="benutzer" element={<Navigate to="/personal?ansicht=benutzer" replace />} />
         {canSeePersonnel(profile) && <Route path="personal" element={<Personnel />} />}
         {canSeePersonnel(profile) && <Route path="personal/:id" element={<PersonnelDetail />} />}
         {profile.role === 'admin' && <Route path="personal/import" element={<EmployeeImport />} />}

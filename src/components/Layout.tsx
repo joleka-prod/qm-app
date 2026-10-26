@@ -32,7 +32,6 @@ export function Layout() {
           {canSeePersonnel(profile) && <NavLink to="/personal">Personal</NavLink>}
           {profile?.role === 'admin' && <NavLink to="/fenster">Fenster</NavLink>}
           {profile?.role === 'admin' && <NavLink to="/artikel">Artikel</NavLink>}
-          {profile?.role === 'admin' && <NavLink to="/benutzer">Benutzer</NavLink>}
           <NavLink to="/profil" title={profile ? ROLE_LABEL[profile.role] : ''}>
             {displayName(profile)}
           </NavLink>
