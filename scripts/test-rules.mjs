@@ -1071,6 +1071,39 @@ await check('Offline: Stempeln mit Uhrzeit vom Handy, nicht in der Zukunft, höc
   await admin.from('attendance').delete().in('id', [id, id2, id3])
 })
 
+await check('Stempel-Terminal: nur der Admin richtet ein, Terminal stempelt per Chip/PIN und sieht sonst nichts', async () => {
+  assert.ok((await worker.c.rpc('create_terminal', { p_name: 'X' })).error, 'Mitarbeiter darf kein Terminal anlegen')
+  const { data: token, error } = await qm.c.rpc('create_terminal', { p_name: 'Test-Terminal' })
+  assert.ifError(error)
+  assert.ifError((await qm.c.rpc('set_terminal_badge', { p_user: worker.id, p_badge: 'AB:CD:12:34' })).error)
+  assert.ifError((await qm.c.rpc('set_terminal_pin', { p_user: worker.id, p_pin: '4711' })).error)
+  assert.ok((await worker.c.rpc('set_terminal_pin', { p_user: worker.id, p_pin: '1111' })).error, 'nur Admin vergibt PINs')
+  assert.match((await qm.c.rpc('set_terminal_badge', { p_user: other.id, p_badge: 'abcd1234' })).error?.message ?? '', /schon/)
+  const term = createClient(url, anon, { auth: { persistSession: false } })
+  assert.equal((await term.from('terminals').select('id')).data?.length ?? 0, 0)
+  assert.equal((await term.from('terminal_credentials').select('user_id')).data?.length ?? 0, 0)
+  assert.equal((await worker.c.from('terminal_credentials').select('user_id')).data?.length ?? 0, 0)
+  assert.ok((await term.rpc('terminal_clock', { p_token: 'falsch', p_badge: 'abcd1234' })).error, 'falscher Schlüssel')
+  assert.ifError((await worker.c.rpc('clock_out')).error)
+  await admin.from('attendance').delete().eq('installer_id', worker.id)
+  const r1 = (await term.rpc('terminal_clock', { p_token: token, p_badge: 'abcd1234' })).data[0]
+  assert.equal(r1.action, 'kommen')
+  const wrong = (await term.rpc('terminal_clock', { p_token: token, p_user: worker.id, p_pin: '0000' })).data[0]
+  assert.equal(wrong.ok, false)
+  // eine Stunde später per PIN gehen (Uhrzeit wie von einem Offline-Terminal)
+  await admin.from('attendance').update({ started_at: new Date(Date.now() - 2 * 3600000).toISOString() }).eq('installer_id', worker.id)
+  const r2 = (await term.rpc('terminal_clock', { p_token: token, p_user: worker.id, p_pin: '4711', p_at: new Date(Date.now() - 3600000).toISOString() })).data[0]
+  assert.equal(r2.action, 'gehen')
+  const { data: a } = await admin.from('attendance').select('ended_at, terminal_id, end_terminal_id').eq('installer_id', worker.id).single()
+  assert.ok(a.terminal_id && a.end_terminal_id)
+  const { data: t } = await qm.c.from('terminals').select('id').eq('name', 'Test-Terminal').single()
+  assert.ifError((await qm.c.rpc('update_terminal', { p_id: t.id, p_name: 'Test-Terminal', p_active: false })).error)
+  assert.match((await term.rpc('terminal_ping', { p_token: token })).error?.message ?? '', /nicht freigegeben/)
+  await admin.from('attendance').delete().eq('installer_id', worker.id)
+  assert.ifError((await qm.c.rpc('delete_terminal', { p_id: t.id })).error)
+  await admin.from('terminal_credentials').delete().eq('user_id', worker.id)
+})
+
 // Testteams wieder entfernen, damit sie nicht im Kalender auftauchen
 await admin.from('tickets').update({ team_id: null }).in('team_id', [T1, T2])
 await admin.from('teams').delete().in('id', [T1, T2])

@@ -1,6 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useAuth } from '../auth'
+import { TerminalAdmin } from '../components/TerminalAdmin'
 import { createUser, deleteUser, generatePassword, setPassword, updateEmail } from '../lib/adminUsers'
+import { formatBadge, nfcSupported, normalizeBadge, startNfc } from '../lib/nfc'
 import { supabase } from '../lib/supabase'
 import { ROLE_LABEL, displayName, type Profile, type Role } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
@@ -20,12 +22,43 @@ export function Users() {
   const [password, setPw] = useState(generatePassword)
   const [busy, setBusy] = useState(false)
 
-  const [edit, setEdit] = useState<{ id: string; full_name: string; email: string; role: Role; active: boolean; supervisor_id: string; vacation_days: string; weekly_hours: string; overtime_start: string; overtime_opening: string; montage_capacity: boolean } | null>(null)
+  const [edit, setEdit] = useState<{ id: string; full_name: string; email: string; role: Role; active: boolean; supervisor_id: string; vacation_days: string; weekly_hours: string; overtime_start: string; overtime_opening: string; montage_capacity: boolean; badge: string; pin: string; removePin: boolean } | null>(null)
+
+  // Stempel-Terminal: Chip und PIN je Benutzer (nur Admin, ohne SQL-Update leer)
+  const [creds, setCreds] = useState<Record<string, { badge_uid: string | null; has_pin: boolean; locked_until: string | null }>>({})
+  const [reading, setReading] = useState(false)
+  const stopReading = useRef<(() => void) | null>(null)
+  const loadCreds = useCallback(async () => {
+    const { data } = await supabase.rpc('terminal_credentials_list')
+    const map: typeof creds = {}
+    for (const c of (data ?? []) as ({ user_id: string } & (typeof creds)[string])[]) map[c.user_id] = c
+    setCreds(map)
+  }, [])
+  useEffect(() => {
+    loadCreds()
+  }, [loadCreds])
+  useEffect(() => () => stopReading.current?.(), [])
+
+  async function readChip() {
+    setError('')
+    try {
+      setReading(true)
+      stopReading.current = await startNfc((serial) => {
+        setEdit((e) => (e ? { ...e, badge: formatBadge(normalizeBadge(serial)) } : e))
+        stopReading.current?.()
+        stopReading.current = null
+        setReading(false)
+      })
+    } catch (err) {
+      setReading(false)
+      setError(`NFC lässt sich nicht starten: ${(err as Error).message}`)
+    }
+  }
 
   function startEdit(p: Profile) {
     setError('')
     setNotice('')
-    setEdit({ id: p.id, full_name: p.full_name, email: p.email, role: p.role, active: p.active, supervisor_id: p.supervisor_id ?? '', vacation_days: String(p.vacation_days ?? 0), weekly_hours: String(p.weekly_hours ?? 40).replace('.', ','), overtime_start: p.overtime_start ?? '', overtime_opening: String(p.overtime_opening ?? 0).replace('.', ','), montage_capacity: p.montage_capacity ?? true })
+    setEdit({ id: p.id, full_name: p.full_name, email: p.email, role: p.role, active: p.active, supervisor_id: p.supervisor_id ?? '', vacation_days: String(p.vacation_days ?? 0), weekly_hours: String(p.weekly_hours ?? 40).replace('.', ','), overtime_start: p.overtime_start ?? '', overtime_opening: String(p.overtime_opening ?? 0).replace('.', ','), montage_capacity: p.montage_capacity ?? true, badge: formatBadge(creds[p.id]?.badge_uid), pin: '', removePin: false })
   }
 
   async function saveEdit(e: FormEvent, p: Profile) {
@@ -56,6 +89,16 @@ export function Users() {
         const { error } = await supabase.from('profiles').update(change).eq('id', p.id)
         if (error) throw error
       }
+      const badge = normalizeBadge(edit.badge)
+      if (badge !== (creds[p.id]?.badge_uid ?? '')) {
+        const { error } = await supabase.rpc('set_terminal_badge', { p_user: p.id, p_badge: badge || null })
+        if (error) throw error
+      }
+      if (edit.pin || edit.removePin) {
+        if (edit.pin && !/^[0-9]{4,8}$/.test(edit.pin)) throw new Error('Die PIN muss aus 4 bis 8 Ziffern bestehen.')
+        const { error } = await supabase.rpc('set_terminal_pin', { p_user: p.id, p_pin: edit.removePin ? null : edit.pin })
+        if (error) throw error
+      }
       const email = edit.email.trim().toLowerCase()
       if (email !== p.email) await updateEmail(p.id, email)
       setNotice(
@@ -66,7 +109,7 @@ export function Users() {
     } catch (err) {
       setError((err as Error).message)
     }
-    await reload()
+    await Promise.all([reload(), loadCreds()])
     setBusy(false)
   }
 
@@ -230,6 +273,44 @@ export function Users() {
                     Zählt bei der Kapazitätsplanung Montage mit
                   </label>
                 )}
+                <fieldset className="terminal-creds">
+                  <legend>Stempel-Terminal</legend>
+                  <label>
+                    Chipnummer (Transponder)
+                    <div className="input-with-button">
+                      <input
+                        value={edit.badge}
+                        placeholder="Chip einlesen oder Nummer eintippen"
+                        // USB-Leser tippen die Nummer mit Enter: nicht gleich speichern
+                        onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                        onChange={(e) => setEdit({ ...edit, badge: e.target.value })}
+                      />
+                      {nfcSupported && (
+                        <button type="button" disabled={reading} onClick={readChip}>{reading ? 'Chip vorhalten…' : 'Chip einlesen'}</button>
+                      )}
+                    </div>
+                  </label>
+                  <label>
+                    {creds[p.id]?.has_pin ? 'Neue PIN (leer lassen = bleibt)' : 'PIN für Stempeln ohne Chip (4–8 Ziffern, optional)'}
+                    <input
+                      inputMode="numeric"
+                      autoComplete="off"
+                      maxLength={8}
+                      value={edit.pin}
+                      disabled={edit.removePin}
+                      onChange={(e) => setEdit({ ...edit, pin: e.target.value.replace(/\D/g, '') })}
+                    />
+                  </label>
+                  {creds[p.id]?.has_pin && (
+                    <label className="checkbox-row">
+                      <input type="checkbox" checked={edit.removePin} onChange={(e) => setEdit({ ...edit, removePin: e.target.checked, pin: '' })} />
+                      PIN entfernen
+                    </label>
+                  )}
+                  {creds[p.id]?.locked_until && new Date(creds[p.id].locked_until!) > new Date() && (
+                    <p className="small appointment-warn">PIN wegen Fehlversuchen gesperrt bis {new Date(creds[p.id].locked_until!).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr. Eine neue PIN hebt die Sperre auf.</p>
+                  )}
+                </fieldset>
                 <label className="checkbox-row">
                   <input
                     type="checkbox"
@@ -258,6 +339,8 @@ export function Users() {
                   {ROLE_LABEL[p.role]}
                   {!p.active && <span className="muted"> · deaktiviert</span>}
                   {p.role === 'monteur' && p.montage_capacity === false && <span className="muted"> · nicht in der Montage-Kapazität</span>}
+                  {creds[p.id]?.badge_uid && <span className="muted"> · Chip {formatBadge(creds[p.id].badge_uid)}</span>}
+                  {creds[p.id]?.has_pin && <span className="muted"> · PIN</span>}
                 </div>
                 <div className="small muted">
                   Vorgesetzte(r): {p.supervisor_id ? displayName(byId[p.supervisor_id]) : '–'} · Urlaub: {Number(p.vacation_days)} Tage/Jahr · {Number(p.weekly_hours).toLocaleString('de-DE')} Std./Woche
@@ -274,6 +357,8 @@ export function Users() {
           ),
         )}
       </ul>
+
+      <TerminalAdmin />
     </div>
   )
 }

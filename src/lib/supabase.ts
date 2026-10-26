@@ -45,3 +45,7 @@ if (!navigator.onLine) void supabase.auth.stopAutoRefresh()
 
 // Übertragen der Warteschlange immer mit frischem Zugang
 configureOffline(async () => (await onlineGetSession()).data.session?.access_token ?? null)
+
+// Für das Stempel-Terminal, das ohne Anmeldung direkt mit der Datenbank spricht
+export const supabaseUrl = url ?? ''
+export const supabaseAnonKey = anonKey ?? ''

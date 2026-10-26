@@ -649,3 +649,38 @@ button.link.danger-link { color: var(--danger); }
 .offline-wait { background: #fef0c7; color: #93370d; }
 .offline-failed { background: var(--error-bg); color: var(--danger); }
 .offline-line button.link { color: inherit; text-decoration: underline; white-space: nowrap; }
+
+/* --- Stempel-Terminal (Vollbild) --- */
+.terminal { position: fixed; inset: 0; display: flex; flex-direction: column; background: #10213f; color: #fff; user-select: none; overflow: auto; }
+.terminal-head { display: flex; justify-content: space-between; padding: 0.75rem 1rem; font-size: 0.95rem; opacity: 0.8; }
+.terminal-offline { background: #b45309; padding: 0.1rem 0.6rem; border-radius: 999px; opacity: 1; }
+.terminal-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 1rem; gap: 0.5rem; }
+.terminal-center h1 { margin: 0; font-size: clamp(1.8rem, 7vw, 3rem); }
+.terminal-center p { margin: 0; font-size: 1.15rem; }
+.terminal-hint a { color: #93c5fd; }
+.terminal-clock { font-size: clamp(4rem, 22vw, 9rem); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.terminal-date { font-size: 1.2rem; opacity: 0.8; }
+.terminal-prompt { margin-top: 2rem !important; font-size: 1.5rem !important; font-weight: 600; }
+.terminal-pin-button { margin-top: 2rem; background: transparent; color: #fff; border-color: rgba(255, 255, 255, 0.4); }
+.terminal-shown { animation: terminal-in 0.15s ease-out; }
+.terminal-kommen { background: #15803d; }
+.terminal-gehen { background: #1d4ed8; }
+.terminal-gespeichert { background: #0f766e; }
+.terminal-fehler { background: #b91c1c; }
+.terminal-icon { font-size: 4.5rem; line-height: 1; font-weight: 700; }
+@keyframes terminal-in { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+.terminal-pick { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 1rem; gap: 1rem; }
+.terminal-pick h2 { margin: 0; }
+.terminal-names { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.6rem; width: 100%; max-width: 640px; }
+.terminal-names button { min-height: 56px; font-size: 1.05rem; }
+.terminal-pin { font-size: 2rem; letter-spacing: 0.4rem; min-height: 2.5rem; }
+.terminal-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; width: 100%; max-width: 320px; }
+.terminal-keys button { min-height: 64px; font-size: 1.5rem; }
+.terminal-back { background: transparent; color: #fff; border-color: rgba(255, 255, 255, 0.4); }
+.terminal-foot { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; padding: 0.5rem 1rem 1rem; font-size: 0.9rem; }
+.terminal-foot .link { color: #93c5fd; }
+.terminal-sync-error { color: #fecaca; }
+.terminal-creds { border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.75rem 0.75rem; display: grid; gap: 0.6rem; }
+.terminal-creds legend { font-weight: 600; padding: 0 0.3rem; }
+.terminal-list { list-style: none; padding: 0; margin: 0 0 0.75rem; }
+.terminal-list li { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
