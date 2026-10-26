@@ -10,7 +10,8 @@ import { useProfiles } from '../lib/useProfiles'
 
 const ROLES = Object.keys(ROLE_LABEL) as Role[]
 
-export function Users() {
+// only: nur diesen Benutzer zeigen (Reiter App-Benutzer in der Personalakte), direkt zum Bearbeiten geöffnet
+export function Users({ only, onChanged }: { only?: string; onChanged?: () => void } = {}) {
   const { profile: me } = useAuth()
   const { profiles, byId, reload } = useProfiles()
   const [error, setError] = useState('')
@@ -56,11 +57,11 @@ export function Users() {
   const navigate = useNavigate()
   const opened = useRef(false)
   useEffect(() => {
-    const id = params.get('bearbeiten')
+    const id = only ?? params.get('bearbeiten')
     if (!id || opened.current || !byId[id]) return
     opened.current = true
     startEdit(byId[id])
-    setTimeout(() => document.getElementById(`user-${id}`)?.scrollIntoView({ block: 'start' }), 100)
+    if (!only) setTimeout(() => document.getElementById(`user-${id}`)?.scrollIntoView({ block: 'start' }), 100)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params, byId, creds])
 
@@ -174,21 +175,26 @@ export function Users() {
       setError((err as Error).message)
     }
     await reload()
+    onChanged?.()
     setBusy(false)
   }
 
   return (
     <div>
-      <div className="page-head">
-        <h1>App-Benutzer</h1>
-      </div>
-      <p className="muted small">Neue App-Benutzer legst du in der Personalakte des Mitarbeiters an (Personal → Mitarbeiter → „App-Benutzer anlegen“).</p>
+      {!only && (
+        <>
+          <div className="page-head">
+            <h1>App-Benutzer</h1>
+          </div>
+          <p className="muted small">Neue App-Benutzer legst du in der Personalakte des Mitarbeiters an (Reiter „App-Benutzer“).</p>
+        </>
+      )}
 
       {notice && <p className="info notice">{notice}</p>}
       {error && <p className="error">{error}</p>}
 
       <ul className="user-list">
-        {profiles.map((p) =>
+        {profiles.filter((p) => !only || p.id === only).map((p) =>
           edit?.id === p.id ? (
             <li key={p.id} id={`user-${p.id}`} className="card">
               <form className="form" onSubmit={(e) => saveEdit(e, p)}>
@@ -354,7 +360,7 @@ export function Users() {
         )}
       </ul>
 
-      <TerminalAdmin />
+      {!only && <TerminalAdmin />}
     </div>
   )
 }

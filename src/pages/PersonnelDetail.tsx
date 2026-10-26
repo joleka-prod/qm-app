@@ -24,6 +24,7 @@ import { supabase } from '../lib/supabase'
 import { ROLE_LABEL, displayName } from '../lib/types'
 import { createUser, generatePassword } from '../lib/adminUsers'
 import { useProfiles } from '../lib/useProfiles'
+import { Users } from './Users'
 
 type Form = Record<string, string | boolean>
 
@@ -298,7 +299,8 @@ export function PersonnelDetail() {
   const seniority = fullYears(String(form.entry_date || '') || null)
   const wc = wageConcept(wage, String(form.entry_date || '') || null)
   const user = emp.user_id ? byId[emp.user_id] : null
-  const current = TABS.find((t) => t.key === tab)!
+  const tabs = me?.role === 'admin' ? [...TABS, { key: 'benutzer', title: 'App-Benutzer', sections: [] }] : TABS
+  const current = tabs.find((t) => t.key === tab) ?? TABS[0]
 
   function toggleWage(groupIdx: number, key: string, on: boolean) {
     const g = WAGE_GROUPS[groupIdx]
@@ -321,20 +323,27 @@ export function PersonnelDetail() {
       </div>
       <p className="muted small">
         App-Benutzer: {user ? `${displayName(user)} · ${user.email}` : 'keiner'}
-        {me?.role === 'admin' && user && <> · <Link to={`/personal?ansicht=benutzer&bearbeiten=${user.id}`}>Zugang bearbeiten</Link></>}
-        {me?.role === 'admin' && !emp.user_id && (
-          <> · <button type="button" className="link" disabled={busy} onClick={createAccount}>App-Benutzer anlegen</button></>
-        )}
         {emp.ninox_id ? ' · aus Ninox übernommen' : ''}
       </p>
       <nav className="emp-tabs">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button type="button" key={t.key} className={t.key === tab ? 'active' : ''} onClick={() => setTab(t.key)}>{t.title}</button>
         ))}
       </nav>
       {error && <p className="error">{error}</p>}
 
-      <section className="card emp-card">
+      {current.key === 'benutzer' &&
+        (emp.user_id ? (
+          <Users key={emp.user_id} only={emp.user_id} onChanged={() => { reloadProfiles(); load() }} />
+        ) : (
+          <section className="card">
+            <p>{employeeName(emp)} hat noch keinen App-Benutzer.</p>
+            <p className="muted small">Login nach dem Schema vorname.nachname@joleka.de, das Startpasswort wird einmal angezeigt.</p>
+            <button type="button" className="primary" disabled={busy} onClick={createAccount}>App-Benutzer anlegen</button>
+          </section>
+        ))}
+
+      {current.key !== 'benutzer' && <section className="card emp-card">
         {current.sections.map((s, i) => (
           <div key={i} className="emp-section">
             {s.title && <h3 className="emp-heading">{s.title}</h3>}
@@ -413,7 +422,7 @@ export function PersonnelDetail() {
             ))}
           </div>
         )}
-      </section>
+      </section>}
 
       {dirty && (
         <div className="emp-savebar">
