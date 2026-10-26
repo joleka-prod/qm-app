@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { TerminalAdmin } from '../components/TerminalAdmin'
+import { NO_LOGIN_DOMAIN } from './UserImport'
 import { createUser, deleteUser, generatePassword, setPassword, updateEmail } from '../lib/adminUsers'
 import { formatBadge, nfcSupported, normalizeBadge, startNfc } from '../lib/nfc'
 import { supabase } from '../lib/supabase'
@@ -166,7 +168,12 @@ export function Users() {
     <div>
       <div className="page-head">
         <h1>Benutzer</h1>
-        {!showForm && <button className="primary" onClick={() => setShowForm(true)}>+ Neuer Benutzer</button>}
+        {!showForm && (
+          <div className="actions">
+            <Link className="button" to="/benutzer/import">Aus Ninox importieren</Link>
+            <button className="primary" onClick={() => setShowForm(true)}>+ Neuer Benutzer</button>
+          </div>
+        )}
       </div>
 
       {showForm && (
@@ -334,7 +341,7 @@ export function Users() {
             <li key={p.id} className={`card user-row ${p.active ? '' : 'inactive'}`}>
               <div>
                 <div className="ticket-title">{p.full_name || <span className="muted">(kein Name)</span>}</div>
-                <div className="muted small">{p.email}</div>
+                <div className="muted small">{p.email.endsWith(NO_LOGIN_DOMAIN) ? 'kein App-Login (nur Stempel-Terminal)' : p.email}</div>
                 <div className="small">
                   {ROLE_LABEL[p.role]}
                   {!p.active && <span className="muted"> · deaktiviert</span>}

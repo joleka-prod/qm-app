@@ -21,6 +21,7 @@ import { Users } from './pages/Users'
 import { Windows } from './pages/Windows'
 import { NfcTest } from './pages/NfcTest'
 import { Terminal } from './pages/Terminal'
+import { UserImport } from './pages/UserImport'
 
 function Routed() {
   const { session, profile, loading, needsPassword } = useAuth()
@@ -59,6 +60,7 @@ function Routed() {
         <Route path="zeiterfassung" element={<Timesheet />} />
         <Route path="stundenzettel" element={<Navigate to="/zeiterfassung" replace />} />
         {profile.role === 'admin' && <Route path="benutzer" element={<Users />} />}
+        {profile.role === 'admin' && <Route path="benutzer/import" element={<UserImport />} />}
         {profile.role === 'admin' && <Route path="artikel" element={<Articles />} />}
         {profile.role === 'admin' && <Route path="fenster" element={<Windows />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
