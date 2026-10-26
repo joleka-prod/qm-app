@@ -19,6 +19,7 @@ import { TicketList } from './pages/TicketList'
 import { Timesheet } from './pages/Timesheet'
 import { Users } from './pages/Users'
 import { Windows } from './pages/Windows'
+import { NfcTest } from './pages/NfcTest'
 
 function Routed() {
   const { session, profile, loading, needsPassword } = useAuth()
@@ -50,6 +51,7 @@ function Routed() {
         {profile.role === 'admin' && <Route path="benutzer" element={<Users />} />}
         {profile.role === 'admin' && <Route path="artikel" element={<Articles />} />}
         {profile.role === 'admin' && <Route path="fenster" element={<Windows />} />}
+        {profile.role === 'admin' && <Route path="nfc-test" element={<NfcTest />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
