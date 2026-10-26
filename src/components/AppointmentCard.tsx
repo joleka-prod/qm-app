@@ -108,7 +108,7 @@ export function AppointmentCard({ ticket: t, profiles, byId, me, canEdit, events
       {canEdit && planned && !form && (
         <div className="actions">
           <button className={state === 'offen' ? 'primary' : ''} disabled={busy} onClick={openForm}>
-            {state === 'offen' ? APPOINTMENT_LABEL.angemeldet : 'Neu anmelden'}
+            {state === 'offen' ? 'Termin bei Kunde anmelden' : 'Neu anmelden'}
           </button>
           {state === 'angemeldet' && (
             <button className="primary" disabled={busy} onClick={confirmAppointment}>
