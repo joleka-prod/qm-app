@@ -31,6 +31,30 @@ const named = (list: unknown) =>
     name: String(x.name ?? x.caption ?? x.id),
   }))
 
+// Felder einer Tabelle (für Verknüpfungen: Typ und Zieltabelle), soweit Ninox sie mitliefert
+const fieldsOf = (t: { fields?: unknown }) =>
+  (Array.isArray(t.fields) ? t.fields : []).map((f: Record<string, unknown>) => ({
+    id: String(f.id ?? ''),
+    name: String(f.name ?? f.caption ?? f.id ?? ''),
+    type: String(f.type ?? ''),
+    refTableId: f.refTableId != null ? String(f.refTableId) : null,
+  }))
+
+async function readRecords(path: string) {
+  const perPage = 500
+  const rows: { id: string; fields: Record<string, unknown> }[] = []
+  for (let page = 0; page < 40; page++) {
+    const list = await ninox(`${path}?page=${page}&perPage=${perPage}`)
+    if (!Array.isArray(list) || list.length === 0) break
+    for (const r of list) {
+      const { id, fields, ...rest } = r as { id: unknown; fields?: Record<string, unknown> }
+      rows.push({ id: String(id), fields: fields ?? rest })
+    }
+    if (list.length < perPage) break
+  }
+  return rows
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return reply(405, { error: 'Nur POST erlaubt' })
@@ -62,19 +86,20 @@ Deno.serve(async (req) => {
       return reply(200, named(await ninox(`/teams/${seg(body.team)}/databases/${seg(body.database)}/tables`)))
     }
     if (body.action === 'records') {
-      const path = `/teams/${seg(body.team)}/databases/${seg(body.database)}/tables/${seg(body.table)}/records`
-      const perPage = 500
-      const rows: { id: string; fields: Record<string, unknown> }[] = []
-      for (let page = 0; page < 40; page++) {
-        const list = await ninox(`${path}?page=${page}&perPage=${perPage}`)
-        if (!Array.isArray(list) || list.length === 0) break
-        for (const r of list) {
-          const { id, fields, ...rest } = r as { id: unknown; fields?: Record<string, unknown> }
-          rows.push({ id: String(id), fields: fields ?? rest })
-        }
-        if (list.length < perPage) break
-      }
-      return reply(200, rows)
+      return reply(200, await readRecords(`/teams/${seg(body.team)}/databases/${seg(body.database)}/tables/${seg(body.table)}/records`))
+    }
+    // ganze Datenbank: alle Tabellen mit Feldern und Datensätzen (für verknüpfte Tabellen)
+    if (body.action === 'database') {
+      const db = `/teams/${seg(body.team)}/databases/${seg(body.database)}`
+      const raw = await ninox(`${db}/tables`)
+      const tables = (Array.isArray(raw) ? raw : []).map((t: Record<string, unknown>) => ({
+        id: String(t.id),
+        name: String(t.name ?? t.caption ?? t.id),
+        fields: fieldsOf(t),
+      }))
+      const records: Record<string, unknown> = {}
+      for (const t of tables) records[t.id] = await readRecords(`${db}/tables/${seg(t.id)}/records`)
+      return reply(200, { tables, records })
     }
   } catch (err) {
     return reply(502, { error: (err as Error).message })

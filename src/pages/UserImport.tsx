@@ -14,6 +14,10 @@ import { useProfiles } from '../lib/useProfiles'
 
 type Item = { id: string; name: string }
 type NinoxRow = { id: string; fields: Record<string, unknown> }
+type NinoxField = { id: string; name: string; type: string; refTableId: string | null }
+type NinoxTable = Item & { fields: NinoxField[] }
+type NinoxDb = { tables: NinoxTable[]; records: Record<string, NinoxRow[]> }
+type Related = Record<string, Record<string, string>[]>
 type Target = 'name' | 'vorname' | 'nachname' | 'email' | 'rolle' | 'wochenstunden' | 'urlaub' | 'eintritt' | 'chip'
 
 const TARGETS: { key: Target; label: string; guess: RegExp }[] = [
@@ -78,6 +82,66 @@ function guessRole(v: string): Role {
   return 'mitarbeiter'
 }
 
+// Verknüpfungen: Ninox liefert bei Verweisfeldern die Nummer des Datensatzes (Zahl, Text oder { id })
+const refId = (v: unknown) =>
+  typeof v === 'number' || (typeof v === 'string' && /^\d+$/.test(v))
+    ? String(v)
+    : v && typeof v === 'object' && 'id' in (v as object)
+      ? String((v as { id: unknown }).id)
+      : null
+
+const norm = (s: string) => s.toLowerCase().replace(/[^a-zäöüß0-9]/g, '')
+
+// Zieltabelle eines Feldes: laut Ninox-Feldbeschreibung oder, falls die fehlt, wenn der Feldname
+// dem Tabellennamen entspricht (z. B. Feld "Lohngruppe" -> Tabelle "Lohngruppen", "Mitarbeiter" -> "Mitarbeiter")
+function refTarget(field: string, table: NinoxTable, all: NinoxTable[]) {
+  const f = table.fields.find((x) => x.name === field)
+  if (f?.refTableId) return all.find((t) => t.id === f.refTableId) ?? null
+  const n = norm(field)
+  if (n.length < 3) return null
+  return all.find((t) => t.id !== table.id && (norm(t.name) === n || norm(t.name).startsWith(n) || n.startsWith(norm(t.name)))) ?? null
+}
+
+// Kurzbezeichnung eines Datensatzes: die ersten Textwerte
+function labelOf(r: NinoxRow) {
+  const parts = Object.values(r.fields).map(text).filter((v) => v && !/^\d+$/.test(v)).slice(0, 2)
+  return parts.join(' – ') || `#${r.id}`
+}
+
+// Verweise in einem Datensatz durch die Bezeichnung des Ziel-Datensatzes ersetzen
+function resolveRow(r: NinoxRow, table: NinoxTable, ndb: NinoxDb, skipField?: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(r.fields)) {
+    if (k === skipField) continue
+    const id = refId(v)
+    const target = id ? refTarget(k, table, ndb.tables) : null
+    const hit = target ? (ndb.records[target.id] ?? []).find((x) => x.id === id) : null
+    out[k] = hit ? labelOf(hit) : text(v)
+  }
+  return out
+}
+
+// Einträge aller Tabellen, die auf einen Mitarbeiter verweisen (Untertabellen wie Lohn, Kinder, Schulungen)
+function relatedOf(main: NinoxTable, ndb: NinoxDb) {
+  const byParent: Record<string, Related> = {}
+  for (const t of ndb.tables) {
+    if (t.id === main.id) continue
+    const rows = ndb.records[t.id] ?? []
+    const linkField =
+      t.fields.find((f) => f.refTableId === main.id)?.name ??
+      [...new Set(rows.flatMap((r) => Object.keys(r.fields)))].find((k) => refTarget(k, t, ndb.tables)?.id === main.id)
+    if (!linkField) continue
+    for (const r of rows) {
+      const parent = refId(r.fields[linkField])
+      if (!parent) continue
+      const entry = Object.fromEntries(Object.entries(resolveRow(r, t, ndb, linkField)).filter(([, v]) => v !== ''))
+      if (Object.keys(entry).length === 0) continue
+      ;((byParent[parent] ??= {})[t.name] ??= []).push(entry)
+    }
+  }
+  return byParent
+}
+
 interface Planned {
   key: string
   row: NinoxRow
@@ -107,6 +171,7 @@ export function UserImport() {
   const [teams, setTeams] = useState<Item[]>([])
   const [dbs, setDbs] = useState<Item[]>([])
   const [tables, setTables] = useState<Item[]>([])
+  const [ndb, setNdb] = useState<NinoxDb | null>(null)
   const [team, setTeam] = useState('')
   const [db, setDb] = useState('')
   const [table, setTable] = useState('')
@@ -158,8 +223,11 @@ export function UserImport() {
     setTables([])
     setTable('')
     if (!db) return
-    step('Lade Tabellen…', () => ninox<Item[]>({ action: 'tables', team, database: db })).then((t) => {
-      if (!t) return
+    setNdb(null)
+    step('Lade alle Tabellen der Datenbank (kann etwas dauern)…', () => ninox<NinoxDb>({ action: 'database', team, database: db })).then((d) => {
+      if (!d) return
+      setNdb(d)
+      const t = d.tables
       setTables(t)
       const guess = t.find((x) => /mitarbeiter|personal|employee/i.test(x.name))
       if (guess || t.length === 1) setTable((guess ?? t[0]).id)
@@ -167,9 +235,11 @@ export function UserImport() {
   }, [db])
   useEffect(() => {
     setRows(null)
-    if (!table) return
-    step('Lade Mitarbeiter…', () => ninox<NinoxRow[]>({ action: 'records', team, database: db, table })).then((r) => {
-      if (!r) return
+    if (!table || !ndb) return
+    const main = ndb.tables.find((t) => t.id === table)!
+    // Verweise (z. B. Lohngruppe) gleich als Klartext
+    const r: NinoxRow[] = (ndb.records[table] ?? []).map((x) => ({ id: x.id, fields: resolveRow(x, main, ndb) }))
+    {
       setRows(r)
       const cols = columnsOf(r)
       const m: Partial<Record<Target, string>> = {}
@@ -187,8 +257,14 @@ export function UserImport() {
       }
       setPmap(pm)
       setSkip(new Set())
-    })
-  }, [table])
+    }
+  }, [table, ndb])
+
+  const related = useMemo(() => {
+    const main = ndb?.tables.find((t) => t.id === table)
+    return main && ndb ? relatedOf(main, ndb) : {}
+  }, [ndb, table])
+  const relatedCount = (id: string) => Object.values(related[id] ?? {}).reduce((n, l) => n + l.length, 0)
 
   const columns = useMemo(() => (rows ? columnsOf(rows) : []), [rows])
   const val = (r: NinoxRow, t: Target) => (map[t] ? text(r.fields[map[t]!]) : '')
@@ -247,7 +323,7 @@ export function UserImport() {
   const fileOnly = withFile ? planned.filter((p) => p.status === 'vorhanden' && p.existingId && !skip.has(p.key)) : []
 
   function personnelRow(userId: string, r: NinoxRow) {
-    const row: Record<string, unknown> = { user_id: userId, source: r.fields }
+    const row: Record<string, unknown> = { user_id: userId, source: r.fields, related: related[r.id] ?? {} }
     // Spalten, die schon Feldern der Akte oder des Benutzers zugeordnet sind, nicht doppelt unter "Weitere Angaben"
     const used = new Set([...Object.values(pmap), ...Object.values(map)])
     for (const f of PERSONNEL_FIELDS) {
@@ -269,6 +345,11 @@ export function UserImport() {
       .from('personnel_files')
       .upsert(personnelRow(userId, r), { onConflict: 'user_id', ignoreDuplicates: onlyIfMissing })
     if (error) throw new Error(`Personalakte nicht übernommen: ${error.message.includes('number_idx') ? 'Personalnummer doppelt' : error.message}`)
+    // vorhandene Akte: von Hand gepflegte Felder bleiben, die verknüpften Ninox-Daten werden ergänzt
+    if (onlyIfMissing && related[r.id]) {
+      const { error: e2 } = await supabase.from('personnel_files').update({ related: related[r.id] }).eq('user_id', userId)
+      if (e2) throw new Error(`Verknüpfte Daten nicht übernommen: ${e2.message}`)
+    }
   }
 
   function toggle(p: Planned) {
@@ -411,7 +492,13 @@ export function UserImport() {
         </div>
         {loading && <p className="muted">{loading}</p>}
         {error && <p className="error">{error}</p>}
-        {rows && <p className="muted small">{rows.length} Datensätze gefunden.</p>}
+        {rows && (
+          <p className="muted small">
+            {rows.length} Datensätze gefunden.
+            {Object.keys(related).length > 0 &&
+              ` Verknüpfte Tabellen: ${[...new Set(Object.values(related).flatMap((r) => Object.keys(r)))].sort().join(', ')}.`}
+          </p>
+        )}
       </section>
 
       {rows && rows.length > 0 && (
@@ -485,7 +572,7 @@ export function UserImport() {
               <table className="import-table">
                 <thead>
                   <tr>
-                    <th></th><th>Name</th><th>E-Mail</th><th>Rolle</th><th>Std./Woche</th><th>Urlaub</th><th>Ab</th><th>Chip</th><th>Hinweis</th>
+                    <th></th><th>Name</th><th>E-Mail</th><th>Rolle</th><th>Std./Woche</th><th>Urlaub</th><th>Ab</th><th>Chip</th><th>Verknüpft</th><th>Hinweis</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -506,6 +593,7 @@ export function UserImport() {
                       <td>{p.vacation ?? '–'}</td>
                       <td>{p.start ?? '–'}</td>
                       <td>{p.chip ? '✓' : ''}</td>
+                      <td>{relatedCount(p.key) || ''}</td>
                       <td className="small">{p.problem}</td>
                     </tr>
                   ))}

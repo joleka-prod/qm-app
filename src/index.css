@@ -693,3 +693,7 @@ button.link.danger-link { color: var(--danger); }
 .personnel-dl dt { font-size: 0.8rem; color: var(--muted); }
 .personnel-dl dd { margin: 0; overflow-wrap: anywhere; }
 .personnel-table a { font-weight: 600; }
+.personnel-related summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 0.4rem; }
+.personnel-related summary::before { content: '▸'; color: var(--muted); }
+.personnel-related[open] summary::before { content: '▾'; }
+.personnel-related summary h3 { margin: 0; display: inline; }

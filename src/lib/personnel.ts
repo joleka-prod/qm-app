@@ -76,6 +76,8 @@ export type PersonnelFile = Record<string, unknown> & {
   user_id: string
   personnel_number: string
   extra: Record<string, unknown>
+  // Einträge der verknüpften Ninox-Tabellen je Tabelle
+  related?: Record<string, Record<string, string>[]>
   updated_at?: string
   updated_by?: string | null
 }

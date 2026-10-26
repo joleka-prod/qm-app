@@ -49,12 +49,19 @@ export function PersonnelDetail() {
   const [error, setError] = useState('')
   const [upload, setUpload] = useState<{ title: string; file: File | null }>({ title: '', file: null })
 
+  // Zusatzfelder (aus Ninox oder von Hand ergänzt) gelten für alle Akten: Namen aus allen Akten sammeln
+  const [extraKeys, setExtraKeys] = useState<string[]>([])
+
   const load = useCallback(async () => {
-    const [f, d, l] = await Promise.all([
+    const [f, d, l, all] = await Promise.all([
       supabase.from('personnel_files').select('*').eq('user_id', id).maybeSingle(),
       supabase.from('personnel_documents').select('*').eq('user_id', id).order('created_at', { ascending: false }),
       supabase.from('personnel_log').select('*').eq('user_id', id).order('at', { ascending: false }).limit(100),
+      supabase.from('personnel_files').select('extra'),
     ])
+    const keys = new Set<string>()
+    for (const r of (all.data ?? []) as { extra: Record<string, unknown> }[]) for (const k of Object.keys(r.extra ?? {})) keys.add(k)
+    setExtraKeys([...keys].sort((a, b) => a.localeCompare(b, 'de')))
     if (f.error) setError(f.error.message)
     setFile((f.data ?? null) as PersonnelFile | null)
     setDocs((d.data ?? []) as Doc[])
@@ -76,7 +83,9 @@ export function PersonnelDetail() {
       values.last_name = parts.length > 1 ? parts.pop()! : ''
       values.first_name = parts.join(' ')
     }
-    setEdit({ values, extra: Object.entries(file?.extra ?? {}).map(([k, v]) => [k, String(v ?? '')]) })
+    const own = file?.extra ?? {}
+    const keys = [...new Set([...extraKeys, ...Object.keys(own)])]
+    setEdit({ values, extra: keys.map((k) => [k, String(own[k] ?? '')]) })
   }
 
   async function save(e: FormEvent) {
@@ -86,7 +95,8 @@ export function PersonnelDetail() {
     setError('')
     const row: Record<string, unknown> = { user_id: id }
     for (const f of PERSONNEL_FIELDS) row[f.key] = toDb(f, edit.values[f.key] ?? '')
-    row.extra = Object.fromEntries(edit.extra.filter(([k]) => k.trim()).map(([k, v]) => [k.trim(), v]))
+    // leere Zusatzfelder nicht speichern; das Feld bleibt über die anderen Akten trotzdem sichtbar
+    row.extra = Object.fromEntries(edit.extra.filter(([k, v]) => k.trim() && v.trim()).map(([k, v]) => [k.trim(), v.trim()]))
     const { error } = await supabase.from('personnel_files').upsert(row)
     if (error) setError(error.message.includes('personnel_files_number_idx') ? 'Diese Personalnummer ist schon vergeben.' : error.message)
     else setEdit(null)
@@ -180,7 +190,7 @@ export function PersonnelDetail() {
             </fieldset>
           ))}
           <fieldset className="terminal-creds">
-            <legend>Weitere Angaben (z. B. aus Ninox)</legend>
+            <legend>Weitere Felder (aus Ninox)</legend>
             {edit.extra.map(([k, v], i) => (
               <div key={i} className="input-with-button">
                 <input placeholder="Feld" value={k} onChange={(e) => setEdit({ ...edit, extra: edit.extra.map((x, j) => (j === i ? [e.target.value, x[1]] : x)) })} />
@@ -188,7 +198,7 @@ export function PersonnelDetail() {
                 <button type="button" onClick={() => setEdit({ ...edit, extra: edit.extra.filter((_, j) => j !== i) })}>✕</button>
               </div>
             ))}
-            <button type="button" className="link" onClick={() => setEdit({ ...edit, extra: [...edit.extra, ['', '']] })}>+ Feld hinzufügen</button>
+            <button type="button" className="link" onClick={() => setEdit({ ...edit, extra: [...edit.extra, ['', '']] })}>+ Neues Feld für alle Akten</button>
           </fieldset>
           <div className="actions">
             <button type="button" disabled={busy} onClick={() => setEdit(null)}>Abbrechen</button>
@@ -223,19 +233,43 @@ export function PersonnelDetail() {
                   </dl>
                 </div>
               ))}
-              {Object.keys(file.extra ?? {}).length > 0 && (
+              {extraKeys.length > 0 && (
                 <div className="personnel-section">
-                  <h3>Weitere Angaben</h3>
+                  <h3>Weitere Felder</h3>
                   <dl className="personnel-dl">
-                    {Object.entries(file.extra).map(([k, v]) => (
+                    {extraKeys.map((k) => (
                       <div key={k}>
                         <dt>{k}</dt>
-                        <dd>{String(v ?? '') || '–'}</dd>
+                        <dd>{String(file.extra?.[k] ?? '') || '–'}</dd>
                       </div>
                     ))}
                   </dl>
                 </div>
               )}
+              {Object.entries((file.related ?? {}) as Record<string, Record<string, string>[]>)
+                .sort(([a], [b]) => a.localeCompare(b, 'de'))
+                .map(([table, entries]) => {
+                  const cols = [...new Set(entries.flatMap((e) => Object.keys(e)))]
+                  return (
+                    <details key={table} className="personnel-section personnel-related">
+                      <summary>
+                        <h3>{table}</h3> <span className="muted small">({entries.length})</span>
+                      </summary>
+                      <div className="cal-scroll">
+                        <table className="import-table">
+                          <thead>
+                            <tr>{cols.map((c) => <th key={c}>{c}</th>)}</tr>
+                          </thead>
+                          <tbody>
+                            {entries.map((e, i) => (
+                              <tr key={i}>{cols.map((c) => <td key={c}>{e[c] ?? ''}</td>)}</tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </details>
+                  )
+                })}
             </>
           )}
         </section>
@@ -285,8 +319,8 @@ export function PersonnelDetail() {
                   {Object.entries(l.changes)
                     .map(([k, c]) => {
                       if (l.kind === 'dokument') return `${String(c)} (${k})`
-                      const label = PERSONNEL_LABEL[k] ?? (k === 'extra' ? 'Weitere Angaben' : k)
-                      if (SECRET.has(k) || k === 'extra' || l.kind === 'angelegt') return label
+                      const label = PERSONNEL_LABEL[k] ?? (k === 'extra' ? 'Weitere Felder' : k === 'related' ? 'Verknüpfte Ninox-Daten' : k)
+                      if (SECRET.has(k) || k === 'extra' || k === 'related' || l.kind === 'angelegt') return label
                       const { alt, neu } = c as { alt: unknown; neu: unknown }
                       return `${label}: ${alt === null || alt === '' || alt === undefined ? '–' : String(alt)} → ${neu === null || neu === '' ? '–' : String(neu)}`
                     })
