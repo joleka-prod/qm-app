@@ -1,4 +1,4 @@
-export type Role = 'mitarbeiter' | 'teamleiter' | 'disposition' | 'monteur' | 'admin'
+export type Role = 'mitarbeiter' | 'teamleiter' | 'disposition' | 'monteur' | 'personal' | 'admin'
 export type TicketType = 'qm' | 'montageauftrag' | 'restarbeit' | 'beanstandung' | 'reparatur'
 export type ServiceArea = 'kundendienst' | 'montage'
 export type TicketStatus = 'neu' | 'zugewiesen' | 'in_bearbeitung' | 'zur_pruefung' | 'abgeschlossen'
@@ -24,7 +24,7 @@ export interface Profile {
 }
 
 export function canSeePersonnel(p: Pick<Profile, 'role' | 'hr_access' | 'active'> | null | undefined) {
-  return !!p && p.active && (p.role === 'admin' || !!p.hr_access)
+  return !!p && p.active && (p.role === 'admin' || p.role === 'personal' || !!p.hr_access)
 }
 
 export interface Ticket {
@@ -229,6 +229,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   teamleiter: 'Teamleiter',
   disposition: 'Disposition',
   monteur: 'Monteur',
+  personal: 'Personalabteilung',
   admin: 'Admin',
 }
 

@@ -258,7 +258,7 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
                     Zählt bei der Kapazitätsplanung Montage mit
                   </label>
                 )}
-                {edit.role !== 'admin' && (
+                {edit.role !== 'admin' && edit.role !== 'personal' && (
                   <label className="checkbox-row">
                     <input type="checkbox" checked={edit.hr_access} onChange={(e) => setEdit({ ...edit, hr_access: e.target.checked })} />
                     Zugriff auf Personalakten (sieht und pflegt alle Personaldaten)
@@ -342,7 +342,7 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
                   {p.role === 'monteur' && p.montage_capacity === false && <span className="muted"> · nicht in der Montage-Kapazität</span>}
                   {creds[p.id]?.badge_uid && <span className="muted"> · Chip {formatBadge(creds[p.id].badge_uid)}</span>}
                   {creds[p.id]?.has_pin && <span className="muted"> · PIN</span>}
-                  {p.hr_access && p.role !== 'admin' && <span className="muted"> · Personalakten</span>}
+                  {p.hr_access && p.role !== 'admin' && p.role !== 'personal' && <span className="muted"> · Personalakten</span>}
                 </div>
                 <div className="small muted">
                   Vorgesetzte(r): {p.supervisor_id ? displayName(byId[p.supervisor_id]) : '–'} · Urlaub: {Number(p.vacation_days)} Tage/Jahr · {Number(p.weekly_hours).toLocaleString('de-DE')} Std./Woche
