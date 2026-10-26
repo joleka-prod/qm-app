@@ -10,28 +10,22 @@ declare
   v_deleted int := 0;
   v_deactivated int := 0;
 begin
-  if to_regclass('public.personnel_files') is not null then
-    execute $q$
-      select coalesce(array_agg(p.id), '{}')
-      from public.profiles p
-      where p.role <> 'admin'
-        and (
-          p.email like '%@kein-login.invalid'
-          or exists (
-            select 1 from public.personnel_files f
-            where f.user_id = p.id and f.source is not null
-              and p.created_at >= coalesce(
-                (select min(l.at) from public.personnel_log l where l.user_id = p.id and l.kind = 'angelegt'),
-                f.updated_at) - interval '10 minutes'
-          )
-        )
-    $q$ into v_ids;
-  else
-    -- Personalakte schon entfernt: dann nur noch die Benutzer ohne App-Login erkennbar
-    select coalesce(array_agg(id), '{}') into v_ids
-    from public.profiles where role <> 'admin' and email like '%@kein-login.invalid';
-    raise notice 'Personalakte war schon entfernt, erkannt werden nur Benutzer ohne App-Login.';
-  end if;
+  -- gleiche Erkennung wie in Schritt 1 (Anlagezeit-Block am 26.10.2026 oder ohne App-Login)
+  with heute as (
+    select p.id, p.created_at,
+      case when p.created_at - lag(p.created_at) over (order by p.created_at) <= interval '2 minutes' then 0 else 1 end as neu
+    from public.profiles p
+    where (p.created_at at time zone 'Europe/Berlin')::date = date '2026-10-26' and p.role <> 'admin'
+  ), bloecke as (
+    select id, sum(neu) over (order by created_at) as block from heute
+  ), gross as (
+    select block from bloecke group by block having count(*) >= 3
+  )
+  select coalesce(array_agg(p.id), '{}') into v_ids
+  from public.profiles p
+  where p.role <> 'admin'
+    and (p.email like '%@kein-login.invalid'
+         or p.id in (select id from bloecke where block in (select block from gross)));
 
   -- Personalakte: Daten und Tabellen
   drop table if exists public.personnel_documents cascade;
