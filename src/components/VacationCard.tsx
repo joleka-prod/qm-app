@@ -20,6 +20,8 @@ export interface VacationRequest {
   state: VacationState
   kind: VacationKind
   decided_by: string | null
+  // Genehmiger ohne App-Benutzer (aus TimeTac übernommen)
+  decided_by_name?: string
   decided_at: string | null
   decision_note: string
   created_at: string
@@ -232,12 +234,15 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
                     <span className={`badge badge-urlaub-${r.state}`}>{STATE_LABEL[r.state]}</span>
                   </div>
                   {r.note && <div className="small muted">{r.note}</div>}
-                  {r.decided_by && (
+                  {(r.decided_by || r.decided_by_name) ? (
                     <div className="small muted">
-                      {STATE_LABEL[r.state]} von {displayName(byId[r.decided_by])} am {formatDate(r.decided_at!)}
+                      {STATE_LABEL[r.state]} von {r.decided_by ? displayName(byId[r.decided_by]) : r.decided_by_name}
+                      {r.decided_at && <> am {formatDate(r.decided_at)}</>}
                       {r.decision_note && <> · {r.decision_note}</>}
                     </div>
-                  )}
+                  ) : r.decision_note && r.state !== 'beantragt' ? (
+                    <div className="small muted">{r.decision_note}</div>
+                  ) : null}
                 </div>
                 <div className="vacation-actions">
                   {r.state === 'beantragt' && canDecide(r) && (
