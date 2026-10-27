@@ -39,7 +39,7 @@ function formOf(e: Employee): Form {
 }
 
 // Eingabefeld je Feldart, angelehnt an das Ninox-Formular
-function Input({ field, value, onChange, list }: { field: Field; value: string | boolean; onChange: (v: string | boolean) => void; list?: string }) {
+function Input({ field, value, onChange, options }: { field: Field; value: string | boolean; onChange: (v: string | boolean) => void; options?: string[] }) {
   if (field.type === 'status') {
     const opts = field.options ?? STATUS
     return (
@@ -63,7 +63,31 @@ function Input({ field, value, onChange, list }: { field: Field; value: string |
   if (field.type === 'date') return <input type="date" value={v} onChange={(e) => onChange(e.target.value)} />
   if (field.type === 'datetime') return <input type="datetime-local" value={v} onChange={(e) => onChange(e.target.value)} />
   if (field.type === 'number' || field.type === 'money') return <input inputMode="decimal" value={v} onChange={(e) => onChange(e.target.value)} />
-  return <input value={v} list={list} onChange={(e) => onChange(e.target.value)} />
+  if (field.type === 'choice' && options) return <ChoiceInput value={v} options={options} onChange={onChange} />
+  return <input value={v} onChange={(e) => onChange(e.target.value)} />
+}
+
+// Auswahlfeld mit allen Vorschlägen. Eine datalist zeigt nur Werte, die zum aktuellen Text passen
+// (bei "JOLEKA Administration" fehlte so "Geschäftsführung"); eigene Werte bleiben über "Anderer Wert …" möglich.
+const OTHER = '__anderer_wert__'
+function ChoiceInput({ value, options, onChange }: { value: string; options: string[]; onChange: (v: string) => void }) {
+  const [custom, setCustom] = useState(false)
+  const all = value && !options.includes(value) ? [value, ...options] : options
+  if (custom) {
+    return (
+      <div className="choice-custom">
+        <input value={value} autoFocus onChange={(e) => onChange(e.target.value)} />
+        <button type="button" className="link" title="Zur Liste" onClick={() => setCustom(false)}>Liste</button>
+      </div>
+    )
+  }
+  return (
+    <select value={value} onChange={(e) => (e.target.value === OTHER ? setCustom(true) : onChange(e.target.value))}>
+      <option value="">–</option>
+      {all.map((o) => <option key={o} value={o}>{o}</option>)}
+      <option value={OTHER}>Anderer Wert …</option>
+    </select>
+  )
 }
 
 // Untertabelle wie in Ninox: Zeilen anklicken zum Bearbeiten, "+ Datensatz erstellen"
@@ -125,10 +149,7 @@ function SubTableView({ table, entries, employeeId, reload }: { table: SubTable;
           {cols.map((c) => (
             <label key={c.key} className={c.wide || c.type === 'textarea' ? 'wide' : ''}>
               {c.label}
-              {c.type === 'choice' && c.options && (
-                <datalist id={`opt-${table.kind}-${c.key}`}>{c.options.map((o) => <option key={o} value={o} />)}</datalist>
-              )}
-              <Input field={c.type === 'file' ? { ...c, type: 'text' } : c} value={edit?.values[c.key] ?? ''} list={c.options ? `opt-${table.kind}-${c.key}` : undefined}
+              <Input field={c.type === 'file' ? { ...c, type: 'text' } : c} value={edit?.values[c.key] ?? ''} options={c.type === 'choice' ? c.options : undefined}
                 onChange={(v) => setEdit((s) => (s ? { ...s, values: { ...s.values, [c.key]: String(v) } } : s))} />
             </label>
           ))}
@@ -424,10 +445,7 @@ export function PersonnelDetail() {
                 {s.fields?.map((f) => (
                   <label key={f.key} className={f.wide ? 'wide' : f.type === 'status' ? 'wide' : ''}>
                     {f.label}
-                    {f.type === 'choice' && (
-                      <datalist id={`opt-${f.key}`}>{(options[f.key] ?? f.options ?? []).map((o) => <option key={o} value={o} />)}</datalist>
-                    )}
-                    <Input field={f} value={form[f.key] ?? ''} list={f.type === 'choice' ? `opt-${f.key}` : undefined} onChange={(v) => set(f.key, v)} />
+                    <Input field={f} value={form[f.key] ?? ''} options={f.type === 'choice' ? options[f.key] ?? f.options ?? [] : undefined} onChange={(v) => set(f.key, v)} />
                   </label>
                 ))}
                 {s.computed?.includes('age') && (
