@@ -59,6 +59,7 @@ export function Personnel() {
 
 // Übersicht Personalakten (nur Admin und Benutzer mit Zugriff auf Personalakten)
 function EmployeeList() {
+  const { profile } = useAuth()
   const { byId } = useProfiles()
   const navigate = useNavigate()
   const [list, setList] = useState<Employee[]>([])
@@ -133,6 +134,7 @@ function EmployeeList() {
       <div className="page-head">
         <h1>Personal</h1>
         <div className="card-head-actions">
+          {profile?.role === 'admin' && <Link to="/personal/timetac" className="button">Import aus TimeTac</Link>}
           <button className="primary" onClick={create}>+ Mitarbeiter</button>
         </div>
       </div>

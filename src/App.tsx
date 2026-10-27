@@ -20,6 +20,7 @@ import { Timesheet } from './pages/Timesheet'
 import { Windows } from './pages/Windows'
 import { NfcTest } from './pages/NfcTest'
 import { Terminal } from './pages/Terminal'
+import { TimetacImport } from './pages/TimetacImport'
 import { Personnel } from './pages/Personnel'
 import { PersonnelDetail } from './pages/PersonnelDetail'
 
@@ -61,6 +62,7 @@ function Routed() {
         <Route path="stundenzettel" element={<Navigate to="/zeiterfassung" replace />} />
         <Route path="benutzer" element={<Navigate to="/personal?ansicht=benutzer" replace />} />
         {canSeePersonnel(profile) && <Route path="personal" element={<Personnel />} />}
+        {profile?.role === 'admin' && <Route path="personal/timetac" element={<TimetacImport />} />}
         {canSeePersonnel(profile) && <Route path="personal/:id" element={<PersonnelDetail />} />}
         {profile.role === 'admin' && <Route path="artikel" element={<Articles />} />}
         {profile.role === 'admin' && <Route path="fenster" element={<Windows />} />}
