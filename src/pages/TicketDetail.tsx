@@ -232,6 +232,8 @@ export function TicketDetail() {
   const donePositions = positions.filter((p) => p.state === 'erledigt').length
   const notDonePositions = positions.filter((p) => p.state === 'nicht_erledigt').length
   const canSign = einsatz && (isAdmin || (!closed && (isInstaller || isPlanner)))
+  // Arbeitsbericht schreiben und erledigt melden: Monteure im Team und Admin (auch am PC)
+  const canReport = einsatz && !closed && (isInstaller || isAdmin)
   const dirty = cause !== ticket.cause || action !== ticket.corrective_action
 
   async function update(patch: Partial<Ticket>) {
@@ -322,7 +324,7 @@ export function TicketDetail() {
           report_by_email: wantsEmail,
           ...(wantsEmail ? { customer_email: signEmail.trim() } : {}),
           // noch nicht gespeicherten Arbeitsbericht nicht verlieren
-          ...(isInstaller && report !== ticket?.work_report ? { work_report: report } : {}),
+          ...(canReport && report !== ticket?.work_report ? { work_report: report } : {}),
         })
         .eq('id', ticketId)
       if (error) throw error
@@ -883,7 +885,7 @@ export function TicketDetail() {
       {einsatz && (
         <section className="card">
           <h2>Arbeitsbericht</h2>
-          {isInstaller && !closed ? (
+          {canReport ? (
             <div className="form">
               <label>
                 Was wurde gemacht?
@@ -1016,7 +1018,7 @@ export function TicketDetail() {
         </section>
       )}
 
-      {einsatz && isInstaller && !closed && (
+      {canReport && (
         <section className="card">
           <div className="actions">
             <button
