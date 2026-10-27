@@ -352,9 +352,12 @@ export function TimetacImport() {
       const next = new Map<string, Grant>()
       let gErr = ''
       try {
-        for (const a of await timetac({ action: 'requests', from, to })) {
-          const uid = str(a.granted_user_id)
-          if (uid && uid !== '0') next.set(str(a.id), { uid, at: toIso(a.granted_timestamp, 'Europe/Berlin') })
+        const ids = [...new Set(list.map((r) => str(r.request_id)).filter((id) => /^\d+$/.test(id) && id !== '0'))]
+        for (let i = 0; i < ids.length; i += 100) {
+          for (const a of await timetac({ action: 'requests', ids: ids.slice(i, i + 100).join('|') })) {
+            const uid = str(a.granted_user_id)
+            if (uid && uid !== '0') next.set(str(a.id), { uid, at: toIso(a.granted_timestamp, 'Europe/Berlin') })
+          }
         }
       } catch (e) {
         gErr = (e as Error).message
