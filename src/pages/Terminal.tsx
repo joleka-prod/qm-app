@@ -259,7 +259,7 @@ export function Terminal() {
           <h1>Kein Stempel-Terminal</h1>
           <p>Dieses Gerät ist noch nicht als Terminal eingerichtet.</p>
           <p className="terminal-hint">
-            Als Admin anmelden und unter <a href="/personal?ansicht=benutzer">Personal → App-Benutzer → Stempel-Terminals</a> „Dieses Gerät als Terminal
+            Als Admin anmelden und unter <a href="/personal?ansicht=benutzer">Personal → Stempel-Terminals</a> „Dieses Gerät als Terminal
             einrichten“ wählen.
           </p>
         </div>

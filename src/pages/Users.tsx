@@ -10,7 +10,8 @@ import { useProfiles } from '../lib/useProfiles'
 
 const ROLES = Object.keys(ROLE_LABEL) as Role[]
 
-// only: nur diesen Benutzer zeigen (Reiter App-Benutzer in der Personalakte), direkt zum Bearbeiten geöffnet
+// only: nur diesen Benutzer zeigen (Reiter App-Benutzer in der Personalakte), direkt zum Bearbeiten geöffnet.
+// Ohne only: nur Benutzer ohne Personalakte (zum Nachpflegen) und die Stempel-Terminals.
 export function Users({ only, onChanged }: { only?: string; onChanged?: () => void } = {}) {
   const { profile: me } = useAuth()
   const { profiles, byId, reload } = useProfiles()
@@ -126,9 +127,12 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
 
   // App-Benutzer gibt es nur zu einem Mitarbeiter (Fabian, 2026-10-26): Benutzer ohne Akte bekommen eine
   const [files, setFiles] = useState<Record<string, number>>({})
+  const [filesLoaded, setFilesLoaded] = useState(false)
+  const orphans = filesLoaded ? profiles.filter((p) => !files[p.id]) : []
   const loadFiles = useCallback(async () => {
     const { data } = await supabase.from('employees').select('id, user_id').not('user_id', 'is', null)
     setFiles(Object.fromEntries((data ?? []).map((r) => [r.user_id as string, r.id as number])))
+    setFilesLoaded(true)
   }, [])
   useEffect(() => {
     loadFiles()
@@ -181,12 +185,10 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
 
   return (
     <div>
-      {!only && (
+      {!only && filesLoaded && orphans.length > 0 && (
         <>
-          <div className="page-head">
-            <h1>App-Benutzer</h1>
-          </div>
-          <p className="muted small">Neue App-Benutzer legst du in der Personalakte des Mitarbeiters an (Reiter „App-Benutzer“).</p>
+          <h2>App-Benutzer ohne Personalakte</h2>
+          <p className="muted small">App-Benutzer gibt es nur zu einem Mitarbeiter. Bitte für diese Benutzer eine Personalakte anlegen oder sie löschen. Alles Weitere bearbeitest du in der Personalakte im Reiter „App-Benutzer“.</p>
         </>
       )}
 
@@ -194,7 +196,7 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
       {error && <p className="error">{error}</p>}
 
       <ul className="user-list">
-        {profiles.filter((p) => !only || p.id === only).map((p) =>
+        {(only ? profiles.filter((p) => p.id === only) : orphans).map((p) =>
           edit?.id === p.id ? (
             <li key={p.id} id={`user-${p.id}`} className="card">
               <form className="form" onSubmit={(e) => saveEdit(e, p)}>

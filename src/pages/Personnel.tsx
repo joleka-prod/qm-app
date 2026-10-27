@@ -19,7 +19,7 @@ export function Personnel() {
       {profile?.role === 'admin' && (
         <nav className="emp-tabs">
           <button type="button" className={users ? '' : 'active'} onClick={() => setParams({})}>Mitarbeiter</button>
-          <button type="button" className={users ? 'active' : ''} onClick={() => setParams({ ansicht: 'benutzer' })}>App-Benutzer &amp; Terminals</button>
+          <button type="button" className={users ? 'active' : ''} onClick={() => setParams({ ansicht: 'benutzer' })}>Stempel-Terminals</button>
         </nav>
       )}
       {users ? <Users /> : <EmployeeList />}
