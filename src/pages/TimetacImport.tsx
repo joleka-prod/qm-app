@@ -28,8 +28,9 @@ const str = (v: unknown) => (v === null || v === undefined ? '' : String(v).trim
 
 // Personalnummer: TimeTac benennt das Feld je nach Konto unterschiedlich
 function ttNumber(u: Row) {
+  if (str(u.personnel_number)) return str(u.personnel_number)
   for (const [k, v] of Object.entries(u)) {
-    if (/personal|personnel|staff_?n|employee_?n|pers_?nr|payroll/i.test(k) && str(v)) return str(v)
+    if (/personal_?n|personnel_?n|staff_?n|employee_?n|pers_?nr/i.test(k) && str(v)) return str(v)
   }
   return ''
 }
@@ -67,6 +68,55 @@ function toIso(local: unknown, tz: unknown) {
 }
 
 const day = (d: Date) => d.toISOString().slice(0, 10)
+
+// Zeitraum in Monate teilen, damit ein Abruf nicht zu lange dauert
+function months(from: string, to: string) {
+  const out: [string, string][] = []
+  for (let start = from; start <= to; ) {
+    const d = new Date(start + 'T00:00:00Z')
+    const monthEnd = day(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)))
+    const end = monthEnd < to ? monthEnd : to
+    out.push([start, end])
+    start = day(new Date(Date.parse(end + 'T00:00:00Z') + 86400000))
+  }
+  return out
+}
+const monthName = (d: string) => new Date(d + 'T00:00').toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+
+// TimeTac-Abwesenheitsarten -> Arten in der App (Feiertage rechnet die App selbst)
+const ABSENCE_KIND: Record<string, { kind: string; label: string }> = {
+  holiday: { kind: 'urlaub', label: 'Urlaub' },
+  overtime_reduction: { kind: 'ueberstunden', label: 'Zeitausgleich (Überstunden)' },
+  sick_leave: { kind: 'krank', label: 'Krankheit' },
+  other_paid_leave: { kind: 'sonderurlaub', label: 'Sonderurlaub' },
+}
+
+interface Absence { start: string; end: string; days: number; kind: string }
+
+// Abwesenheitstage zu Zeiträumen zusammenfassen: gleicher Antrag und gleiche Art, nicht über den Jahreswechsel
+function groupAbsences(rows: Row[]) {
+  const per = new Map<string, Absence[]>()
+  const sorted = rows
+    .filter((r) => Number(r.status) === 1 && ABSENCE_KIND[str(r.type)] && Number(r.value) > 0)
+    .map((r): Row & { date: string } => ({ ...r, date: str(r.date).slice(0, 10) }))
+    .sort((a, b) => (a.date < b.date ? -1 : 1))
+  const open = new Map<string, Absence & { req: string }>()
+  for (const r of sorted) {
+    const uid = str(r.user_id)
+    const kind = ABSENCE_KIND[str(r.type)].kind
+    const days = str(r.value_unit) === 'hs' ? Number(r.value) / 8 : Number(r.value)
+    const cur = open.get(uid)
+    if (cur && cur.kind === kind && cur.req === str(r.request_id) && cur.end.slice(0, 4) === r.date.slice(0, 4)) {
+      cur.end = r.date
+      cur.days += days
+      continue
+    }
+    if (cur) per.set(uid, [...(per.get(uid) ?? []), { start: cur.start, end: cur.end, days: cur.days, kind: cur.kind }])
+    open.set(uid, { start: r.date, end: r.date, days, kind, req: str(r.request_id) })
+  }
+  for (const [uid, cur] of open) per.set(uid, [...(per.get(uid) ?? []), { start: cur.start, end: cur.end, days: cur.days, kind: cur.kind }])
+  return per
+}
 const STORE = 'timetac-zuordnung'
 
 export function TimetacImport() {
@@ -88,6 +138,8 @@ export function TimetacImport() {
   const [trackings, setTrackings] = useState<Row[] | null>(null)
   const [tasks, setTasks] = useState<Record<string, string>>({})
   const [skipTasks, setSkipTasks] = useState<string[]>([])
+  const [absences, setAbsences] = useState<Map<string, Absence[]> | null>(null)
+  const [absResult, setAbsResult] = useState<{ name: string; inserted: number; skipped: number; error?: string }[]>([])
   const [result, setResult] = useState<{ name: string; inserted: number; skipped: number; error?: string }[]>([])
 
   async function loadEmployees() {
@@ -163,15 +215,10 @@ export function TimetacImport() {
     setError('')
     setResult([])
     try {
-      // monatsweise, damit ein Abruf nicht zu lange dauert
       const list: Row[] = []
-      for (let start = from; start <= to; ) {
-        const d = new Date(start + 'T00:00:00Z')
-        const monthEnd = day(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)))
-        const end = monthEnd < to ? monthEnd : to
-        setBusy(`Lade Zeiten aus TimeTac … ${new Date(start + 'T00:00').toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}`)
+      for (const [start, end] of months(from, to)) {
+        setBusy(`Lade Zeiten aus TimeTac … ${monthName(start)}`)
         list.push(...(await timetac({ action: 'trackings', from: start, to: end })))
-        start = day(new Date(Date.parse(end + 'T00:00:00Z') + 86400000))
       }
       const taskList = await timetac({ action: 'tasks' }).catch(() => [] as Row[])
       setTrackings(list)
@@ -237,6 +284,41 @@ export function TimetacImport() {
     }
     setBusy('')
   }
+
+  async function loadAbsences() {
+    setError('')
+    setAbsResult([])
+    try {
+      const list: Row[] = []
+      for (const [start, end] of months(from, to)) {
+        setBusy(`Lade Abwesenheiten aus TimeTac … ${monthName(start)}`)
+        list.push(...(await timetac({ action: 'absences', from: start, to: end })))
+      }
+      setAbsences(groupAbsences(list))
+    } catch (e) {
+      setError((e as Error).message)
+    }
+    setBusy('')
+  }
+
+  async function importAbsences() {
+    if (!absences || !confirm('Abwesenheiten jetzt übernehmen? Sie werden als genehmigt eingetragen. Bereits eingetragene Zeiträume werden übersprungen.')) return
+    setError('')
+    const out: typeof absResult = []
+    for (const [uid, rows] of absences) {
+      const e = empById[map[uid]]
+      if (!e?.user_id) continue
+      setBusy(`Übernehme Abwesenheiten von ${userName(uid)} …`)
+      const { data, error } = await supabase.rpc('import_absences', { p_user: e.user_id, p_rows: rows })
+      const err = error ? (error.message.includes('import_absences') ? 'Bitte zuerst das SQL-Update für die Abwesenheiten ausführen.' : error.message) : ''
+      out.push({ name: employeeName(e), inserted: data?.inserted ?? 0, skipped: data?.skipped ?? 0, error: err || undefined })
+      setAbsResult([...out])
+      if (err) break
+    }
+    setBusy('')
+  }
+
+  const absenceSum = (rows: Absence[], kind: string) => rows.filter((r) => r.kind === kind).reduce((s, r) => s + r.days, 0)
 
   const hours = (rows: { start: string; end: string }[]) =>
     rows.reduce((s, r) => s + (Date.parse(r.end) - Date.parse(r.start)) / 3600000, 0)
@@ -383,6 +465,65 @@ export function TimetacImport() {
             </table>
           )}
           {!busy && result.length > 0 && <p className="small"><b>Import abgeschlossen.</b></p>}
+        </section>
+      )}
+      {users && (
+        <section className="card">
+          <h2>4. Abwesenheiten</h2>
+          <p className="muted small">
+            Genehmigte Abwesenheiten im gleichen Zeitraum (oben bei 2. gewählt): Urlaub, Zeitausgleich, Krankheit und
+            Sonderurlaub. Sie werden als genehmigt eingetragen und mindern das Soll; Urlaub zählt gegen den Anspruch.
+          </p>
+          <button type="button" className="primary" disabled={!!busy || !from || !to || from > to} onClick={loadAbsences}>Abwesenheiten laden</button>
+          {absences && (
+            <>
+              <div className="cal-scroll">
+                <table className="import-table">
+                  <thead>
+                    <tr>
+                      <th>TimeTac</th><th>Personalakte</th>
+                      {Object.values(ABSENCE_KIND).map((k) => <th key={k.kind}>{k.label}</th>)}
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...absences.entries()].map(([uid, rows]) => {
+                      const e = empById[map[uid]]
+                      return (
+                        <tr key={uid} className={e?.user_id ? '' : 'muted'}>
+                          <td>{userName(uid)}</td>
+                          <td>{e ? employeeName(e) : '–'}</td>
+                          {Object.values(ABSENCE_KIND).map((k) => (
+                            <td key={k.kind}>{absenceSum(rows, k.kind) ? absenceSum(rows, k.kind).toLocaleString('de-DE') : '–'}</td>
+                          ))}
+                          <td className="small">{e?.user_id ? 'wird importiert' : e ? 'kein App-Benutzer' : 'nicht zugeordnet'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {absences.size === 0 && <p className="muted">Keine genehmigten Abwesenheiten in diesem Zeitraum.</p>}
+              {absences.size > 0 && <button type="button" className="primary" disabled={!!busy} onClick={importAbsences}>Abwesenheiten übernehmen</button>}
+            </>
+          )}
+          {absResult.length > 0 && (
+            <table className="import-table">
+              <thead>
+                <tr><th>Mitarbeiter</th><th>übernommen</th><th>übersprungen</th></tr>
+              </thead>
+              <tbody>
+                {absResult.map((r) => (
+                  <tr key={r.name}>
+                    <td>{r.name}</td>
+                    <td>{r.inserted}</td>
+                    <td>{r.skipped}{r.error && <span className="error"> {r.error}</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {!busy && absResult.length > 0 && <p className="small"><b>Abwesenheiten übernommen.</b></p>}
         </section>
       )}
     </div>

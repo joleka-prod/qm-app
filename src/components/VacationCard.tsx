@@ -3,9 +3,12 @@ import { supabase } from '../lib/supabase'
 import { displayName, formatDate, formatDay, type Profile } from '../lib/types'
 
 export type VacationState = 'beantragt' | 'genehmigt' | 'abgelehnt' | 'storniert'
-export type VacationKind = 'urlaub' | 'ueberstunden'
+export type VacationKind = 'urlaub' | 'ueberstunden' | 'krank' | 'sonderurlaub'
 
-export const KIND_LABEL: Record<VacationKind, string> = { urlaub: 'Urlaubstage', ueberstunden: 'Überstunden' }
+export const KIND_LABEL: Record<VacationKind, string> = { urlaub: 'Urlaubstage', ueberstunden: 'Überstunden', krank: 'Krank', sonderurlaub: 'Sonderurlaub' }
+
+// Zusatz hinter dem Zeitraum (Urlaub ohne Zusatz)
+const KIND_NOTE: Record<VacationKind, string> = { urlaub: '', ueberstunden: 'über Überstunden', krank: 'Krankheit', sonderurlaub: 'Sonderurlaub' }
 
 export interface VacationRequest {
   id: number
@@ -104,7 +107,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
   }
 
   const allowance = Number(byId[userId]?.vacation_days ?? 0)
-  const sum = (s: VacationState) => list.filter((r) => r.state === s && r.kind !== 'ueberstunden').reduce((a, r) => a + r.days, 0)
+  const sum = (s: VacationState) => list.filter((r) => r.state === s && r.kind === 'urlaub').reduce((a, r) => a + r.days, 0)
   const approved = sum('genehmigt')
   const requested = sum('beantragt')
   const rest = allowance - approved - requested
@@ -139,7 +142,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
                   <strong>{displayName(byId[r.user_id])}</strong>
                   <div className="small">
                     {period(r)} · {dayWord(r.days)}
-                    {r.kind === 'ueberstunden' && <> · über Überstunden</>}
+                    {KIND_NOTE[r.kind] && <> · {KIND_NOTE[r.kind]}</>}
                   </div>
                   {r.note && <div className="small muted">{r.note}</div>}
                 </div>
@@ -225,7 +228,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
                 <div>
                   <div>
                     {period(r)} · {dayWord(r.days)}
-                    {r.kind === 'ueberstunden' && <span className="muted"> · über Überstunden</span>}{' '}
+                    {KIND_NOTE[r.kind] && <span className="muted"> · {KIND_NOTE[r.kind]}</span>}{' '}
                     <span className={`badge badge-urlaub-${r.state}`}>{STATE_LABEL[r.state]}</span>
                   </div>
                   {r.note && <div className="small muted">{r.note}</div>}

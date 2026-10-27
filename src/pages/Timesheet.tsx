@@ -34,6 +34,8 @@ type Edit = { id?: number; start: string; end: string; reason: string }
 
 // Stundenkonto: Tage, Wochen und Monat aus den Stempelzeiten. Mitarbeiter sehen ihr eigenes,
 // QM und Teamleiter alle und können Zeiten korrigieren oder nachtragen.
+const VACATION_TEXT = { urlaub: 'Urlaub ', ueberstunden: 'Frei (Überstunden) ', krank: 'Krank ', sonderurlaub: 'Sonderurlaub ' }
+
 export function Timesheet() {
   const { profile } = useAuth()
   const { profiles, byId } = useProfiles()
@@ -271,7 +273,7 @@ export function Timesheet() {
                       {holidayName(d) && <span className="holiday-name">{holidayName(d)}</span>}
                     </strong>
                     <span className="ts-work">
-                      {vac && <span className="ts-vacation">{vac.kind === 'ueberstunden' ? 'Frei (Überstunden) ' : 'Urlaub '}</span>}
+                      {vac && <span className="ts-vacation">{VACATION_TEXT[vac.kind as keyof typeof VACATION_TEXT] ?? 'Urlaub '}</span>}
                       {work > 0 ? formatMinutes(work) : !onVacation && <span className="muted">–</span>}
                     </span>
                   </div>
