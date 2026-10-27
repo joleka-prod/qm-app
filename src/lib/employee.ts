@@ -220,14 +220,6 @@ export const SUBTABLES: SubTable[] = [
     ],
   },
   {
-    kind: 'krankheit', title: 'Krankheitstage', sortBy: 'year',
-    columns: [
-      { key: 'year', label: 'Jahr', type: 'number' },
-      { key: 'days_total', label: 'Fehltage gesamt', type: 'number' },
-      { key: 'accident_days', label: 'Davon Unfalltage', type: 'number' },
-    ],
-  },
-  {
     kind: 'reha', title: 'Reha/Kur', sortBy: 'start',
     columns: [
       { key: 'type', label: 'Auswahl', type: 'choice', options: ['Reha', 'Kur'] },
@@ -275,7 +267,7 @@ export const TABS: Tab[] = [
   },
   { key: 'schulungen', title: 'Schulungen', sections: [{ tables: ['schulung', 'deutschkurs'] }] },
   { key: 'kleidung', title: 'Kleidung/KFZ', sections: [{ tables: ['schuhe', 'kleidung', 'kfz'] }] },
-  { key: 'fehlzeiten', title: 'Fehlzeiten', sections: [{ tables: ['unfall', 'krankheit', 'reha'] }] },
+  { key: 'fehlzeiten', title: 'Fehlzeiten', sections: [{ tables: ['unfall', 'reha'] }] },
   { key: 'lohnkonzept', title: 'Lohnkonzept', sections: [] },
 ]
 

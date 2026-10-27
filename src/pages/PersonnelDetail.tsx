@@ -171,6 +171,54 @@ function SubTableView({ table, entries, employeeId, reload }: { table: SubTable;
   )
 }
 
+// Krankheitstage je Jahr aus der Zeiterfassung (Abwesenheiten "Krank", z. B. aus TimeTac)
+function SickDaysByYear({ employeeId, hasUser }: { employeeId: number; hasUser: boolean }) {
+  const [rows, setRows] = useState<{ year: number; days: number }[] | null>(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!hasUser) return
+    supabase.rpc('employee_sick_days', { p_employee: employeeId }).then(({ data, error }) => {
+      if (error) setError(error.message)
+      setRows((data ?? []) as { year: number; days: number }[])
+    })
+  }, [employeeId, hasUser])
+
+  const fmt = (n: number) => Number(n).toLocaleString('de-DE', { maximumFractionDigits: 1 })
+
+  return (
+    <div className="emp-sub">
+      <div className="emp-sub-title">Krankheitstage laut Zeiterfassung</div>
+      {!hasUser ? (
+        <p className="muted small">Kein App-Benutzer verknüpft, daher keine Zeiterfassung.</p>
+      ) : error ? (
+        <p className="error">{error}</p>
+      ) : rows === null ? (
+        <p className="muted small">Lädt…</p>
+      ) : rows.length === 0 ? (
+        <p className="muted small">Keine Daten aus der Zeiterfassung vorhanden.</p>
+      ) : (
+        <div className="cal-scroll">
+          <p className="small">
+            Durchschnitt pro Jahr: <b>{fmt(rows.reduce((a, r) => a + Number(r.days), 0) / rows.length)} Tage</b>
+            <span className="muted"> (über {rows.length} {rows.length === 1 ? 'Jahr' : 'Jahre'} mit Zeiterfassung)</span>
+          </p>
+          <table className="import-table emp-table">
+            <thead>
+              <tr><th>Jahr</th><th className="num">Krankheitstage</th></tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.year}><td>{r.year}</td><td className="num">{fmt(r.days)}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Personalakte eines Mitarbeiters mit den Reitern aus Ninox
 export function PersonnelDetail() {
   const { id = '' } = useParams()
@@ -351,6 +399,11 @@ export function PersonnelDetail() {
       })()}
 
       {current.key !== 'benutzer' && <section className="card emp-card">
+        {current.key === 'fehlzeiten' && (
+          <div className="emp-section">
+            <SickDaysByYear employeeId={emp.id} hasUser={!!emp.user_id} />
+          </div>
+        )}
         {current.sections.map((s, i) => (
           <div key={i} className="emp-section">
             {s.title && <h3 className="emp-heading">{s.title}</h3>}
