@@ -1,20 +1,13 @@
 import { useState, type FormEvent } from 'react'
 import { useArticles, type Article } from '../lib/articles'
 import { supabase } from '../lib/supabase'
-import { formatEuro, UNITS, UNIT_HINT } from '../lib/types'
+import { formatEuro, parsePrice, UNITS, UNIT_HINT } from '../lib/types'
 
 
 type Form = { id?: number; article_number: string; description: string; unit: string; price: string; active: boolean }
 
 const emptyForm: Form = { article_number: '', description: '', unit: 'Stk', price: '', active: true }
 
-// "12,50" / "1.234,5" / "12.5" -> 12.5; leer -> null; ungültig -> NaN
-function parsePrice(s: string) {
-  const v = s.trim().replace(/\s|€/g, '')
-  if (!v) return null
-  const normalized = v.includes(',') ? v.replace(/\./g, '').replace(',', '.') : v
-  return /^\d+(\.\d{0,2})?$/.test(normalized) ? Number(normalized) : NaN
-}
 
 // Artikel / wiederkehrende Positionen pflegen (nur Admin)
 export function Articles() {

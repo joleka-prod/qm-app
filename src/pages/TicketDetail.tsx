@@ -4,7 +4,7 @@ import { useAuth } from '../auth'
 import { PhotoGallery } from '../components/PhotoGallery'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { PositionPhotos } from '../components/PositionPhotos'
-import { PositionsEditor, isEmptyPosition, newPositionDraft, type PositionDraft } from '../components/PositionsEditor'
+import { PositionsEditor, isEmptyPosition, newPositionDraft, positionPrice, positionToDraft, type PositionDraft } from '../components/PositionsEditor'
 import { OrderChain } from '../components/OrderChain'
 import { SignaturePad, canvasToBlob } from '../components/SignaturePad'
 import { TeamSelect } from '../components/TeamSelect'
@@ -51,6 +51,7 @@ import {
   type TicketStatus,
   isPlannerRole,
   canUseCrm,
+  formatEuro,
 } from '../lib/types'
 import { ensureCustomer } from '../lib/customers'
 import { ProjectPicker } from '../components/ProjectPicker'
@@ -228,6 +229,8 @@ export function TicketDetail() {
   const canEditPositions =
     einsatz && (isAdmin || (isPlanner && !closed) || (ticket.created_by === profile.id && ticket.status === 'neu'))
   const canCheckPositions = einsatz && !closed && (isInstaller || canEditPositions)
+  // Planer tragen Menge, Einheit und Einzelpreis gleich mit ein, solange nicht berechnet
+  const withPrices = isPlanner && !appendOnly && ticket.billing_state !== 'berechnet'
   const canAddPositions = einsatz && !closed && isInstaller && !canEditPositions
   const canDeletePhoto = (p: TicketPhoto) => isAdmin || (p.uploaded_by === profile.id && !closed)
   const openPositions = positions.filter((p) => p.state === 'offen').length
@@ -265,13 +268,21 @@ export function TicketDetail() {
     try {
       const keep = positionDrafts.filter((p) => !isEmptyPosition(p))
       const offset = appendOnly ? positions.length : 0
+      // Fehleingaben vor dem Speichern melden
+      if (withPrices) keep.forEach((p, i) => positionPrice(p, offset + i + 1))
       const removed = appendOnly ? [] : positions.filter((p) => !keep.some((k) => k.id === p.id)).map((p) => p.id)
       if (removed.length > 0) {
         const { error } = await supabase.from('ticket_positions').delete().in('id', removed)
         if (error) throw error
       }
       for (const [i, p] of keep.entries()) {
-        const row = { sort: offset + i, position_number: String(offset + i + 1), description: p.description.trim(), article_id: p.article_id ?? null }
+        const row = {
+          sort: offset + i,
+          position_number: String(offset + i + 1),
+          description: p.description.trim(),
+          article_id: p.article_id ?? null,
+          ...(withPrices ? positionPrice(p, offset + i + 1) : {}),
+        }
         const { error } = p.id
           ? await supabase.from('ticket_positions').update(row).eq('id', p.id)
           : await supabase.from('ticket_positions').insert({ ...row, ticket_id: ticketId })
@@ -599,7 +610,7 @@ export function TicketDetail() {
           {positionDrafts ? (
             <div className="form">
               {appendOnly && <p className="muted small">Neue Positionen werden an die bestehenden angehängt (ab Pos. {positions.length + 1}).</p>}
-              <PositionsEditor positions={positionDrafts} onChange={setPositionDrafts} />
+              <PositionsEditor positions={positionDrafts} onChange={setPositionDrafts} withPrices={withPrices} />
               <div className="actions">
                 <button disabled={busy} onClick={() => setPositionDrafts(null)}>Abbrechen</button>
                 <button className="primary" disabled={busy} onClick={savePositions}>Positionen speichern</button>
@@ -618,6 +629,11 @@ export function TicketDetail() {
                         {p.position_number && p.description && ' – '}
                         <span className="pre">{p.description}</span>
                       </div>
+                      {isPlanner && p.price != null && (
+                        <div className="muted small">
+                          {String(p.quantity).replace('.', ',')} {p.unit} × {formatEuro(p.price)} = {formatEuro(Math.round(p.quantity * p.price * 100) / 100)}
+                        </div>
+                      )}
                       {canCheckPositions ? (
                         <div className="position-state" role="group" aria-label={`Status Position ${p.position_number || p.sort + 1}`}>
                           <button
@@ -725,14 +741,7 @@ export function TicketDetail() {
                     setAppendOnly(false)
                     setPositionDrafts(
                       positions.length > 0
-                        ? positions.map((p) => ({
-                            key: String(p.id),
-                            id: p.id,
-                            position_number: p.position_number,
-                            description: p.description,
-                            article_id: p.article_id,
-                            files: [],
-                          }))
+                        ? positions.map(positionToDraft)
                         : [newPositionDraft()],
                     )
                   }}

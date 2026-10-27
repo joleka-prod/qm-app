@@ -6,7 +6,7 @@ import { CalcTimeFields, calcTimeColumns } from '../components/CalcTimeFields'
 import { AddressFields, CustomerFields, customerFromMaster, addressesToCheck, addressColumns, customerColumns, emptyAddress, emptyCustomer, type AltAddress, type CustomerData } from '../components/AddressFields'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { TeamSelect } from '../components/TeamSelect'
-import { PositionsEditor, isEmptyPosition, newPositionDraft, type PositionDraft } from '../components/PositionsEditor'
+import { PositionsEditor, isEmptyPosition, newPositionDraft, positionPrice, type PositionDraft } from '../components/PositionsEditor'
 import { uploadPhotos } from '../lib/photos'
 import { useTeams } from '../lib/teams'
 import { supabase } from '../lib/supabase'
@@ -101,6 +101,15 @@ export function NewTicket() {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    // Preise vor dem Anlegen prüfen, damit kein halber Auftrag entsteht
+    const filled = positions.filter((p) => !isEmptyPosition(p))
+    let prices: ReturnType<typeof positionPrice>[] = []
+    try {
+      if (canPlan) prices = filled.map((p, i) => positionPrice(p, i + 1))
+    } catch (err) {
+      setError((err as Error).message)
+      return
+    }
     setBusy(true)
     if (einsatz && !(await confirmAddresses(addressesToCheck(cust, crm && !project ? projectAddr : emptyAddress, billingAddr)))) {
       setBusy(false)
@@ -159,13 +168,13 @@ export function NewTicket() {
       setBusy(false)
       return
     }
-    const filled = positions.filter((p) => !isEmptyPosition(p))
     const posRows = filled.map((p, i) => ({
       ticket_id: data.id,
       sort: i,
       position_number: String(i + 1),
       description: p.description.trim(),
       article_id: p.article_id ?? null,
+      ...prices[i],
     }))
     let saved: { id: number; sort: number }[] = []
     if (einsatz && posRows.length > 0) {
@@ -241,7 +250,7 @@ export function NewTicket() {
       {einsatz && (
         <div className="field">
           <span>Positionen</span>
-          <PositionsEditor positions={positions} onChange={setPositions} withPhotos />
+          <PositionsEditor positions={positions} onChange={setPositions} withPhotos withPrices={canPlan} />
         </div>
       )}
       {!einsatz && (

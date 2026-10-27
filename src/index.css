@@ -733,3 +733,14 @@ button.link.danger-link { color: var(--danger); }
 .key-figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
 .key-figures .key-figure { margin: 0; }
 .key-figure-value { font-size: 1.75rem; font-weight: 700; margin: 0.2rem 0; }
+.position-price { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; padding-left: 4.9rem; }
+.position-price label { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.75rem; color: var(--muted); }
+.position-price input { width: 5rem; }
+.position-price label:last-of-type input { width: 7rem; text-align: right; }
+.position-amount { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; padding-bottom: 0.55rem; }
+@media (max-width: 600px) {
+  .position-price { padding-left: 0; }
+  .position-price label { flex: 1 1 0; min-width: 0; }
+  .position-price input, .position-price label:last-of-type input { width: 100%; }
+  .position-price .position-amount { flex-basis: 100%; text-align: right; padding-bottom: 0; }
+}

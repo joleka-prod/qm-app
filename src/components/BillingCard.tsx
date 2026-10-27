@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { addressLine, addressOf } from './AddressFields'
-import { BILLING_LABEL, displayName, formatDate, formatEuro, type Profile, type Ticket, type TicketPosition, UNITS, UNIT_HINT } from '../lib/types'
+import { BILLING_LABEL, displayName, formatDate, formatEuro, type Profile, type Ticket, type TicketPosition, parsePrice, UNITS, UNIT_HINT } from '../lib/types'
 
 interface Props {
   ticket: Ticket
@@ -23,13 +23,6 @@ function qtyText(n: number) {
 
 type Row = { quantity: string; unit: string; price: string }
 
-// "12,50" / "1.234,5" / "12.5" -> 12.5; leer -> null; ungültig -> NaN
-function parsePrice(s: string) {
-  const v = s.trim().replace(/\s|€/g, '')
-  if (!v) return null
-  const normalized = v.includes(',') ? v.replace(/\./g, '').replace(',', '.') : v
-  return /^\d+(\.\d{0,2})?$/.test(normalized) ? Number(normalized) : NaN
-}
 
 // Preise je Position eintragen, solange ein Reparaturauftrag zur Berechnung steht
 export function BillingCard({ ticket: t, positions, byId, canEdit, isAdmin, onChanged }: Props) {
