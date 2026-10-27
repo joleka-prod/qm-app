@@ -220,7 +220,7 @@ export const SUBTABLES: SubTable[] = [
     ],
   },
   {
-    kind: 'krankheit', title: 'Krankheitstage', sortBy: 'year',
+    kind: 'krankheit', title: 'Krankheitstage (manuell erfasst)', sortBy: 'year',
     columns: [
       { key: 'year', label: 'Jahr', type: 'number' },
       { key: 'days_total', label: 'Fehltage gesamt', type: 'number' },
