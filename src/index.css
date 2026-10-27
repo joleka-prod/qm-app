@@ -704,6 +704,8 @@ button.link.danger-link { color: var(--danger); }
 .emp-grid label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.85rem; min-width: 0; }
 .emp-grid label.wide { grid-column: span 2; }
 .emp-grid input[readonly] { background: var(--bg); }
+.choice-custom { display: flex; gap: 0.4rem; align-items: center; }
+.choice-custom input { flex: 1; min-width: 0; }
 .emp-sub { margin-top: 0.8rem; }
 .emp-sub-title { font-size: 0.85rem; color: var(--muted); margin-bottom: 0.25rem; }
 .emp-table { border: 1px solid var(--border); border-radius: 6px; }
