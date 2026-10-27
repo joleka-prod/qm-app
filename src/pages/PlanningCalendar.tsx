@@ -279,25 +279,35 @@ export function PlanningCalendar() {
           )}
         </div>
       </div>
-      <div className="segmented four view-switch" role="radiogroup" aria-label="Kalender">
-        {(['einplanung', 'montage', 'kundendienst', ''] as const).map((k) => {
-          const active = k === 'einplanung' ? view === 'einplanung' : view === 'tage' && areaFilter === k
+      {/* Vorplanung nur allein; Montage und Kundendienst einzeln oder zusammen (mindestens einer bleibt an) */}
+      <div className="segmented three view-switch" role="group" aria-label="Kalender">
+        <button
+          aria-pressed={view === 'einplanung'}
+          className={view === 'einplanung' ? 'active' : ''}
+          onClick={() => changeView('einplanung')}
+        >
+          Vorplanung
+        </button>
+        {(['montage', 'kundendienst'] as const).map((a) => {
+          const other = a === 'montage' ? 'kundendienst' : 'montage'
+          const active = view === 'tage' && areaFilter !== other
           return (
             <button
-              key={k || 'alle'}
-              role="radio"
-              aria-checked={active}
-              className={`${active ? 'active' : ''} ${k && k !== 'einplanung' ? `area-btn-${k}` : ''}`}
+              key={a}
+              aria-pressed={active}
+              className={`${active ? 'active' : ''} area-btn-${a}`}
               onClick={() => {
-                if (k === 'einplanung') {
-                  changeView('einplanung')
-                } else {
-                  setAreaFilter(k)
+                if (view !== 'tage') {
+                  setAreaFilter(a)
                   changeView('tage')
+                } else if (areaFilter === '') {
+                  setAreaFilter(other)
+                } else if (areaFilter === other) {
+                  setAreaFilter('')
                 }
               }}
             >
-              {k === 'einplanung' ? 'Vorplanung' : k ? AREA_LABEL[k] : 'Kundendienst & Montage'}
+              {AREA_LABEL[a]}
             </button>
           )
         })}
