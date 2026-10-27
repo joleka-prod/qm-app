@@ -57,7 +57,7 @@ export const MAIN_FIELDS: Field[] = [
   { key: 'email_private', label: 'E-Mail privat', type: 'text', wide: true },
   { key: 'vacation_days', label: 'Urlaubsanspruch', type: 'number', unit: 'Tage' },
   { key: 'entry_date', label: 'Firmeneintritt', type: 'date' },
-  { key: 'department', label: 'Abteilung', type: 'choice', options: [] },
+  { key: 'department', label: 'Abteilung', type: 'choice', options: ['Geschäftsführung'] },
   { key: 'specific_experience', label: 'Spezifische Berufserfahrung', type: 'text' },
   { key: 'vl_payment', label: 'VL Zahlung?', type: 'yesno' },
   { key: 'residence_title', label: 'Aufenthaltstitel', type: 'choice', options: [] },
@@ -470,8 +470,8 @@ export const PAYROLL_REQUIRED = [
   'health_insurance', 'iban',
 ]
 
-// Geschäftsführer brauchen keine(n) Vorgesetzte(n) (Fabian, 2026-10-27); erkannt an Tätigkeit oder Abteilung
-export const isManagingDirector = (e: Record<string, unknown>) => /gesch(ä|ae)ftsf/i.test(`${e.job_title ?? ''} ${e.department ?? ''}`)
+// Geschäftsführer brauchen keine(n) Vorgesetzte(n) (Fabian, 2026-10-27); gesteuert über die Abteilung "Geschäftsführung"
+export const isManagingDirector = (e: Record<string, unknown>) => String(e.department ?? '').trim().toLowerCase() === 'geschäftsführung'
 
 // fehlende Pflichtangaben als Feldnamen; hasWage: gibt es einen Eintrag unter "Lohn und Gehalt"?
 // supervisor: App-Benutzer hat eine(n) Vorgesetzte(n) (null = kein App-Benutzer, dann nicht prüfbar)

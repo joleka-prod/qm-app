@@ -82,7 +82,7 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
     try {
       // Pflicht für alle Mitarbeiter außer den Geschäftsführern (Fabian, 2026-10-27)
       if (files[p.id] && !directors.has(p.id) && !edit.supervisor_id) {
-        throw new Error('Bitte eine(n) verantwortliche(n) Vorgesetzte(n) wählen. Nur Geschäftsführer brauchen keine(n).')
+        throw new Error('Bitte eine(n) verantwortliche(n) Vorgesetzte(n) wählen. Nur die Abteilung Geschäftsführung braucht keine(n).')
       }
       const change: Partial<Profile> = {}
       if (edit.full_name.trim() !== p.full_name) change.full_name = edit.full_name.trim()
@@ -138,10 +138,8 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
   const [filesLoaded, setFilesLoaded] = useState(false)
   const orphans = filesLoaded ? profiles.filter((p) => !files[p.id]) : []
   const loadFiles = useCallback(async () => {
-    const first = await supabase.from('employees').select('id, user_id, job_title, department').not('user_id', 'is', null)
-    // ältere Datenbank ohne Feld "Tätigkeit"
-    const res = first.error ? await supabase.from('employees').select('id, user_id, department').not('user_id', 'is', null) : first
-    const rows = (res.data ?? []) as Record<string, unknown>[]
+    const { data } = await supabase.from('employees').select('id, user_id, department').not('user_id', 'is', null)
+    const rows = (data ?? []) as Record<string, unknown>[]
     setFiles(Object.fromEntries(rows.map((r) => [r.user_id as string, r.id as number])))
     setDirectors(new Set(rows.filter(isManagingDirector).map((r) => r.user_id as string)))
     setFilesLoaded(true)
