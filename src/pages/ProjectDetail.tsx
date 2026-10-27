@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { AddressSuggest } from '../components/AddressSuggest'
 import { confirmAddresses } from '../lib/addressCheck'
+import { noAutofill } from '../lib/noAutofill'
 import { StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { GROUP_LABEL, searchCustomers, type Customer, type CustomerContact, type CustomerNote } from '../lib/customers'
 import { PROJECT_ROLES, ROLE_LABEL, projectAddress, roleForGroup, type Project, type ProjectCustomer, type ProjectRole } from '../lib/projects'
@@ -130,7 +131,7 @@ export function ProjectDetail() {
       )}
       <label>
         Bezeichnung *
-        <input required maxLength={200} value={form.name} placeholder="z. B. Wohnpark Daun, Haus 3 oder Neubau Familie Müller" onChange={(e) => set({ name: e.target.value })} />
+        <input required maxLength={200} {...noAutofill('project-name')} value={form.name} placeholder="z. B. Wohnpark Daun, Haus 3 oder Neubau Familie Müller" onChange={(e) => set({ name: e.target.value })} />
       </label>
       <ProjectAddressFields form={form} set={set} />
       {!isNew && (
@@ -276,7 +277,7 @@ function ProjectAddressFields({ form, set }: { form: ProjectForm; set: (p: Parti
         <label>
           Straße
           <input
-            autoComplete="off"
+            {...noAutofill('project-street')}
             maxLength={150}
             value={form.street}
             onChange={(e) => {
@@ -288,7 +289,7 @@ function ProjectAddressFields({ form, set }: { form: ProjectForm; set: (p: Parti
         </label>
         <label>
           Nr.
-          <input maxLength={20} value={form.house_no} onChange={(e) => set({ house_no: e.target.value })} />
+          <input maxLength={20} {...noAutofill('project-house-no')} value={form.house_no} onChange={(e) => set({ house_no: e.target.value })} />
         </label>
       </div>
       <AddressSuggest
@@ -302,11 +303,11 @@ function ProjectAddressFields({ form, set }: { form: ProjectForm; set: (p: Parti
       <div className="row zip-row">
         <label>
           PLZ
-          <input inputMode="numeric" maxLength={10} value={form.zip} onChange={(e) => set({ zip: e.target.value })} />
+          <input inputMode="numeric" maxLength={10} {...noAutofill('project-zip')} value={form.zip} onChange={(e) => set({ zip: e.target.value })} />
         </label>
         <label>
           Ort
-          <input maxLength={100} value={form.city} onChange={(e) => set({ city: e.target.value })} />
+          <input maxLength={100} {...noAutofill('project-city')} value={form.city} onChange={(e) => set({ city: e.target.value })} />
         </label>
       </div>
     </>

@@ -4,6 +4,7 @@ import { useAuth } from '../auth'
 import { AddressSuggest } from '../components/AddressSuggest'
 import { CustomerProjectsCard, type CustomerProject } from '../components/CustomerProjectsCard'
 import { confirmAddresses } from '../lib/addressCheck'
+import { noAutofill } from '../lib/noAutofill'
 import {
   CUSTOMER_GROUPS,
   GROUP_LABEL,
@@ -167,33 +168,34 @@ export function CustomerDetail() {
         <input
           value={form.customer_number}
           maxLength={30}
+          {...noAutofill('master-number')}
           placeholder={isNew ? 'wird automatisch vergeben' : ''}
           onChange={(e) => set({ customer_number: e.target.value })}
         />
       </label>
       <label>
         {NAME_LABEL[form.customer_group][0]}
-        <input required maxLength={150} value={form.name} placeholder={NAME_LABEL[form.customer_group][1]} onChange={(e) => set({ name: e.target.value })} />
+        <input required maxLength={150} {...noAutofill('master-name')} value={form.name} placeholder={NAME_LABEL[form.customer_group][1]} onChange={(e) => set({ name: e.target.value })} />
       </label>
       <label>
         Zusatz
-        <input maxLength={150} value={form.name2} placeholder="z. B. Abteilung, z. Hd., Bauabschnitt" onChange={(e) => set({ name2: e.target.value })} />
+        <input maxLength={150} {...noAutofill('master-name2')} value={form.name2} placeholder="z. B. Abteilung, z. Hd., Bauabschnitt" onChange={(e) => set({ name2: e.target.value })} />
       </label>
       <CustomerAddress form={form} set={set} />
       <div className="row">
         <label>
           Telefon
-          <input type="tel" maxLength={50} value={form.phone} onChange={(e) => set({ phone: e.target.value })} />
+          <input type="tel" maxLength={50} {...noAutofill('master-phone')} value={form.phone} onChange={(e) => set({ phone: e.target.value })} />
         </label>
         <label>
           Mobil
-          <input type="tel" maxLength={50} value={form.mobile} onChange={(e) => set({ mobile: e.target.value })} />
+          <input type="tel" maxLength={50} {...noAutofill('master-mobile')} value={form.mobile} onChange={(e) => set({ mobile: e.target.value })} />
         </label>
       </div>
       <div className="row">
         <label>
           E-Mail
-          <input type="email" inputMode="email" maxLength={200} value={form.email} onChange={(e) => set({ email: e.target.value })} />
+          <input type="email" inputMode="email" maxLength={200} {...noAutofill('master-email')} value={form.email} onChange={(e) => set({ email: e.target.value })} />
         </label>
         <label>
           Webseite
@@ -294,7 +296,7 @@ function CustomerAddress({ form, set }: { form: CustomerForm; set: (p: Partial<C
         <label>
           Straße
           <input
-            autoComplete="off"
+            {...noAutofill('master-street')}
             maxLength={150}
             value={form.street}
             onChange={(e) => {
@@ -306,7 +308,7 @@ function CustomerAddress({ form, set }: { form: CustomerForm; set: (p: Partial<C
         </label>
         <label>
           Hausnummer
-          <input maxLength={20} value={form.house_no} onChange={(e) => set({ house_no: e.target.value })} />
+          <input maxLength={20} {...noAutofill('master-house-no')} value={form.house_no} onChange={(e) => set({ house_no: e.target.value })} />
         </label>
       </div>
       <AddressSuggest
@@ -320,16 +322,16 @@ function CustomerAddress({ form, set }: { form: CustomerForm; set: (p: Partial<C
       <div className="row zip-row">
         <label>
           PLZ
-          <input inputMode="numeric" maxLength={10} value={form.zip} onChange={(e) => set({ zip: e.target.value })} />
+          <input inputMode="numeric" maxLength={10} {...noAutofill('master-zip')} value={form.zip} onChange={(e) => set({ zip: e.target.value })} />
         </label>
         <label>
           Ort
-          <input maxLength={100} value={form.city} onChange={(e) => set({ city: e.target.value })} />
+          <input maxLength={100} {...noAutofill('master-city')} value={form.city} onChange={(e) => set({ city: e.target.value })} />
         </label>
       </div>
       <label>
         Land
-        <input list="country-list" maxLength={60} value={form.country} onChange={(e) => set({ country: e.target.value })} />
+        <input list="country-list" maxLength={60} {...noAutofill('master-country')} value={form.country} onChange={(e) => set({ country: e.target.value })} />
       </label>
     </>
   )
