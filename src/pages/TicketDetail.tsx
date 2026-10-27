@@ -1194,12 +1194,12 @@ export function TicketDetail() {
         </section>
       ) : isAdmin ? (
         <div className="actions danger-zone">
+          <button className="danger" onClick={removeTicket}>Auftrag löschen</button>
           {closed && (
-            <button disabled={busy} onClick={() => update({ status: einsatz ? 'zugewiesen' : 'in_bearbeitung' })}>
+            <button className="push-right" disabled={busy} onClick={() => update({ status: einsatz ? 'zugewiesen' : 'in_bearbeitung' })}>
               Wieder öffnen
             </button>
           )}
-          <button className="danger" onClick={removeTicket}>Auftrag löschen</button>
         </div>
       ) : canRequestDeletion && requestingDeletion ? (
         <section className="card danger-card">

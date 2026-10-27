@@ -169,6 +169,7 @@ button.link { border: none; background: none; color: var(--primary); padding: 0.
 .checkbox { display: flex; align-items: center; gap: 0.35rem; }
 .checkbox input { width: auto; }
 .danger-zone { justify-content: flex-start; margin-top: 1.5rem; }
+.actions .push-right { margin-left: auto; }
 
 @media (min-width: 700px) {
   .history li { flex-direction: row; gap: 1rem; }
