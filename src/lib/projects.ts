@@ -43,10 +43,18 @@ export function roleForGroup(group: Customer['customer_group']): ProjectRole {
   return group === 'bautraeger' || group === 'generalunternehmer' || group === 'architekt' ? group : 'bauherr'
 }
 
-export function projectAddress(p: Pick<Project, 'street' | 'house_no' | 'zip' | 'city' | 'country'>) {
+export type ProjectAddress = Pick<Project, 'street' | 'house_no' | 'zip' | 'city' | 'country'>
+
+export function projectAddress(p: ProjectAddress) {
   return [`${p.street} ${p.house_no}`.trim(), `${p.zip} ${p.city}`.trim(), p.country === 'Deutschland' ? '' : p.country]
     .filter(Boolean)
     .join(', ')
+}
+
+// gleiche Adresse wie in project_for_ticket: Straße, Hausnummer, PLZ
+export function sameAddress(a: ProjectAddress, b: ProjectAddress) {
+  const n = (v: string) => v.trim().toLowerCase()
+  return n(a.street) === n(b.street) && n(a.house_no) === n(b.house_no) && a.zip.trim() === b.zip.trim()
 }
 
 export function projectLabel(p: Pick<Project, 'project_number' | 'name'>) {
