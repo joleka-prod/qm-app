@@ -83,6 +83,15 @@ export const MAIN_FIELDS: Field[] = [
   { key: 'iban', label: 'IBAN', type: 'text', wide: true },
   { key: 'bic', label: 'BIC', type: 'text' },
   { key: 'account_holder', label: 'Kontoinhaber', type: 'text', wide: true },
+  // Externe Dienstleister (Fabian, 2026-10-27)
+  { key: 'company', label: 'Firma', type: 'text', wide: true },
+  { key: 'trade', label: 'Gewerk / Tätigkeit', type: 'text', wide: true },
+  { key: 'phone', label: 'Telefon', type: 'text', wide: true },
+  { key: 'mobile', label: 'Mobil', type: 'text', wide: true },
+  { key: 'email', label: 'E-Mail', type: 'text', wide: true },
+  { key: 'vat_id', label: 'USt-IdNr.', type: 'text' },
+  { key: 'tax_number', label: 'Steuernummer', type: 'text' },
+  { key: 'note', label: 'Notiz', type: 'textarea', wide: true },
 ]
 
 const F = Object.fromEntries(MAIN_FIELDS.map((f) => [f.key, f])) as Record<string, Field>
@@ -271,6 +280,34 @@ export const TABS: Tab[] = [
   { key: 'lohnkonzept', title: 'Lohnkonzept', sections: [] },
 ]
 
+// Externe Dienstleister haben nur Stammdaten (eigene Felder) und den Reiter App-Benutzer.
+// Keine Pflichtangaben für die Lohnabrechnung, keine Vorgesetzten-Pflicht, kein TimeTac-Abgleich.
+export const isExternal = (e: Record<string, unknown>) => e.employee_type === 'extern'
+
+const relabel = (key: string, label: string, extra: Partial<Field> = {}): Field => ({ ...F[key], label, ...extra })
+
+export const EXTERNAL_TAB: Tab = {
+  key: 'mitarbeiter',
+  title: 'Stammdaten',
+  sections: [
+    { fields: [F.company, relabel('status', 'Status', { options: ['Aktiv', 'nicht aktiv'] }), F.trade] },
+    { title: 'Ansprechpartner', fields: pick('salutation', 'first_name', 'last_name') },
+    { title: 'Anschrift', fields: pick('street', 'house_no', 'zip', 'city') },
+    { title: 'Kontakt', fields: pick('phone', 'mobile', 'email') },
+    { title: 'Zusammenarbeit', fields: [relabel('entry_date', 'Zusammenarbeit seit'), relabel('exit_date', 'Zusammenarbeit bis')] },
+    { title: 'Steuer', fields: pick('vat_id', 'tax_number') },
+    { title: 'Bankverbindung', fields: pick('iban', 'bic', 'account_holder') },
+    { fields: pick('note') },
+  ],
+}
+
+// Anzeigename eines Externen: Firma, dahinter der Ansprechpartner
+export function externalName(e: Record<string, unknown>) {
+  const person = [e.first_name, e.last_name].filter(Boolean).join(' ')
+  const company = String(e.company ?? '').trim()
+  return company && person ? `${company} (${person})` : company || person || 'Ohne Namen'
+}
+
 // ---------------------------------------------------------------- Lohnkonzept
 
 export interface WageItem {
@@ -452,8 +489,8 @@ export interface Entry {
   data: Record<string, unknown>
 }
 
-export const employeeName = (e: { first_name?: unknown; last_name?: unknown }) =>
-  [e.first_name, e.last_name].filter(Boolean).join(' ') || 'Ohne Namen'
+export const employeeName = (e: { first_name?: unknown; last_name?: unknown; employee_type?: unknown; company?: unknown }) =>
+  e.employee_type === 'extern' ? externalName(e) : [e.first_name, e.last_name].filter(Boolean).join(' ') || 'Ohne Namen'
 
 // Für die Lohnabrechnung nötige Angaben (Fabian, 2026-10-27). Geprüft wird bei allen, die nicht "nicht aktiv" sind.
 export const PAYROLL_REQUIRED = [
@@ -468,7 +505,7 @@ export const isManagingDirector = (e: Record<string, unknown>) => String(e.depar
 // fehlende Pflichtangaben als Feldnamen; hasWage: gibt es einen Eintrag unter "Lohn und Gehalt"?
 // supervisor: App-Benutzer hat eine(n) Vorgesetzte(n) (null = kein App-Benutzer, dann nicht prüfbar)
 export function missingPayroll(e: Record<string, unknown>, hasWage: boolean, supervisor: boolean | null = null): string[] {
-  if (e.status === 'nicht aktiv') return []
+  if (e.status === 'nicht aktiv' || isExternal(e)) return []
   const missing = PAYROLL_REQUIRED.filter((k) => e[k] === null || e[k] === undefined || String(e[k]).trim() === '').map((k) => F[k].label)
   if (!hasWage) missing.push('Lohn und Gehalt (Stundenlohn / Gehalt)')
   if (supervisor === false && !isManagingDirector(e)) missing.push('Vorgesetzte(r) (Reiter App-Benutzer)')
