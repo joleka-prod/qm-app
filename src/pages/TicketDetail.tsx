@@ -889,8 +889,6 @@ export function TicketDetail() {
         />
       )}
 
-      {einsatz && <OrderChain ticket={ticket} canCreate={isPlanner} />}
-
       {einsatz && !timeOnTop && timeCard}
 
       {einsatz && (
@@ -1035,6 +1033,8 @@ export function TicketDetail() {
           )}
         </section>
       )}
+
+      {einsatz && <OrderChain ticket={ticket} canCreate={isPlanner} />}
 
       {canReport && (
         <section className="card">
