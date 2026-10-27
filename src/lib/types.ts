@@ -58,6 +58,8 @@ export interface Ticket {
   report_by_email: boolean
   report_sent_at: string | null
   report_send_error: string
+  // gespeichertes PDF des zuletzt gesendeten Serviceberichts (Bucket ticket-photos)
+  report_pdf_path?: string | null
   parent_id: number | null
   customer_id: number | null
   project_id: number | null

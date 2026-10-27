@@ -94,8 +94,13 @@ await check('Monteur sendet Bericht, PDF hängt an', async () => {
   assert.match(mail.subject, /Servicebericht RP-\d{4}/)
   assert.equal(mail.attachments.length, 1)
   assert.ok(mail.attachments[0].size > 1000)
-  const { data } = await qm.c.from('tickets').select('report_sent_at').eq('id', job.id).single()
+  const { data } = await qm.c.from('tickets').select('report_sent_at, report_pdf_path').eq('id', job.id).single()
   assert.ok(data.report_sent_at)
+  // gesendetes PDF ist im Auftrag gespeichert und für Berechtigte abrufbar
+  assert.match(data.report_pdf_path, new RegExp(`^${job.id}/servicebericht-.*\\.pdf$`))
+  const { data: file, error } = await qm.c.storage.from('ticket-photos').download(data.report_pdf_path)
+  assert.ifError(error)
+  assert.equal(new TextDecoder().decode((await file.arrayBuffer()).slice(0, 5)), '%PDF-')
 })
 
 await check('Kein doppelter Versand, Monteur kann nicht erzwingen, Teamleiter schon', async () => {
