@@ -74,6 +74,7 @@ function toIso(local: unknown, tz: unknown) {
 }
 
 const day = (d: Date) => d.toISOString().slice(0, 10)
+const fmtDay = (d: string) => (d ? new Date(d + 'T00:00').toLocaleDateString('de-DE') : '')
 
 // Zeitraum in Monate teilen, damit ein Abruf nicht zu lange dauert
 function months(from: string, to: string) {
@@ -150,11 +151,14 @@ export function TimetacImport() {
   const [from, setFrom] = useState(() => `${new Date().getFullYear() - 1}-01-01`)
   const [to, setTo] = useState(() => day(new Date(Date.now() - 86400000)))
   const [trackings, setTrackings] = useState<Slim[] | null>(null)
+  // Zeitraum, für den Zeiten bzw. Abwesenheiten geladen wurden (wird beim Import ersetzt)
+  const [ttRange, setTtRange] = useState<[string, string]>(['', ''])
+  const [absRange, setAbsRange] = useState<[string, string]>(['', ''])
   const [tasks, setTasks] = useState<Record<string, string>>({})
   const [skipTasks, setSkipTasks] = useState<string[]>([])
   const [absences, setAbsences] = useState<Map<string, Absence[]> | null>(null)
-  const [absResult, setAbsResult] = useState<{ name: string; inserted: number; skipped: number; error?: string }[]>([])
-  const [result, setResult] = useState<{ name: string; inserted: number; skipped: number; error?: string }[]>([])
+  const [absResult, setAbsResult] = useState<{ name: string; replaced: number; inserted: number; skipped: number; error?: string }[]>([])
+  const [result, setResult] = useState<{ name: string; replaced: number; inserted: number; skipped: number; error?: string }[]>([])
 
   async function loadEmployees() {
     const { data } = await supabase.from('employees').select('id, user_id, personnel_number, status, first_name, last_name')
@@ -241,6 +245,7 @@ export function TimetacImport() {
       }
       const taskList = await timetac({ action: 'tasks' }).catch(() => [] as Row[])
       setTrackings(list)
+      setTtRange([from, to])
       setTasks(Object.fromEntries(taskList.map((t) => [str(t.id), str(t.name) || `Aufgabe ${str(t.id)}`])))
     } catch (e) {
       setError((e as Error).message)
@@ -289,7 +294,10 @@ export function TimetacImport() {
   }
 
   async function runImport() {
-    if (!confirm('Zeiten jetzt in die Zeiterfassung übernehmen? Bereits vorhandene Zeiten werden nicht überschrieben.')) return
+    if (!confirm(
+      `TimeTac ist führend: Alle Stempelzeiten der zugeordneten Mitarbeiter vom ${fmtDay(ttRange[0])} bis ${fmtDay(ttRange[1])} ` +
+      'werden durch die Zeiten aus TimeTac ersetzt. Laufende Stempelungen bleiben stehen.\n\nJetzt importieren?',
+    )) return
     setError('')
     const out: typeof result = []
     for (const [uid, rows] of perUser) {
@@ -299,6 +307,13 @@ export function TimetacImport() {
       let inserted = 0
       let skipped = 0
       let err = ''
+      const cleared = await supabase.rpc('clear_attendance', { p_user: e.user_id, p_from: ttRange[0], p_to: ttRange[1] })
+      if (cleared.error) {
+        err = cleared.error.message.includes('clear_attendance') ? 'Bitte zuerst das SQL-Update „TimeTac führend“ ausführen.' : cleared.error.message
+        out.push({ name: employeeName(e), replaced: 0, inserted, skipped, error: err })
+        setResult([...out])
+        break
+      }
       for (let i = 0; i < rows.length; i += 500) {
         const { data, error } = await supabase.rpc('import_attendance', {
           p_user: e.user_id,
@@ -311,7 +326,7 @@ export function TimetacImport() {
         inserted += data.inserted
         skipped += data.skipped
       }
-      out.push({ name: employeeName(e), inserted, skipped, error: err || undefined })
+      out.push({ name: employeeName(e), replaced: cleared.data ?? 0, inserted, skipped, error: err || undefined })
       setResult([...out])
       if (err) break
     }
@@ -328,6 +343,7 @@ export function TimetacImport() {
         list.push(...(await timetac({ action: 'absences', from: start, to: end })))
       }
       setAbsences(groupAbsences(list))
+      setAbsRange([from, to])
     } catch (e) {
       setError((e as Error).message)
     }
@@ -335,16 +351,22 @@ export function TimetacImport() {
   }
 
   async function importAbsences() {
-    if (!absences || !confirm('Abwesenheiten jetzt übernehmen? Sie werden als genehmigt eingetragen. Bereits eingetragene Zeiträume werden übersprungen.')) return
+    if (!absences || !confirm(
+      `TimeTac ist führend: Urlaub, Krankheit und andere Abwesenheiten der zugeordneten Mitarbeiter vom ${fmtDay(absRange[0])} bis ${fmtDay(absRange[1])} ` +
+      'werden storniert und durch die genehmigten Abwesenheiten aus TimeTac ersetzt.\n\nJetzt übernehmen?',
+    )) return
     setError('')
     const out: typeof absResult = []
     for (const [uid, rows] of absences) {
       const e = empById[map[uid]]
       if (!e?.user_id) continue
       setBusy(`Übernehme Abwesenheiten von ${userName(uid)} …`)
-      const { data, error } = await supabase.rpc('import_absences', { p_user: e.user_id, p_rows: rows })
-      const err = error ? (error.message.includes('import_absences') ? 'Bitte zuerst das SQL-Update für die Abwesenheiten ausführen.' : error.message) : ''
-      out.push({ name: employeeName(e), inserted: data?.inserted ?? 0, skipped: data?.skipped ?? 0, error: err || undefined })
+      const cleared = await supabase.rpc('clear_absences', { p_user: e.user_id, p_from: absRange[0], p_to: absRange[1] })
+      const { data, error } = cleared.error ? { data: null, error: cleared.error } : await supabase.rpc('import_absences', { p_user: e.user_id, p_rows: rows })
+      const err = error
+        ? /import_absences|clear_absences/.test(error.message) ? 'Bitte zuerst die SQL-Updates für die Abwesenheiten und „TimeTac führend“ ausführen.' : error.message
+        : ''
+      out.push({ name: employeeName(e), replaced: cleared.data ?? 0, inserted: data?.inserted ?? 0, skipped: data?.skipped ?? 0, error: err || undefined })
       setAbsResult([...out])
       if (err) break
     }
@@ -473,19 +495,21 @@ export function TimetacImport() {
         <section className="card">
           <h2>3. Importieren</h2>
           <p className="muted small">
-            Zeiten, die sich mit schon erfassten Zeiten überschneiden, werden übersprungen. Der Import kann daher gefahrlos
-            wiederholt werden. Importierte Zeiten tragen die Notiz „TimeTac“.
+            TimeTac ist führend: Vorhandene Stempelzeiten der zugeordneten Mitarbeiter im geladenen Zeitraum werden durch
+            die Zeiten aus TimeTac ersetzt (laufende Stempelungen bleiben stehen). Der Import kann beliebig oft wiederholt
+            werden. Importierte Zeiten tragen die Notiz „TimeTac“.
           </p>
           <button type="button" className="primary" disabled={!!busy} onClick={runImport}>Import starten</button>
           {result.length > 0 && (
             <table className="import-table">
               <thead>
-                <tr><th>Mitarbeiter</th><th>übernommen</th><th>übersprungen</th></tr>
+                <tr><th>Mitarbeiter</th><th>ersetzt</th><th>übernommen</th><th>übersprungen</th></tr>
               </thead>
               <tbody>
                 {result.map((r) => (
                   <tr key={r.name}>
                     <td>{r.name}</td>
+                    <td>{r.replaced}</td>
                     <td>{r.inserted}</td>
                     <td>{r.skipped}{r.error && <span className="error"> {r.error}</span>}</td>
                   </tr>
@@ -501,7 +525,7 @@ export function TimetacImport() {
           <h2>4. Abwesenheiten</h2>
           <p className="muted small">
             Genehmigte Abwesenheiten im gleichen Zeitraum (oben bei 2. gewählt): Urlaub, Zeitausgleich, Krankheit und
-            Sonderurlaub. Sie werden als genehmigt eingetragen und mindern das Soll; Urlaub zählt gegen den Anspruch.
+            Sonderurlaub. Sie werden als genehmigt eingetragen und mindern das Soll; Urlaub zählt gegen den Anspruch. Vorhandene Abwesenheiten im Zeitraum werden durch TimeTac ersetzt.
           </p>
           <button type="button" className="primary" disabled={!!busy || !from || !to || from > to} onClick={loadAbsences}>Abwesenheiten laden</button>
           {absences && (
@@ -539,12 +563,13 @@ export function TimetacImport() {
           {absResult.length > 0 && (
             <table className="import-table">
               <thead>
-                <tr><th>Mitarbeiter</th><th>übernommen</th><th>übersprungen</th></tr>
+                <tr><th>Mitarbeiter</th><th>ersetzt</th><th>übernommen</th><th>übersprungen</th></tr>
               </thead>
               <tbody>
                 {absResult.map((r) => (
                   <tr key={r.name}>
                     <td>{r.name}</td>
+                    <td>{r.replaced}</td>
                     <td>{r.inserted}</td>
                     <td>{r.skipped}{r.error && <span className="error"> {r.error}</span>}</td>
                   </tr>
