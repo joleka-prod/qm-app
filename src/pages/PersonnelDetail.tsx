@@ -196,9 +196,13 @@ function SickDaysByYear({ employeeId, hasUser }: { employeeId: number; hasUser: 
       ) : rows === null ? (
         <p className="muted small">Lädt…</p>
       ) : rows.length === 0 ? (
-        <p className="muted small">Keine Krankheitstage erfasst.</p>
+        <p className="muted small">Keine Daten aus der Zeiterfassung vorhanden.</p>
       ) : (
         <div className="cal-scroll">
+          <p className="small">
+            Durchschnitt pro Jahr: <b>{fmt(rows.reduce((a, r) => a + Number(r.days), 0) / rows.length)} Tage</b>
+            <span className="muted"> (über {rows.length} {rows.length === 1 ? 'Jahr' : 'Jahre'} mit Zeiterfassung)</span>
+          </p>
           <table className="import-table emp-table">
             <thead>
               <tr><th>Jahr</th><th className="num">Krankheitstage</th></tr>
