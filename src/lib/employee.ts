@@ -62,6 +62,27 @@ export const MAIN_FIELDS: Field[] = [
   { key: 'vl_payment', label: 'VL Zahlung?', type: 'yesno' },
   { key: 'residence_title', label: 'Aufenthaltstitel', type: 'choice', options: [] },
   { key: 'residence_valid_until', label: 'Aufenthaltstitel gültig bis:', type: 'date' },
+  // Abrechnungsrelevante Angaben (Fabian, 2026-10-27)
+  { key: 'birth_name', label: 'Geburtsname', type: 'text' },
+  { key: 'birth_place', label: 'Geburtsort', type: 'text' },
+  { key: 'nationality', label: 'Staatsangehörigkeit', type: 'choice', options: ['deutsch'] },
+  { key: 'exit_date', label: 'Austrittsdatum', type: 'date' },
+  { key: 'job_title', label: 'Tätigkeit / Berufsbezeichnung', type: 'text', wide: true },
+  { key: 'employment_type', label: 'Beschäftigungsart', type: 'choice', options: ['Vollzeit', 'Teilzeit', 'Minijob', 'Auszubildende(r)', 'Werkstudent(in)', 'Aushilfe'] },
+  { key: 'weekly_hours', label: 'Wochenarbeitszeit', type: 'number', unit: 'Std.' },
+  { key: 'probation_end', label: 'Probezeit bis', type: 'date' },
+  { key: 'contract_end', label: 'Befristet bis', type: 'date' },
+  { key: 'wage_type', label: 'Vergütung', type: 'choice', options: ['Stundenlohn', 'Monatsgehalt'] },
+  { key: 'tax_id', label: 'Steuer-ID', type: 'text' },
+  { key: 'church_tax', label: 'Konfession (Kirchensteuer)', type: 'choice', options: ['keine', 'evangelisch', 'römisch-katholisch', 'andere'] },
+  { key: 'child_allowance', label: 'Kinderfreibeträge', type: 'number' },
+  { key: 'social_security_no', label: 'Sozialversicherungsnummer', type: 'text' },
+  { key: 'health_insurance', label: 'Krankenkasse', type: 'text', wide: true },
+  { key: 'insurance_type', label: 'Krankenversicherung', type: 'choice', options: ['gesetzlich', 'privat'] },
+  { key: 'disability', label: 'Schwerbehinderung', type: 'choice', options: ['nein', 'ja (GdB ab 50)', 'gleichgestellt'] },
+  { key: 'iban', label: 'IBAN', type: 'text', wide: true },
+  { key: 'bic', label: 'BIC', type: 'text' },
+  { key: 'account_holder', label: 'Kontoinhaber', type: 'text', wide: true },
 ]
 
 const F = Object.fromEntries(MAIN_FIELDS.map((f) => [f.key, f])) as Record<string, Field>
@@ -225,10 +246,16 @@ export const TABS: Tab[] = [
     sections: [
       { fields: pick('personnel_number', 'status', 'tax_class') },
       { fields: pick('salutation', 'first_name', 'last_name', 'mother_tongue') },
-      { fields: pick('birth_date', 'marital_status'), computed: ['age'] },
+      { fields: pick('birth_date', 'marital_status', 'birth_name', 'birth_place', 'nationality'), computed: ['age'] },
       { tables: ['kinder'] },
       { title: 'Anschrift', fields: pick('street', 'house_no', 'zip', 'city', 'phone_private', 'mobile_private', 'email_private') },
-      { title: 'Vertragsdaten', fields: pick('vacation_days', 'entry_date', 'department', 'specific_experience'), computed: ['seniority'] },
+      {
+        title: 'Vertragsdaten',
+        fields: pick('vacation_days', 'entry_date', 'exit_date', 'department', 'job_title', 'specific_experience', 'employment_type', 'weekly_hours', 'wage_type', 'probation_end', 'contract_end'),
+        computed: ['seniority'],
+      },
+      { title: 'Lohnabrechnung', fields: pick('tax_id', 'church_tax', 'child_allowance', 'social_security_no', 'health_insurance', 'insurance_type', 'disability') },
+      { title: 'Bankverbindung', fields: pick('iban', 'bic', 'account_holder') },
       { title: 'Vermögenswirksame Leistungen (VL)', fields: pick('vl_payment') },
       { title: 'Arbeits- und Aufenthaltsgenehmigungen', fields: pick('residence_title', 'residence_valid_until'), tables: ['a1'] },
     ],
@@ -435,3 +462,18 @@ export interface Entry {
 
 export const employeeName = (e: { first_name?: unknown; last_name?: unknown }) =>
   [e.first_name, e.last_name].filter(Boolean).join(' ') || 'Ohne Namen'
+
+// Für die Lohnabrechnung nötige Angaben (Fabian, 2026-10-27). Geprüft wird bei allen, die nicht "nicht aktiv" sind.
+export const PAYROLL_REQUIRED = [
+  'personnel_number', 'tax_class', 'birth_date', 'nationality', 'street', 'house_no', 'zip', 'city',
+  'entry_date', 'employment_type', 'weekly_hours', 'wage_type', 'tax_id', 'church_tax', 'social_security_no',
+  'health_insurance', 'iban',
+]
+
+// fehlende Pflichtangaben als Feldnamen; hasWage: gibt es einen Eintrag unter "Lohn und Gehalt"?
+export function missingPayroll(e: Record<string, unknown>, hasWage: boolean): string[] {
+  if (e.status === 'nicht aktiv') return []
+  const missing = PAYROLL_REQUIRED.filter((k) => e[k] === null || e[k] === undefined || String(e[k]).trim() === '').map((k) => F[k].label)
+  if (!hasWage) missing.push('Lohn und Gehalt (Stundenlohn / Gehalt)')
+  return missing
+}

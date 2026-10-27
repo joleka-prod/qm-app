@@ -19,6 +19,7 @@ import {
   type Field,
   type SubTable,
   companyEmail,
+  missingPayroll,
 } from '../lib/employee'
 import { supabase } from '../lib/supabase'
 import { ROLE_LABEL, displayName } from '../lib/types'
@@ -339,6 +340,15 @@ export function PersonnelDetail() {
             <button type="button" className="primary" disabled={busy} onClick={createAccount}>App-Benutzer anlegen</button>
           </section>
         ))}
+
+      {current.key === 'mitarbeiter' && (() => {
+        const missing = missingPayroll(emp, entries.some((x) => x.kind === 'lohn'))
+        return missing.length > 0 && (
+          <p className="emp-missing small">
+            <b>Für die Lohnabrechnung fehlt noch:</b> {missing.join(', ')}
+          </p>
+        )
+      })()}
 
       {current.key !== 'benutzer' && <section className="card emp-card">
         {current.sections.map((s, i) => (

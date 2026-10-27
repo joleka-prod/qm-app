@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
-import { STATUS, employeeName, norm, type Employee } from '../lib/employee'
+import { STATUS, employeeName, missingPayroll, norm, type Employee } from '../lib/employee'
 import { supabase } from '../lib/supabase'
 import { displayName } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
@@ -70,13 +70,27 @@ function EmployeeList() {
   const [skip, setSkip] = useState<string[]>(ignored)
   const [busy, setBusy] = useState(false)
 
+  const [withWage, setWithWage] = useState<Set<number>>(new Set())
+  const [showMissing, setShowMissing] = useState(false)
+
   const load = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('employees')
-      .select('id, user_id, personnel_number, status, first_name, last_name, birth_date, department, entry_date, wage_concept, updated_at')
+    const [{ data, error }, wages] = await Promise.all([
+      supabase.from('employees').select('*'),
+      supabase.from('employee_entries').select('employee_id').eq('kind', 'lohn'),
+    ])
     if (error) setError(error.message.includes('employees') ? 'Bitte zuerst das SQL-Update für das Personal ausführen.' : error.message)
     setList((data ?? []) as unknown as Employee[])
+    setWithWage(new Set((wages.data ?? []).map((w) => w.employee_id as number)))
   }, [])
+
+  const incomplete = useMemo(
+    () =>
+      list
+        .map((e) => ({ e, missing: missingPayroll(e, withWage.has(e.id)) }))
+        .filter((x) => x.missing.length > 0)
+        .sort((a, b) => String(a.e.last_name).localeCompare(String(b.e.last_name), 'de')),
+    [list, withWage],
+  )
 
   useEffect(() => {
     load()
@@ -166,6 +180,32 @@ function EmployeeList() {
               <button type="button" className="link" onClick={() => notDuplicate(g)}>Keine Doppelten, ausblenden</button>
             </div>
           ))}
+        </section>
+      )}
+      {incomplete.length > 0 && (
+        <section className="card">
+          <div className="card-head">
+            <h2>Fehlende Angaben für die Lohnabrechnung ({incomplete.length})</h2>
+            <button type="button" className="link" onClick={() => setShowMissing(!showMissing)}>{showMissing ? 'ausblenden' : 'anzeigen'}</button>
+          </div>
+          {showMissing && (
+            <div className="cal-scroll">
+              <table className="import-table">
+                <thead>
+                  <tr><th>Mitarbeiter</th><th>Status</th><th>Es fehlt</th></tr>
+                </thead>
+                <tbody>
+                  {incomplete.map(({ e, missing }) => (
+                    <tr key={e.id}>
+                      <td><Link to={`/personal/${e.id}`}>{e.last_name || e.first_name ? `${e.last_name}, ${e.first_name}` : employeeName(e)}</Link></td>
+                      <td>{String(e.status)}</td>
+                      <td className="small">{missing.join(', ')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       )}
       <div className="filters">

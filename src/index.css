@@ -719,3 +719,6 @@ button.link.danger-link { color: var(--danger); }
 .emp-history > ul { list-style: none; padding: 0; margin: 0; }
 .emp-history > ul > li { padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
 .emp-history-changes { margin: 0.2rem 0 0; padding-left: 1.1rem; overflow-wrap: anywhere; }
+
+/* Personalakte: fehlende Angaben für die Lohnabrechnung */
+.emp-missing { border: 1px solid var(--danger); border-radius: 8px; padding: 0.6rem 0.8rem; margin: 0 0 0.75rem; }

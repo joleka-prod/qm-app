@@ -203,7 +203,7 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
               <form className="form" onSubmit={(e) => saveEdit(e, p)}>
                 <h2>Benutzer bearbeiten</h2>
                 {files[p.id] ? (
-                  <p className="muted small">Name, Urlaubsanspruch und Status kommen aus den Stammdaten der Personalakte. „Nicht aktiv“ sperrt den Zugang.</p>
+                  <p className="muted small">Name, Urlaubsanspruch, Wochenarbeitszeit und Status kommen aus den Stammdaten der Personalakte. „Nicht aktiv“ sperrt den Zugang.</p>
                 ) : (
                   <label>
                     Name
@@ -244,10 +244,12 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
                   </label>
                 )}
                 <div className="row">
-                  <label>
-                    Wochenstunden laut Arbeitsvertrag
-                    <input inputMode="decimal" value={edit.weekly_hours} onChange={(e) => setEdit({ ...edit, weekly_hours: e.target.value })} />
-                  </label>
+                  {!files[p.id] && (
+                    <label>
+                      Wochenstunden laut Arbeitsvertrag
+                      <input inputMode="decimal" value={edit.weekly_hours} onChange={(e) => setEdit({ ...edit, weekly_hours: e.target.value })} />
+                    </label>
+                  )}
                   <label>
                     Stundenkonto ab
                     <input type="date" value={edit.overtime_start} onChange={(e) => setEdit({ ...edit, overtime_start: e.target.value })} />
