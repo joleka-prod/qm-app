@@ -284,6 +284,7 @@ export function Timesheet() {
                       <div key={s.id} className="ts-session small">
                         <span>
                           {clockTime(s.started_at)} – {s.ended_at ? clockTime(s.ended_at) : <span className="time-running">läuft</span>}
+                          {s.note?.startsWith('TimeTac') && <span className="muted"> · Importiert aus TimeTac</span>}
                           {s.edited_by && <span className="muted"> · korrigiert von {displayName(byId[s.edited_by])}</span>}
                         </span>
                         {canCorrect && (
