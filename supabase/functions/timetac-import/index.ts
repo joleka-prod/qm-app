@@ -41,7 +41,7 @@ async function readAll(tok: string, resources: string[], params: Record<string, 
     const limit = 500
     let ok = true
     for (let page = 0; page < 400; page++) {
-      const q = new URLSearchParams({ ...params, _limit: String(limit), _offset: String(page * limit) })
+      const q = new URLSearchParams({ ...params, _limit: String(limit), _offset: String(rows.length) })
       const res = await fetch(`${base}/${account}/v4/${resource}/read/?${q}`, { headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json' } })
       if (res.status === 404) {
         ok = false
@@ -54,7 +54,8 @@ async function readAll(tok: string, resources: string[], params: Record<string, 
       }
       const list = Array.isArray(data.Results) ? data.Results : []
       rows.push(...list)
-      if (list.length < limit) break
+      // nicht auf volle Seiten verlassen: TimeTac kann weniger pro Seite liefern als angefragt
+      if (list.length === 0) break
     }
     if (ok) return rows
   }

@@ -15,8 +15,9 @@ async function timetac(body: Record<string, string>): Promise<Row[]> {
   const { data, error } = await supabase.functions.invoke('timetac-import', { body })
   if (error) {
     if (error instanceof FunctionsHttpError) {
+      const status = error.context.status
       const payload = await error.context.json().catch(() => null)
-      throw new Error(payload?.error ?? 'TimeTac-Abruf fehlgeschlagen')
+      throw new Error(payload?.error ?? `TimeTac-Abruf fehlgeschlagen (Fehler ${status}${status === 546 || status === 504 ? ', Zeitüberschreitung' : ''})`)
     }
     throw new Error('TimeTac-Import nicht erreichbar. Ist die Funktion „timetac-import“ in Supabase eingerichtet?')
   }
@@ -162,10 +163,17 @@ export function TimetacImport() {
     setError('')
     setResult([])
     try {
-      const [list, taskList] = await Promise.all([
-        timetac({ action: 'trackings', from, to }),
-        timetac({ action: 'tasks' }).catch(() => [] as Row[]),
-      ])
+      // monatsweise, damit ein Abruf nicht zu lange dauert
+      const list: Row[] = []
+      for (let start = from; start <= to; ) {
+        const d = new Date(start + 'T00:00:00Z')
+        const monthEnd = day(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)))
+        const end = monthEnd < to ? monthEnd : to
+        setBusy(`Lade Zeiten aus TimeTac … ${new Date(start + 'T00:00').toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}`)
+        list.push(...(await timetac({ action: 'trackings', from: start, to: end })))
+        start = day(new Date(Date.parse(end + 'T00:00:00Z') + 86400000))
+      }
+      const taskList = await timetac({ action: 'tasks' }).catch(() => [] as Row[])
       setTrackings(list)
       setTasks(Object.fromEntries(taskList.map((t) => [str(t.id), str(t.name) || `Aufgabe ${str(t.id)}`])))
     } catch (e) {
