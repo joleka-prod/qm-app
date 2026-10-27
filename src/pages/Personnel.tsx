@@ -9,16 +9,16 @@ import { Users } from './Users'
 
 const fmt = (d: unknown) => (d ? new Date(String(d) + 'T00:00').toLocaleDateString('de-DE') : '–')
 
-// Mögliche Doppelte: gleicher Name (auch Vor-/Nachname vertauscht) oder gleiche Personalnummer
+// Mögliche Doppelte: gleiche Namensteile (auch vertauscht oder alles in einem Feld) oder gleiche Personalnummer
 function duplicateGroups(list: Employee[]) {
   const parent = new Map<number, number>()
   const find = (x: number): number => (parent.get(x) === x ? x : find(parent.get(x)!))
   for (const e of list) parent.set(e.id, e.id)
   const seen = new Map<string, number>()
   for (const e of list) {
-    const a = norm(String(e.first_name ?? ''))
-    const b = norm(String(e.last_name ?? ''))
-    const keys = [a && b ? 'n:' + [a, b].sort().join('|') : '', e.personnel_number ? 'p:' + String(e.personnel_number).trim() : ''].filter(Boolean)
+    // alle Namensteile egal in welchem Feld: "Zimmer Thomas" im Nachnamen = Vorname Thomas + Nachname Zimmer
+    const parts = `${e.first_name ?? ''} ${e.last_name ?? ''}`.split(/[\s,;]+/).map(norm).filter(Boolean)
+    const keys = [parts.length >= 2 ? 'n:' + parts.sort().join('|') : '', e.personnel_number ? 'p:' + String(e.personnel_number).trim() : ''].filter(Boolean)
     for (const k of keys) {
       if (seen.has(k)) parent.set(find(e.id), find(seen.get(k)!))
       else seen.set(k, e.id)
