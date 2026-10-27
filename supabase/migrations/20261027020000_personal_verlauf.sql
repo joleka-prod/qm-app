@@ -194,10 +194,17 @@ begin
 end;
 $$;
 
-drop trigger if exists terminal_credentials_employee_log on public.terminal_credentials;
-create trigger terminal_credentials_employee_log
-  after insert or update of badge_uid, pin_hash or delete on public.terminal_credentials
-  for each row execute function public.terminal_credentials_employee_log();
+-- nur wenn das Stempel-Terminal (Migration 20261026100000) schon eingespielt ist
+do $$
+begin
+  if to_regclass('public.terminal_credentials') is not null then
+    drop trigger if exists terminal_credentials_employee_log on public.terminal_credentials;
+    create trigger terminal_credentials_employee_log
+      after insert or update of badge_uid, pin_hash or delete on public.terminal_credentials
+      for each row execute function public.terminal_credentials_employee_log();
+  end if;
+end;
+$$;
 
 -- Zusammenführen: Verlauf der aufgelösten Akte übernehmen und den Vorgang selbst vermerken
 create or replace function public.merge_employees(p_keep bigint, p_drop bigint)

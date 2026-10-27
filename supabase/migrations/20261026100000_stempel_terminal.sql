@@ -321,3 +321,15 @@ grant execute on function public.set_terminal_pin(uuid, text) to authenticated;
 grant execute on function public.terminal_ping(text) to anon, authenticated;
 grant execute on function public.terminal_people(text) to anon, authenticated;
 grant execute on function public.terminal_clock(text, text, uuid, text, timestamptz) to anon, authenticated;
+
+-- Verlauf der Personalakte (falls 20261027020000 schon eingespielt ist)
+do $$
+begin
+  if to_regprocedure('public.terminal_credentials_employee_log()') is not null then
+    drop trigger if exists terminal_credentials_employee_log on public.terminal_credentials;
+    create trigger terminal_credentials_employee_log
+      after insert or update of badge_uid, pin_hash or delete on public.terminal_credentials
+      for each row execute function public.terminal_credentials_employee_log();
+  end if;
+end;
+$$;
