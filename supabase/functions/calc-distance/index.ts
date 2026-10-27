@@ -1,5 +1,5 @@
-// Berechnet bei Aufträgen (nicht QM) die Fahrstrecke vom Hauptstandort zur Kundenadresse (Hin- und Rückweg)
-// (bei abweichender Baustellenadresse zur Baustelle) und speichert sie am Auftrag. Adressen werden über OpenStreetMap-Daten gefunden (Photon, ersatzweise
+// Berechnet bei Aufträgen (nicht QM) die Fahrstrecke vom Hauptstandort zur Adresse des Bauvorhabens (Hin- und Rückweg;
+// hat das Bauvorhaben keine Adresse, zur Kundenadresse) und speichert sie am Auftrag. Adressen werden über OpenStreetMap-Daten gefunden (Photon, ersatzweise
 // Nominatim), die Strecke über OSRM (ersatzweise der OSRM-Server der FOSSGIS). Alles kostenlos, ohne Schlüssel.
 // Optional: ORIGIN_ADDRESS (Standard: Hauptstandort), PHOTON_URL, NOMINATIM_URL, OSRM_URL, OSRM_URL_2 (Tests).
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -120,7 +120,7 @@ async function route(a: Point, b: Point): Promise<{ distance: number; duration: 
       last = e instanceof Error ? e.message : 'Fehler'
     }
   }
-  throw new Error(`Keine Route zur Kundenadresse gefunden (${last}).`)
+  throw new Error(`Keine Route zum Bauvorhaben gefunden (${last}).`)
 }
 
 Deno.serve(async (req) => {
@@ -171,20 +171,22 @@ Deno.serve(async (req) => {
     auth: { persistSession: false },
     global: { headers: { Authorization: auth } },
   })
-  const { data: t } = await user.from('tickets').select('id, ticket_type, site_address, jobsite_address_different, jobsite_street, jobsite_house_no, jobsite_zip, jobsite_city, jobsite_country').eq('id', body.ticket_id ?? 0).maybeSingle()
+  const { data: t } = await user.from('tickets').select('id, ticket_type, site_address, project_id').eq('id', body.ticket_id ?? 0).maybeSingle()
   if (!t) return reply(404, { error: 'Auftrag nicht gefunden' })
   if (t.ticket_type === 'qm') return reply(400, { error: 'Die Fahrstrecke gibt es nur bei Aufträgen.' })
 
-  // Einsatzort: abweichende Baustelle, sonst Kundenadresse (gleiche Schreibweise wie in der App)
-  const address = t.jobsite_address_different
-    ? [`${t.jobsite_street} ${t.jobsite_house_no}`.trim(), `${t.jobsite_zip} ${t.jobsite_city}`.trim(), t.jobsite_country === 'Deutschland' ? '' : t.jobsite_country]
-      .filter(Boolean).join('\n')
-    : (t.site_address ?? '').trim()
+  // Einsatzort: Adresse des Bauvorhabens (Fabian, 2026-10-27), ohne Adresse am Bauvorhaben die Kundenadresse
+  // (gleiche Schreibweise wie jobAddress in der App)
+  const { data: p } = t.project_id
+    ? await admin.from('projects').select('street, house_no, zip, city, country').eq('id', t.project_id).maybeSingle()
+    : { data: null }
+  const projectAddress = p
+    ? [`${p.street} ${p.house_no}`.trim(), `${p.zip} ${p.city}`.trim(), p.country === 'Deutschland' ? '' : p.country].filter(Boolean).join('\n')
+    : ''
+  const address = projectAddress || (t.site_address ?? '').trim()
   const save = async (km: number | null, error: string, minutes: number | null = null) => {
     await admin.from('tickets').update({ distance_km: km, distance_minutes: minutes, distance_address: address, distance_error: error }).eq('id', t.id)
-      .eq('site_address', t.site_address).eq('jobsite_address_different', t.jobsite_address_different)
-      .eq('jobsite_street', t.jobsite_street).eq('jobsite_house_no', t.jobsite_house_no)
-      .eq('jobsite_zip', t.jobsite_zip).eq('jobsite_city', t.jobsite_city).eq('jobsite_country', t.jobsite_country)
+      .eq('site_address', t.site_address)
     return reply(200, { distance_km: km, distance_minutes: minutes, distance_error: error })
   }
   if (!address) return save(null, '')
@@ -193,7 +195,7 @@ Deno.serve(async (req) => {
     const from = await geocode(ORIGIN)
     if (!from) throw new Error('Hauptstandort wurde nicht gefunden.')
     const to = await geocode(address.replace(/\s*\n\s*/g, ', '))
-    if (!to) return save(null, 'Kundenadresse wurde nicht gefunden. Bitte Straße, PLZ und Ort prüfen.')
+    if (!to) return save(null, 'Adresse des Bauvorhabens wurde nicht gefunden. Bitte Straße, PLZ und Ort prüfen.')
     const r = await route(from, to)
     // hin und zurück
     return save(Math.round((r.distance * 2) / 100) / 10, '', Math.round((r.duration * 2) / 60))

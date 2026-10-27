@@ -5,8 +5,9 @@ import type { Ticket } from '../lib/types'
 import { noAutofill } from '../lib/noAutofill'
 import { AddressSuggest } from './AddressSuggest'
 
-// Abweichende Adresse am Auftrag: Rechnungsadresse (billing_*) oder Baustellenadresse (jobsite_*)
-export type AddressKind = 'billing' | 'jobsite'
+// Abweichende Adresse: Rechnungsadresse am Auftrag (billing_*) oder Adresse eines neuen Bauvorhabens.
+// Die frühere Baustellenadresse (jobsite_*) wird nicht mehr erfasst, der Einsatzort ist das Bauvorhaben (Fabian, 2026-10-27).
+export type AddressKind = 'billing' | 'project'
 
 export interface AltAddress {
   different: boolean
@@ -55,32 +56,36 @@ export function addressLine(a: AltAddress, withName = true) {
     .join(', ')
 }
 
-// Wo der Einsatz stattfindet: Baustelle, sonst Kundenadresse (mehrzeilig)
-export function jobAddress(t: Ticket) {
-  const j = addressOf(t, 'jobsite')
-  if (!j.different) return t.site_address.trim()
-  return [`${j.street} ${j.house_no}`.trim(), `${j.zip} ${j.city}`.trim(), j.country === DEFAULT_COUNTRY ? '' : j.country].filter(Boolean).join('\n')
+// Wo der Einsatz stattfindet: Adresse des Bauvorhabens, sonst Kundenadresse (mehrzeilig, wie in calc-distance)
+export function jobAddress(t: Pick<Ticket, 'project' | 'site_address'>) {
+  const p = t.project
+  if (!p || !`${p.street ?? ''}${p.zip}${p.city}`.trim()) return t.site_address.trim()
+  return [`${p.street ?? ''} ${p.house_no ?? ''}`.trim(), `${p.zip} ${p.city}`.trim(), !p.country || p.country === DEFAULT_COUNTRY ? '' : p.country]
+    .filter(Boolean)
+    .join('\n')
 }
 
-const TITLE: Record<AddressKind, string> = { billing: 'Rechnungsadresse', jobsite: 'Baustellenadresse' }
+const TITLE: Record<AddressKind, string> = { billing: 'Rechnungsadresse', project: 'Adresse des Bauvorhabens' }
+const TOGGLE: Record<AddressKind, string> = { billing: 'Abweichende Rechnungsadresse', project: 'Bauvorhaben liegt nicht an der Kundenadresse' }
 
 export function AddressFields({ kind, value, onChange }: { kind: AddressKind; value: AltAddress; onChange: (v: AltAddress) => void }) {
   const set = (patch: Partial<AltAddress>) => onChange({ ...value, ...patch })
-  const nameRequired = kind === 'billing'
   const [typing, setTyping] = useState(false)
   return (
     <>
       <label className="checkbox-row">
         <input type="checkbox" checked={value.different} onChange={(e) => set({ different: e.target.checked })} />
-        Abweichende {TITLE[kind]}
+        {TOGGLE[kind]}
       </label>
       {value.different && (
         <fieldset className="billing-address">
           <legend>{TITLE[kind]}</legend>
-          <label>
-            {nameRequired ? 'Name *' : 'Name / Bezeichnung'}
-            <input required={nameRequired} {...noAutofill(`${kind}-name`)} value={value.name} maxLength={150} onChange={(e) => set({ name: e.target.value })} />
-          </label>
+          {kind === 'billing' && (
+            <label>
+              Name *
+              <input required {...noAutofill(`${kind}-name`)} value={value.name} maxLength={150} onChange={(e) => set({ name: e.target.value })} />
+            </label>
+          )}
           <div className="row street-row">
             <label>
               Straße *
@@ -414,11 +419,11 @@ function CountryInput({ field, value, onChange }: { field: string; value: string
 }
 
 // Für die Adressprüfung beim Speichern
-export function addressesToCheck(c: CustomerData, jobsite: AltAddress, billing: AltAddress) {
+export function addressesToCheck(c: CustomerData, project: AltAddress, billing: AltAddress) {
   const list = [
     { label: 'Kundenadresse', street: c.customer_street, house_no: c.customer_house_no, zip: c.customer_zip, city: c.customer_city, country: c.customer_country },
   ]
-  if (jobsite.different) list.push({ label: 'Baustellenadresse', ...jobsite })
+  if (project.different) list.push({ label: 'Adresse des Bauvorhabens', ...project })
   if (billing.different) list.push({ label: 'Rechnungsadresse', ...billing })
   return list
 }
