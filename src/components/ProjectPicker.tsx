@@ -76,6 +76,12 @@ export function ProjectPicker({ value, onChange, customerId, newProject }: Props
       ) : (
         <>
           {own.length > 0 && <p className="small muted customer-link">Bauvorhaben des Kunden – bitte auswählen:</p>}
+          {sameSite && !value && (
+            <p className="small customer-link">
+              An dieser Adresse gibt es schon <strong>{projectLabel(sameSite)}</strong>.{' '}
+              <button type="button" className="link" onClick={() => pick(sameSite)}>Übernehmen</button>
+            </p>
+          )}
           {own.length > 0 && (
             <div className="chip-row" aria-label="Bauvorhaben des Kunden">
               {own.map((p) => (
@@ -109,12 +115,6 @@ export function ProjectPicker({ value, onChange, customerId, newProject }: Props
           )}
           {newProject && !value && (
             <div className="new-project">
-              {sameSite && (
-                <p className="small customer-link">
-                  An dieser Adresse gibt es schon <strong>{projectLabel(sameSite)}</strong>.{' '}
-                  <button type="button" className="link" onClick={() => pick(sameSite)}>Übernehmen</button>
-                </p>
-              )}
               <label>
                 {own.length > 0 || matches.length > 0 ? 'Oder neues Bauvorhaben anlegen – Bezeichnung *' : 'Neues Bauvorhaben – Bezeichnung *'}
                 <input
