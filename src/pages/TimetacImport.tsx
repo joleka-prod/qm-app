@@ -100,7 +100,10 @@ const ABSENCE_KIND: Record<string, { kind: string; label: string }> = {
 
 interface Slim { uid: string; task: string; start: string; end: string }
 
-interface Absence { start: string; end: string; days: number; kind: string }
+interface Absence { start: string; end: string; days: number; kind: string; req: string }
+
+// Genehmiger eines TimeTac-Antrags (TimeTac-Benutzer-ID und Zeitpunkt, UTC)
+interface Grant { uid: string; at: string | null }
 
 // Abwesenheitstage zu Zeiträumen zusammenfassen: gleicher Antrag und gleiche Art, nicht über den Jahreswechsel
 function groupAbsences(rows: Row[]) {
@@ -109,9 +112,9 @@ function groupAbsences(rows: Row[]) {
     .filter((r) => Number(r.status) === 1 && ABSENCE_KIND[str(r.type)] && Number(r.value) > 0)
     .map((r): Row & { date: string } => ({ ...r, date: str(r.date).slice(0, 10) }))
     .sort((a, b) => (a.date < b.date ? -1 : 1))
-  const open = new Map<string, Absence & { req: string }>()
+  const open = new Map<string, Absence>()
   const push = (uid: string, a: Absence) => {
-    const item = { start: a.start, end: a.end, days: a.days, kind: a.kind }
+    const item = { start: a.start, end: a.end, days: a.days, kind: a.kind, req: a.req }
     const list = per.get(uid)
     if (list) list.push(item)
     else per.set(uid, [item])
@@ -157,6 +160,8 @@ export function TimetacImport() {
   const [tasks, setTasks] = useState<Record<string, string>>({})
   const [skipTasks, setSkipTasks] = useState<string[]>([])
   const [absences, setAbsences] = useState<Map<string, Absence[]> | null>(null)
+  const [grants, setGrants] = useState<Map<string, Grant>>(new Map())
+  const [grantsError, setGrantsError] = useState('')
   const [absResult, setAbsResult] = useState<{ name: string; replaced: number; inserted: number; skipped: number; error?: string }[]>([])
   const [result, setResult] = useState<{ name: string; replaced: number; inserted: number; skipped: number; error?: string }[]>([])
 
@@ -342,12 +347,35 @@ export function TimetacImport() {
         setBusy(`Lade Abwesenheiten aus TimeTac … ${monthName(start)}`)
         list.push(...(await timetac({ action: 'absences', from: start, to: end })))
       }
+      setBusy('Lade Genehmiger aus TimeTac …')
+      // Genehmiger stehen nur im Antrag; fehlt er, wird die Abwesenheit ohne Genehmiger übernommen
+      const next = new Map<string, Grant>()
+      let gErr = ''
+      try {
+        for (const a of await timetac({ action: 'requests', from, to })) {
+          const uid = str(a.granted_user_id)
+          if (uid && uid !== '0') next.set(str(a.id), { uid, at: toIso(a.granted_timestamp, 'Europe/Berlin') })
+        }
+      } catch (e) {
+        gErr = (e as Error).message
+      }
+      setGrants(next)
+      setGrantsError(gErr)
       setAbsences(groupAbsences(list))
       setAbsRange([from, to])
     } catch (e) {
       setError((e as Error).message)
     }
     setBusy('')
+  }
+
+  // Genehmiger eines Antrags: App-Benutzer der zugeordneten Personalakte, sonst nur der Name
+  function approver(req: string) {
+    const g = grants.get(req)
+    if (!g) return { decided_by: null, decided_by_name: '', decided_at: null }
+    const e = empById[map[g.uid]]
+    if (e?.user_id) return { decided_by: e.user_id, decided_by_name: '', decided_at: g.at }
+    return { decided_by: null, decided_by_name: e ? employeeName(e) : userName(g.uid), decided_at: g.at }
   }
 
   async function importAbsences() {
@@ -362,7 +390,10 @@ export function TimetacImport() {
       if (!e?.user_id) continue
       setBusy(`Übernehme Abwesenheiten von ${userName(uid)} …`)
       const cleared = await supabase.rpc('clear_absences', { p_user: e.user_id, p_from: absRange[0], p_to: absRange[1] })
-      const { data, error } = cleared.error ? { data: null, error: cleared.error } : await supabase.rpc('import_absences', { p_user: e.user_id, p_rows: rows })
+      const { data, error } = cleared.error ? { data: null, error: cleared.error } : await supabase.rpc('import_absences', {
+            p_user: e.user_id,
+            p_rows: rows.map((r) => ({ start: r.start, end: r.end, days: r.days, kind: r.kind, ...approver(r.req) })),
+          })
       const err = error
         ? /import_absences|clear_absences/.test(error.message) ? 'Bitte zuerst die SQL-Updates für die Abwesenheiten und „TimeTac führend“ ausführen.' : error.message
         : ''
@@ -556,6 +587,11 @@ export function TimetacImport() {
                   </tbody>
                 </table>
               </div>
+              {grantsError ? (
+                <p className="error small">Genehmiger konnten nicht aus TimeTac geladen werden ({grantsError}). Die Abwesenheiten werden ohne Genehmiger übernommen.</p>
+              ) : (
+                <p className="muted small">Genehmiger aus TimeTac: {grants.size.toLocaleString('de-DE')} Anträge. Wer keinen App-Benutzer hat, erscheint nur mit Namen.</p>
+              )}
               {absences.size === 0 && <p className="muted">Keine genehmigten Abwesenheiten in diesem Zeitraum.</p>}
               {absences.size > 0 && <button type="button" className="primary" disabled={!!busy} onClick={importAbsences}>Abwesenheiten übernehmen</button>}
             </>

@@ -1,4 +1,4 @@
-// Einmaliger Import aus TimeTac (Fabian, 2026-10-27): liest Benutzer, Aufgaben, Zeitbuchungen und Abwesenheitstage über die
+// Einmaliger Import aus TimeTac (Fabian, 2026-10-27): liest Benutzer, Aufgaben, Zeitbuchungen, Abwesenheitstage und -anträge über die
 // TimeTac-API v4 (OAuth2 client_credentials). Nur lesend; geschrieben wird danach in der App.
 // Secrets: TIMETAC_ACCOUNT (Kontoname aus der TimeTac-Adresse), TIMETAC_CLIENT_ID, TIMETAC_CLIENT_SECRET.
 // TIMETAC_API_URL nur für Tests. Aufrufer muss aktiver Admin sein.
@@ -101,6 +101,16 @@ Deno.serve(async (req) => {
     if (body.action === 'absences') {
       if (!day.test(body.from ?? '') || !day.test(body.to ?? '')) return reply(400, { error: 'Zeitraum fehlt' })
       return reply(200, await readAll(tok, ['absenceDays', 'absenceDay'], { _op__date: 'betw', date: `${body.from}|${body.to}` }))
+    }
+    // Abwesenheitsanträge, die den Zeitraum berühren: liefern den Genehmiger (granted_user_id, granted_timestamp)
+    if (body.action === 'requests') {
+      if (!day.test(body.from ?? '') || !day.test(body.to ?? '')) return reply(400, { error: 'Zeitraum fehlt' })
+      return reply(200, await readAll(tok, ['absences', 'absence'], {
+        _op__from_date: 'lte',
+        from_date: body.to!,
+        _op__to_date: 'gte',
+        to_date: body.from!,
+      }))
     }
   } catch (err) {
     return reply(502, { error: (err as Error).message })
