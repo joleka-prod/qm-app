@@ -118,13 +118,13 @@ export function ProjectPicker({ value, onChange, customerId, newProject, childre
           {newProject && !value && (
             <div className="new-project">
               <label>
-                {own.length > 0 || matches.length > 0 ? 'Oder neues Bauvorhaben anlegen – Bezeichnung *' : 'Neues Bauvorhaben – Bezeichnung *'}
+                Neues Bauvorhaben erstellen
                 <input
                   required
                   autoComplete="off"
                   maxLength={200}
                   value={newProject.name}
-                  placeholder="z. B. Neubau EFH Müller"
+                  placeholder="Bezeichnung neues Bauvorhaben - z.B. Neubau EFH Müller"
                   onChange={(e) => newProject.onName(e.target.value)}
                 />
               </label>
