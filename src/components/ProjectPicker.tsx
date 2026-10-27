@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { projectAddress, projectLabel, searchProjects, type Project } from '../lib/projects'
+import { projectAddress, projectLabel, sameAddress, searchProjects, type Project, type ProjectAddress } from '../lib/projects'
 import { supabase } from '../lib/supabase'
 
 interface Props {
@@ -8,12 +8,12 @@ interface Props {
   onChange: (p: Project | null) => void
   // Bauvorhaben dieses Kunden werden zur schnellen Auswahl angeboten
   customerId: number | null
-  // Neuer Auftrag: ohne Auswahl legt der Server das Bauvorhaben aus der Adresse an
-  allowAuto?: boolean
+  // Neuer Auftrag: ohne Auswahl wird aus der Einsatzadresse ein neues Bauvorhaben mit dieser Bezeichnung angelegt
+  newProject?: { name: string; onName: (name: string) => void; address: ProjectAddress }
 }
 
 // Auswahl des Bauvorhabens im Auftrag
-export function ProjectPicker({ value, onChange, customerId, allowAuto }: Props) {
+export function ProjectPicker({ value, onChange, customerId, newProject }: Props) {
   const [own, setOwn] = useState<Project[]>([])
   const [searching, setSearching] = useState(false)
   const [query, setQuery] = useState('')
@@ -48,6 +48,11 @@ export function ProjectPicker({ value, onChange, customerId, allowAuto }: Props)
     }
   }, [query])
 
+  const allowAuto = !!newProject
+  const newAddress = newProject ? projectAddress(newProject.address) : ''
+  // Bauvorhaben des Kunden an derselben Adresse statt eines neuen vorschlagen
+  const sameSite = newProject && newAddress ? own.find((p) => sameAddress(p, newProject.address)) : undefined
+
   function pick(p: Project | null) {
     onChange(p)
     setSearching(false)
@@ -65,16 +70,12 @@ export function ProjectPicker({ value, onChange, customerId, allowAuto }: Props)
           </div>
           <div className="customer-summary-actions">
             <button type="button" className="link" onClick={() => setSearching(true)}>Ändern</button>
-            {allowAuto && <button type="button" className="link" onClick={() => pick(null)}>Automatisch</button>}
+            {allowAuto && <button type="button" className="link" onClick={() => pick(null)}>Neues Bauvorhaben</button>}
           </div>
         </div>
       ) : (
         <>
-          {allowAuto && !value && (
-            <p className="small muted customer-link">
-              Ohne Auswahl wird beim Speichern ein Bauvorhaben aus der Einsatzadresse angelegt (oder ein vorhandenes des Kunden an derselben Adresse genommen).
-            </p>
-          )}
+          {own.length > 0 && <p className="small muted customer-link">Bauvorhaben des Kunden – bitte auswählen:</p>}
           {own.length > 0 && (
             <div className="chip-row" aria-label="Bauvorhaben des Kunden">
               {own.map((p) => (
@@ -105,6 +106,32 @@ export function ProjectPicker({ value, onChange, customerId, allowAuto }: Props)
           )}
           {value && (
             <button type="button" className="link" onClick={() => setSearching(false)}>Abbrechen</button>
+          )}
+          {newProject && !value && (
+            <div className="new-project">
+              {sameSite && (
+                <p className="small customer-link">
+                  An dieser Adresse gibt es schon <strong>{projectLabel(sameSite)}</strong>.{' '}
+                  <button type="button" className="link" onClick={() => pick(sameSite)}>Übernehmen</button>
+                </p>
+              )}
+              <label>
+                {own.length > 0 || matches.length > 0 ? 'Oder neues Bauvorhaben anlegen – Bezeichnung *' : 'Neues Bauvorhaben – Bezeichnung *'}
+                <input
+                  required
+                  autoComplete="off"
+                  maxLength={200}
+                  value={newProject.name}
+                  placeholder="z. B. Neubau EFH Müller"
+                  onChange={(e) => newProject.onName(e.target.value)}
+                />
+              </label>
+              <p className="small muted customer-link">
+                {newAddress
+                  ? `Adresse des Bauvorhabens: ${newAddress} (Baustellenadresse, sonst Kundenadresse)`
+                  : 'Adresse des Bauvorhabens: wird aus Baustellen- bzw. Kundenadresse übernommen'}
+              </p>
+            </div>
           )}
         </>
       )}

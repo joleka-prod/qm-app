@@ -539,6 +539,7 @@ button.link.danger { color: #b42318; }
 .customer-name2 { margin: 0 0 0.4rem; }
 .customer-notes { background: var(--bg); border-radius: 8px; padding: 0.5rem 0.7rem; }
 .customer-link { margin: 0; }
+.new-project { display: grid; gap: 0.55rem; }
 .contact-line { display: flex; flex-wrap: wrap; gap: 0.35rem 1rem; margin: 0.25rem 0; }
 .contact-row { flex-direction: row !important; justify-content: space-between; align-items: flex-start; gap: 0.75rem; }
 .contact-form { padding: 0.75rem 0; }

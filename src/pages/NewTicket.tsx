@@ -23,7 +23,7 @@ import {
 } from '../lib/types'
 import { ensureCustomer, type Customer } from '../lib/customers'
 import { ProjectPicker } from '../components/ProjectPicker'
-import type { Project } from '../lib/projects'
+import { sameAddress, type Project, type ProjectAddress } from '../lib/projects'
 import { useProfiles } from '../lib/useProfiles'
 
 export function NewTicket() {
@@ -61,6 +61,29 @@ export function NewTicket() {
 
   const einsatz = type !== 'qm'
 
+  // Bauvorhaben: ausgewählt (project) oder neu aus der Einsatzadresse mit Pflicht-Bezeichnung (newProjectName)
+  const [project, setProject] = useState<Project | null>(null)
+  const [newProjectName, setNewProjectName] = useState('')
+  const siteAddress: ProjectAddress = jobsiteAddr.different
+    ? { street: jobsiteAddr.street, house_no: jobsiteAddr.house_no, zip: jobsiteAddr.zip, city: jobsiteAddr.city, country: jobsiteAddr.country }
+    : { street: cust.customer_street, house_no: cust.customer_house_no, zip: cust.customer_zip, city: cust.customer_city, country: cust.customer_country }
+
+  // Gewähltes Bauvorhaben liegt nicht an der Kundenadresse: als Baustellenadresse übernehmen (falls noch keine eingetragen)
+  function siteFromProject(p: Project, c: CustomerData) {
+    const custAddr = { street: c.customer_street, house_no: c.customer_house_no, zip: c.customer_zip, city: c.customer_city, country: c.customer_country }
+    if (!p.street.trim() || sameAddress(p, custAddr)) return
+    setJobsiteAddr((j) =>
+      j.different && j.street.trim()
+        ? j
+        : { different: true, name: '', street: p.street, house_no: p.house_no, zip: p.zip, city: p.city, country: p.country || emptyAddress.country },
+    )
+  }
+
+  function chooseProject(p: Project | null) {
+    setProject(p)
+    if (p) siteFromProject(p, cust)
+  }
+
   // Aus der Kundenakte: /neu?kunde=<id> übernimmt den Kunden
   const fromCustomer = params.get('kunde')
   useEffect(() => {
@@ -74,7 +97,6 @@ export function NewTicket() {
   }, [fromCustomer])
 
   // Aus dem Bauvorhaben: /neu?bv=<id> übernimmt das Bauvorhaben und (wenn eindeutig) den Bauherrn als Kunden
-  const [project, setProject] = useState<Project | null>(null)
   const fromProject = params.get('bv')
   useEffect(() => {
     if (!fromProject) return
@@ -89,6 +111,7 @@ export function NewTicket() {
         setProject(p)
         const owners = pcs.filter((x) => x.role === 'bauherr' && x.customers)
         if (owners.length === 1) setCust((c) => (c.customer_id || c.customer_name ? c : customerFromMaster(owners[0].customers!)))
+        if (owners.length === 1) siteFromProject(p, customerFromMaster(owners[0].customers!))
       })
   }, [fromProject])
 
@@ -100,6 +123,31 @@ export function NewTicket() {
       return
     }
     setError('')
+    const customer = einsatz ? (crm ? await ensureCustomer(cust) : cust) : emptyCustomer
+    // Neues Bauvorhaben mit der eingegebenen Bezeichnung anlegen; der Kunde wird beim Speichern des Auftrags verknüpft
+    let projectId = project?.id ?? null
+    if (einsatz && crm && !project) {
+      const { data: created, error: projErr } = await supabase
+        .from('projects')
+        .insert({
+          name: newProjectName.trim(),
+          street: siteAddress.street.trim(),
+          house_no: siteAddress.house_no.trim(),
+          zip: siteAddress.zip.trim(),
+          city: siteAddress.city.trim(),
+          country: siteAddress.country.trim() || emptyAddress.country,
+        })
+        .select('*')
+        .single()
+      if (projErr || !created) {
+        setError(`Bauvorhaben konnte nicht angelegt werden: ${projErr?.message ?? ''}`)
+        setBusy(false)
+        return
+      }
+      // falls der Auftrag gleich scheitert, beim nächsten Versuch dieses Bauvorhaben nehmen statt ein zweites anzulegen
+      setProject(created as Project)
+      projectId = created.id
+    }
     const { data, error } = await supabase
       .from('tickets')
       .insert({
@@ -109,8 +157,8 @@ export function NewTicket() {
         description: einsatz ? '' : description.trim(),
         order_number: orderNumber.trim(),
         position_number: einsatz ? '' : positionNumber.trim(),
-        ...customerColumns(einsatz ? (crm ? await ensureCustomer(cust) : cust) : emptyCustomer),
-        ...(einsatz && project ? { project_id: project.id } : {}),
+        ...customerColumns(customer),
+        ...(einsatz && projectId ? { project_id: projectId } : {}),
         site_address: '',
         ...addressColumns(einsatz ? billingAddr : emptyAddress, 'billing'),
         ...addressColumns(einsatz ? jobsiteAddr : emptyAddress, 'jobsite'),
@@ -181,9 +229,16 @@ export function NewTicket() {
       {einsatz && (
         <>
           <CustomerFields value={cust} onChange={setCust} crm={crm} />
+          {crm && (
+            <ProjectPicker
+              value={project}
+              onChange={chooseProject}
+              customerId={cust.customer_id}
+              newProject={{ name: newProjectName, onName: setNewProjectName, address: siteAddress }}
+            />
+          )}
           <AddressFields kind="jobsite" value={jobsiteAddr} onChange={setJobsiteAddr} />
           <AddressFields kind="billing" value={billingAddr} onChange={setBillingAddr} />
-          {crm && <ProjectPicker value={project} onChange={setProject} customerId={cust.customer_id} allowAuto />}
         </>
       )}
       {type === 'montageauftrag' && <CalcTimeFields men={calcMen} days={calcDays} onMen={setCalcMen} onDays={setCalcDays} />}
