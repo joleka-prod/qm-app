@@ -715,3 +715,4 @@ button.link.danger-link { color: var(--danger); }
 .wage-or { font-weight: 600; font-size: 0.85rem; margin: 0.6rem 0 0.3rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--border); }
 @media (max-width: 600px) { .emp-grid label.wide { grid-column: auto; } }
 .wage-items .checkbox-row { display: flex; align-items: flex-start; gap: 0.5rem; }
+.dupe-group + .dupe-group { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); }

@@ -1,13 +1,43 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
-import { STATUS, employeeName, type Employee } from '../lib/employee'
+import { STATUS, employeeName, norm, type Employee } from '../lib/employee'
 import { supabase } from '../lib/supabase'
 import { displayName } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 import { Users } from './Users'
 
 const fmt = (d: unknown) => (d ? new Date(String(d) + 'T00:00').toLocaleDateString('de-DE') : '–')
+
+// Mögliche Doppelte: gleicher Name (auch Vor-/Nachname vertauscht) oder gleiche Personalnummer
+function duplicateGroups(list: Employee[]) {
+  const parent = new Map<number, number>()
+  const find = (x: number): number => (parent.get(x) === x ? x : find(parent.get(x)!))
+  for (const e of list) parent.set(e.id, e.id)
+  const seen = new Map<string, number>()
+  for (const e of list) {
+    const a = norm(String(e.first_name ?? ''))
+    const b = norm(String(e.last_name ?? ''))
+    const keys = [a && b ? 'n:' + [a, b].sort().join('|') : '', e.personnel_number ? 'p:' + String(e.personnel_number).trim() : ''].filter(Boolean)
+    for (const k of keys) {
+      if (seen.has(k)) parent.set(find(e.id), find(seen.get(k)!))
+      else seen.set(k, e.id)
+    }
+  }
+  const groups = new Map<number, Employee[]>()
+  for (const e of list) groups.set(find(e.id), [...(groups.get(find(e.id)) ?? []), e])
+  return [...groups.values()].filter((g) => g.length > 1)
+}
+
+const IGNORE_KEY = 'personal-keine-doppelten'
+const groupKey = (g: Employee[]) => g.map((e) => e.id).sort((a, b) => a - b).join('-')
+function ignored(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(IGNORE_KEY) ?? '[]')
+  } catch {
+    return []
+  }
+}
 
 // Menüpunkt Personal: Personalakten und (nur Admin) App-Benutzer mit Stempel-Terminals
 export function Personnel() {
@@ -36,15 +66,53 @@ function EmployeeList() {
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<string>('Aktiv')
 
-  useEffect(() => {
-    supabase
+  const [skip, setSkip] = useState<string[]>(ignored)
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    const { data, error } = await supabase
       .from('employees')
-      .select('id, user_id, personnel_number, status, first_name, last_name, department, entry_date, wage_concept, extra, updated_at')
-      .then(({ data, error }) => {
-        if (error) setError(error.message.includes('employees') ? 'Bitte zuerst das SQL-Update für das Personal ausführen.' : error.message)
-        setList((data ?? []) as Employee[])
-      })
+      .select('id, user_id, personnel_number, status, first_name, last_name, birth_date, department, entry_date, wage_concept, extra, updated_at')
+    if (error) setError(error.message.includes('employees') ? 'Bitte zuerst das SQL-Update für das Personal ausführen.' : error.message)
+    setList((data ?? []) as unknown as Employee[])
   }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const dupes = useMemo(() => duplicateGroups(list).filter((g) => !skip.includes(groupKey(g))), [list, skip])
+
+  async function merge(keep: Employee, group: Employee[]) {
+    const others = group.filter((e) => e.id !== keep.id)
+    const users = group.filter((e) => e.user_id).length
+    if (!confirm(
+      `${employeeName(keep)} (Nr. ${keep.personnel_number || '–'}) behalten und ${others.length} weitere Akte(n) hineinführen?\n\n` +
+      'Leere Felder werden ergänzt, alle Einträge (Lohn, Kinder, Schulungen …) übernommen, die anderen Akten gelöscht.' +
+      (users > 1 ? '\n\nAchtung: Mehrere Akten haben einen App-Benutzer. Nur einer bleibt verknüpft, die anderen stehen danach unter „App-Benutzer ohne Personalakte“.' : ''),
+    )) return
+    setBusy(true)
+    setError('')
+    for (const o of others) {
+      const { error } = await supabase.rpc('merge_employees', { p_keep: keep.id, p_drop: o.id })
+      if (error) {
+        setError(error.message.includes('merge_employees') ? 'Bitte zuerst das SQL-Update zum Zusammenführen ausführen.' : error.message)
+        break
+      }
+    }
+    await load()
+    setBusy(false)
+  }
+
+  function notDuplicate(g: Employee[]) {
+    const next = [...skip, groupKey(g)]
+    setSkip(next)
+    try {
+      localStorage.setItem(IGNORE_KEY, JSON.stringify(next))
+    } catch {
+      // ohne Speicher erscheint der Hinweis beim nächsten Mal wieder
+    }
+  }
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -69,6 +137,35 @@ function EmployeeList() {
         </div>
       </div>
       {error && <p className="error">{error}</p>}
+      {dupes.length > 0 && (
+        <section className="card">
+          <h2>Mögliche doppelte Mitarbeiter ({dupes.length})</h2>
+          <p className="muted small">Gleicher Name oder gleiche Personalnummer. Wähle die Akte, die bleiben soll; die anderen werden hineingeführt.</p>
+          {dupes.map((g) => (
+            <div key={groupKey(g)} className="cal-scroll dupe-group">
+              <table className="import-table">
+                <thead>
+                  <tr><th>Nr.</th><th>Name</th><th>Status</th><th>Geburtsdatum</th><th>Firmeneintritt</th><th>App-Benutzer</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {g.map((e) => (
+                    <tr key={e.id}>
+                      <td>{String(e.personnel_number || '–')}</td>
+                      <td><Link to={`/personal/${e.id}`}>{employeeName(e)}</Link></td>
+                      <td>{String(e.status)}</td>
+                      <td>{fmt(e.birth_date)}</td>
+                      <td>{fmt(e.entry_date)}</td>
+                      <td>{e.user_id ? (byId[e.user_id]?.email ?? 'ja') : '–'}</td>
+                      <td><button type="button" disabled={busy} onClick={() => merge(e, g)}>Diese behalten</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <button type="button" className="link" onClick={() => notDuplicate(g)}>Keine Doppelten, ausblenden</button>
+            </div>
+          ))}
+        </section>
+      )}
       <div className="filters">
         <input type="search" placeholder="Name, Personalnummer, Abteilung…" value={q} onChange={(e) => setQ(e.target.value)} />
         <select value={status} onChange={(e) => setStatus(e.target.value)}>
