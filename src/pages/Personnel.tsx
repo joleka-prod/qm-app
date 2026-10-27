@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
-import { STATUS, employeeName, missingPayroll, norm, type Employee } from '../lib/employee'
+import { STATUS, employeeName, isExternal, missingPayroll, norm, type Employee } from '../lib/employee'
 import { supabase } from '../lib/supabase'
 import { displayName } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
@@ -39,20 +39,95 @@ function ignored(): string[] {
   }
 }
 
-// Menüpunkt Personal: Personalakten und (nur Admin) App-Benutzer mit Stempel-Terminals
+// Menüpunkt Personal: Mitarbeiter, externe Dienstleister (Fabian, 2026-10-27) und (nur Admin) App-Benutzer mit Stempel-Terminals
 export function Personnel() {
   const { profile } = useAuth()
   const [params, setParams] = useSearchParams()
   const users = profile?.role === 'admin' && params.get('ansicht') === 'benutzer'
+  const external = !users && params.get('art') === 'extern'
   return (
     <div>
-      {profile?.role === 'admin' && (
-        <nav className="emp-tabs">
-          <button type="button" className={users ? '' : 'active'} onClick={() => setParams({})}>Mitarbeiter</button>
+      <nav className="emp-tabs">
+        <button type="button" className={users || external ? '' : 'active'} onClick={() => setParams({})}>Mitarbeiter</button>
+        <button type="button" className={external ? 'active' : ''} onClick={() => setParams({ art: 'extern' })}>Externe Dienstleister</button>
+        {profile?.role === 'admin' && (
           <button type="button" className={users ? 'active' : ''} onClick={() => setParams({ ansicht: 'benutzer' })}>Stempel-Terminals</button>
-        </nav>
-      )}
-      {users ? <Users /> : <EmployeeList />}
+        )}
+      </nav>
+      {users ? <Users /> : external ? <ExternalList /> : <EmployeeList />}
+    </div>
+  )
+}
+
+// Übersicht externe Dienstleister: nur Stammdaten und App-Benutzer, keine Pflichtangaben für die Lohnabrechnung
+function ExternalList() {
+  const { byId } = useProfiles()
+  const navigate = useNavigate()
+  const [list, setList] = useState<Employee[]>([])
+  const [error, setError] = useState('')
+  const [q, setQ] = useState('')
+  const [status, setStatus] = useState<string>('Aktiv')
+
+  useEffect(() => {
+    supabase.from('employees').select('*').eq('employee_type', 'extern').then(({ data, error }) => {
+      if (error) setError(error.message.includes('employee_type') ? 'Bitte zuerst das SQL-Update für externe Dienstleister ausführen.' : error.message)
+      setList((data ?? []) as unknown as Employee[])
+    })
+  }, [])
+
+  const shown = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    return list
+      .filter((e) => !status || e.status === status)
+      .filter((e) => !needle || [e.company, e.first_name, e.last_name, e.trade, e.city].some((s) => String(s ?? '').toLowerCase().includes(needle)))
+      .sort((a, b) => employeeName(a).localeCompare(employeeName(b), 'de'))
+  }, [list, q, status])
+
+  async function create() {
+    const { data, error } = await supabase.from('employees').insert({ status: 'Aktiv', employee_type: 'extern' }).select('id').single()
+    if (error) setError(error.message)
+    else navigate(`/personal/${data.id}`)
+  }
+
+  return (
+    <div>
+      <div className="page-head">
+        <h1>Externe Dienstleister</h1>
+        <div className="card-head-actions">
+          <button className="primary" onClick={create}>+ Externer Dienstleister</button>
+        </div>
+      </div>
+      {error && <p className="error">{error}</p>}
+      <div className="filters">
+        <input type="search" placeholder="Firma, Ansprechpartner, Gewerk, Ort…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="Aktiv">Aktiv</option>
+          <option value="nicht aktiv">nicht aktiv</option>
+          <option value="">Alle</option>
+        </select>
+      </div>
+      <section className="card">
+        <div className="cal-scroll">
+          <table className="import-table">
+            <thead>
+              <tr><th>Firma</th><th>Ansprechpartner</th><th>Gewerk / Tätigkeit</th><th>Telefon</th><th>Ort</th><th>App-Benutzer</th></tr>
+            </thead>
+            <tbody>
+              {shown.map((e) => (
+                <tr key={e.id} className={e.status === 'Aktiv' ? '' : 'muted'}>
+                  <td><Link to={`/personal/${e.id}`}>{String(e.company || '') || 'Ohne Firma'}</Link></td>
+                  <td>{[e.first_name, e.last_name].filter(Boolean).join(' ') || '–'}</td>
+                  <td>{String(e.trade || '–')}</td>
+                  <td>{String(e.mobile || e.phone || '–')}</td>
+                  <td>{String(e.city || '–')}</td>
+                  <td>{e.user_id ? (byId[e.user_id] ? `${displayName(byId[e.user_id])} (${byId[e.user_id].email})` : 'ja') : '–'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {shown.length === 0 && <p className="muted">Keine Einträge.</p>}
+      </section>
     </div>
   )
 }
@@ -79,7 +154,8 @@ function EmployeeList() {
       supabase.from('employee_entries').select('employee_id').eq('kind', 'lohn'),
     ])
     if (error) setError(error.message.includes('employees') ? 'Bitte zuerst das SQL-Update für das Personal ausführen.' : error.message)
-    setList((data ?? []) as unknown as Employee[])
+    // externe Dienstleister stehen in einer eigenen Liste
+    setList(((data ?? []) as unknown as Employee[]).filter((e) => !isExternal(e)))
     setWithWage(new Set((wages.data ?? []).map((w) => w.employee_id as number)))
   }, [])
 

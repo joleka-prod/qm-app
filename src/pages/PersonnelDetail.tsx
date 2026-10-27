@@ -20,6 +20,8 @@ import {
   type SubTable,
   companyEmail,
   missingPayroll,
+  EXTERNAL_TAB,
+  isExternal,
 } from '../lib/employee'
 import { supabase } from '../lib/supabase'
 import { ROLE_LABEL, displayName } from '../lib/types'
@@ -39,9 +41,10 @@ function formOf(e: Employee): Form {
 // Eingabefeld je Feldart, angelehnt an das Ninox-Formular
 function Input({ field, value, onChange, list }: { field: Field; value: string | boolean; onChange: (v: string | boolean) => void; list?: string }) {
   if (field.type === 'status') {
+    const opts = field.options ?? STATUS
     return (
-      <div className="segmented three">
-        {STATUS.map((s) => (
+      <div className={`segmented ${opts.length === 2 ? 'two' : 'three'}`}>
+        {opts.map((s) => (
           <button type="button" key={s} className={value === s ? 'active' : ''} onClick={() => onChange(s)}>{s}</button>
         ))}
       </div>
@@ -310,9 +313,12 @@ export function PersonnelDetail() {
     if (!emp) return
     const first = String(form.first_name ?? '').trim()
     const last = String(form.last_name ?? '').trim()
-    if (!first || !last) return setError('Bitte zuerst Vor- und Nachname eintragen und speichern.')
-    const email = companyEmail(first, last)
-    const role = /montage/i.test(String(form.department ?? '')) ? 'monteur' : 'mitarbeiter'
+    const external = isExternal(emp)
+    if (!first || !last) return setError(external ? 'Bitte zuerst Vor- und Nachname des Ansprechpartners eintragen und speichern.' : 'Bitte zuerst Vor- und Nachname eintragen und speichern.')
+    // Externe melden sich mit ihrer eigenen E-Mail-Adresse an
+    const email = external ? String(emp.email ?? '').trim().toLowerCase() : companyEmail(first, last)
+    if (external && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setError('Bitte zuerst die E-Mail-Adresse eintragen und speichern, sie wird der Login.')
+    const role = external || /montage/i.test(String(form.department ?? '')) ? 'monteur' : 'mitarbeiter'
     if (!confirm(`App-Benutzer ${email} (${ROLE_LABEL[role]}) anlegen?`)) return
     setBusy(true)
     setError('')
@@ -334,7 +340,7 @@ export function PersonnelDetail() {
     if (!emp || !confirm(`${employeeName(emp)} mit allen Einträgen endgültig löschen? Ein App-Benutzer bleibt bestehen.`)) return
     const { error } = await supabase.from('employees').delete().eq('id', emp.id)
     if (error) return setError(error.message)
-    navigate('/personal')
+    navigate(isExternal(emp) ? '/personal?art=extern' : '/personal')
   }
 
   if (!loaded) return <p className="muted">Lädt…</p>
@@ -346,8 +352,10 @@ export function PersonnelDetail() {
   const seniority = fullYears(String(form.entry_date || '') || null)
   const wc = wageConcept(wage, String(form.entry_date || '') || null)
   const user = emp.user_id ? byId[emp.user_id] : null
-  const tabs = me?.role === 'admin' ? [...TABS, { key: 'benutzer', title: 'App-Benutzer', sections: [] }] : TABS
-  const current = tabs.find((t) => t.key === tab) ?? TABS[0]
+  const external = isExternal(emp)
+  const own = external ? [EXTERNAL_TAB] : TABS
+  const tabs = me?.role === 'admin' ? [...own, { key: 'benutzer', title: 'App-Benutzer', sections: [] }] : own
+  const current = tabs.find((t) => t.key === tab) ?? own[0]
 
   function toggleWage(groupIdx: number, key: string, on: boolean) {
     const g = WAGE_GROUPS[groupIdx]
@@ -366,7 +374,7 @@ export function PersonnelDetail() {
     <div className="emp-page">
       <div className="page-head">
         <h1>{employeeName(emp)}</h1>
-        <Link to="/personal">← Personal</Link>
+        <Link to={external ? '/personal?art=extern' : '/personal'}>← {external ? 'Externe Dienstleister' : 'Personal'}</Link>
       </div>
       <p className="muted small">
         App-Benutzer: {user ? `${displayName(user)} · ${user.email}` : 'keiner'}
@@ -384,7 +392,11 @@ export function PersonnelDetail() {
         ) : (
           <section className="card">
             <p>{employeeName(emp)} hat noch keinen App-Benutzer.</p>
-            <p className="muted small">Login nach dem Schema vorname.nachname@joleka.de, das Startpasswort wird einmal angezeigt.</p>
+            <p className="muted small">
+              {external
+                ? `Login ist die E-Mail-Adresse aus den Stammdaten${emp.email ? ` (${emp.email})` : ''}, das Startpasswort wird einmal angezeigt.`
+                : 'Login nach dem Schema vorname.nachname@joleka.de, das Startpasswort wird einmal angezeigt.'}
+            </p>
             <button type="button" className="primary" disabled={busy} onClick={createAccount}>App-Benutzer anlegen</button>
           </section>
         ))}
@@ -432,7 +444,7 @@ export function PersonnelDetail() {
           </div>
         ))}
 
-        {tab === 'lohnkonzept' && (
+        {current.key === 'lohnkonzept' && (
           <div className="emp-section">
             <div className="emp-grid wage-top">
               <label>Lohn / Gehalt nach neuem LK<input readOnly value={euro(wc.base)} /></label>
@@ -481,7 +493,7 @@ export function PersonnelDetail() {
       <EmployeeHistory employeeId={emp.id} version={logVersion} />
 
       {me?.role === 'admin' && (
-        <p><button type="button" className="danger" onClick={removeEmployee}>Mitarbeiter löschen</button></p>
+        <p><button type="button" className="danger" onClick={removeEmployee}>{external ? 'Externen Dienstleister löschen' : 'Mitarbeiter löschen'}</button></p>
       )}
     </div>
   )
