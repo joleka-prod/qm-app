@@ -470,10 +470,15 @@ export const PAYROLL_REQUIRED = [
   'health_insurance', 'iban',
 ]
 
+// Geschäftsführer brauchen keine(n) Vorgesetzte(n) (Fabian, 2026-10-27); erkannt an Tätigkeit oder Abteilung
+export const isManagingDirector = (e: Record<string, unknown>) => /gesch(ä|ae)ftsf/i.test(`${e.job_title ?? ''} ${e.department ?? ''}`)
+
 // fehlende Pflichtangaben als Feldnamen; hasWage: gibt es einen Eintrag unter "Lohn und Gehalt"?
-export function missingPayroll(e: Record<string, unknown>, hasWage: boolean): string[] {
+// supervisor: App-Benutzer hat eine(n) Vorgesetzte(n) (null = kein App-Benutzer, dann nicht prüfbar)
+export function missingPayroll(e: Record<string, unknown>, hasWage: boolean, supervisor: boolean | null = null): string[] {
   if (e.status === 'nicht aktiv') return []
   const missing = PAYROLL_REQUIRED.filter((k) => e[k] === null || e[k] === undefined || String(e[k]).trim() === '').map((k) => F[k].label)
   if (!hasWage) missing.push('Lohn und Gehalt (Stundenlohn / Gehalt)')
+  if (supervisor === false && !isManagingDirector(e)) missing.push('Vorgesetzte(r) (Reiter App-Benutzer)')
   return missing
 }

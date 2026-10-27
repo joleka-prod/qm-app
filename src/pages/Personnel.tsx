@@ -86,10 +86,10 @@ function EmployeeList() {
   const incomplete = useMemo(
     () =>
       list
-        .map((e) => ({ e, missing: missingPayroll(e, withWage.has(e.id)) }))
+        .map((e) => ({ e, missing: missingPayroll(e, withWage.has(e.id), e.user_id && byId[e.user_id] ? !!byId[e.user_id].supervisor_id : null) }))
         .filter((x) => x.missing.length > 0)
         .sort((a, b) => String(a.e.last_name).localeCompare(String(b.e.last_name), 'de')),
-    [list, withWage],
+    [list, withWage, byId],
   )
 
   useEffect(() => {
@@ -185,7 +185,7 @@ function EmployeeList() {
       {incomplete.length > 0 && (
         <section className="card">
           <div className="card-head">
-            <h2>Fehlende Angaben für die Lohnabrechnung ({incomplete.length})</h2>
+            <h2>Fehlende Pflichtangaben ({incomplete.length})</h2>
             <button type="button" className="link" onClick={() => setShowMissing(!showMissing)}>{showMissing ? 'ausblenden' : 'anzeigen'}</button>
           </div>
           {showMissing && (

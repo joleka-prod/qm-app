@@ -342,10 +342,10 @@ export function PersonnelDetail() {
         ))}
 
       {current.key === 'mitarbeiter' && (() => {
-        const missing = missingPayroll(emp, entries.some((x) => x.kind === 'lohn'))
+        const missing = missingPayroll(emp, entries.some((x) => x.kind === 'lohn'), emp.user_id && byId[emp.user_id] ? !!byId[emp.user_id].supervisor_id : null)
         return missing.length > 0 && (
           <p className="emp-missing small">
-            <b>Für die Lohnabrechnung fehlt noch:</b> {missing.join(', ')}
+            <b>Es fehlen noch Pflichtangaben:</b> {missing.join(', ')}
           </p>
         )
       })()}

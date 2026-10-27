@@ -6,6 +6,7 @@ import { deleteUser, generatePassword, setPassword, updateEmail } from '../lib/a
 import { formatBadge, nfcSupported, normalizeBadge, startNfc } from '../lib/nfc'
 import { supabase } from '../lib/supabase'
 import { ROLE_LABEL, displayName, type Profile, type Role } from '../lib/types'
+import { isManagingDirector } from '../lib/employee'
 import { useProfiles } from '../lib/useProfiles'
 
 const ROLES = Object.keys(ROLE_LABEL) as Role[]
@@ -79,6 +80,10 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
     setError('')
     setNotice('')
     try {
+      // Pflicht für alle Mitarbeiter außer den Geschäftsführern (Fabian, 2026-10-27)
+      if (files[p.id] && !directors.has(p.id) && !edit.supervisor_id) {
+        throw new Error('Bitte eine(n) verantwortliche(n) Vorgesetzte(n) wählen. Nur Geschäftsführer brauchen keine(n).')
+      }
       const change: Partial<Profile> = {}
       if (edit.full_name.trim() !== p.full_name) change.full_name = edit.full_name.trim()
       if (edit.role !== p.role) change.role = edit.role
@@ -128,11 +133,17 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
 
   // App-Benutzer gibt es nur zu einem Mitarbeiter (Fabian, 2026-10-26): Benutzer ohne Akte bekommen eine
   const [files, setFiles] = useState<Record<string, number>>({})
+  // Geschäftsführer (ohne Pflicht für Vorgesetzte) je App-Benutzer
+  const [directors, setDirectors] = useState<Set<string>>(new Set())
   const [filesLoaded, setFilesLoaded] = useState(false)
   const orphans = filesLoaded ? profiles.filter((p) => !files[p.id]) : []
   const loadFiles = useCallback(async () => {
-    const { data } = await supabase.from('employees').select('id, user_id').not('user_id', 'is', null)
-    setFiles(Object.fromEntries((data ?? []).map((r) => [r.user_id as string, r.id as number])))
+    const first = await supabase.from('employees').select('id, user_id, job_title, department').not('user_id', 'is', null)
+    // ältere Datenbank ohne Feld "Tätigkeit"
+    const res = first.error ? await supabase.from('employees').select('id, user_id, department').not('user_id', 'is', null) : first
+    const rows = (res.data ?? []) as Record<string, unknown>[]
+    setFiles(Object.fromEntries(rows.map((r) => [r.user_id as string, r.id as number])))
+    setDirectors(new Set(rows.filter(isManagingDirector).map((r) => r.user_id as string)))
     setFilesLoaded(true)
   }, [])
   useEffect(() => {
@@ -223,9 +234,9 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
                   </select>
                 </label>
                 <label>
-                  Verantwortliche(r) Vorgesetzte(r)
+                  Verantwortliche(r) Vorgesetzte(r){files[p.id] && !directors.has(p.id) ? ' *' : ''}
                   <select value={edit.supervisor_id} onChange={(e) => setEdit({ ...edit, supervisor_id: e.target.value })}>
-                    <option value="">– keine(r) –</option>
+                    <option value="">{files[p.id] && !directors.has(p.id) ? '– bitte wählen –' : '– keine(r) –'}</option>
                     {profiles
                       .filter((o) => o.id !== p.id && (o.active || o.id === p.supervisor_id))
                       .map((o) => (
