@@ -38,6 +38,21 @@ function ttNumber(u: Row) {
 const ttName = (u: Row) => [str(u.firstname), str(u.lastname)].filter(Boolean).join(' ') || str(u.username) || `#${str(u.id)}`
 const nameKey = (s: string) => s.split(/[\s,;]+/).map(norm).filter(Boolean).sort().join('|')
 
+// Formatierer je Zeitzone nur einmal anlegen (bei vielen Jahren sonst sehr langsam)
+const formatters = new Map<string, Intl.DateTimeFormat>()
+function formatter(zone: string): Intl.DateTimeFormat {
+  let f = formatters.get(zone)
+  if (!f) {
+    try {
+      f = new Intl.DateTimeFormat('en-US', { timeZone: zone || 'Europe/Berlin', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    } catch {
+      f = formatter('Europe/Berlin')
+    }
+    formatters.set(zone, f)
+  }
+  return f
+}
+
 // "2024-01-15 07:00:00" in der Zeitzone des Eintrags -> ISO (UTC)
 function toIso(local: unknown, tz: unknown) {
   const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/.exec(str(local))
@@ -49,16 +64,7 @@ function toIso(local: unknown, tz: unknown) {
     const [h, mi] = [+zone.slice(1, 3), +zone.slice(-2)]
     return new Date(utc - sign * (h * 60 + mi) * 60000).toISOString()
   }
-  const valid = (z: string) => {
-    try {
-      new Intl.DateTimeFormat('en-US', { timeZone: z })
-      return true
-    } catch {
-      return false
-    }
-  }
-  const name = zone && valid(zone) ? zone : 'Europe/Berlin'
-  const fmt = new Intl.DateTimeFormat('en-US', { timeZone: name, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const fmt = formatter(zone)
   const offset = (t: number) => {
     const p = Object.fromEntries(fmt.formatToParts(new Date(t)).map((x) => [x.type, x.value]))
     return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - t
@@ -91,6 +97,8 @@ const ABSENCE_KIND: Record<string, { kind: string; label: string }> = {
   other_paid_leave: { kind: 'sonderurlaub', label: 'Sonderurlaub' },
 }
 
+interface Slim { uid: string; task: string; start: string; end: string }
+
 interface Absence { start: string; end: string; days: number; kind: string }
 
 // Abwesenheitstage zu Zeiträumen zusammenfassen: gleicher Antrag und gleiche Art, nicht über den Jahreswechsel
@@ -101,6 +109,12 @@ function groupAbsences(rows: Row[]) {
     .map((r): Row & { date: string } => ({ ...r, date: str(r.date).slice(0, 10) }))
     .sort((a, b) => (a.date < b.date ? -1 : 1))
   const open = new Map<string, Absence & { req: string }>()
+  const push = (uid: string, a: Absence) => {
+    const item = { start: a.start, end: a.end, days: a.days, kind: a.kind }
+    const list = per.get(uid)
+    if (list) list.push(item)
+    else per.set(uid, [item])
+  }
   for (const r of sorted) {
     const uid = str(r.user_id)
     const kind = ABSENCE_KIND[str(r.type)].kind
@@ -111,10 +125,10 @@ function groupAbsences(rows: Row[]) {
       cur.days += days
       continue
     }
-    if (cur) per.set(uid, [...(per.get(uid) ?? []), { start: cur.start, end: cur.end, days: cur.days, kind: cur.kind }])
+    if (cur) push(uid, cur)
     open.set(uid, { start: r.date, end: r.date, days, kind, req: str(r.request_id) })
   }
-  for (const [uid, cur] of open) per.set(uid, [...(per.get(uid) ?? []), { start: cur.start, end: cur.end, days: cur.days, kind: cur.kind }])
+  for (const [uid, cur] of open) push(uid, cur)
   return per
 }
 const STORE = 'timetac-zuordnung'
@@ -135,7 +149,7 @@ export function TimetacImport() {
   const [error, setError] = useState('')
   const [from, setFrom] = useState(() => `${new Date().getFullYear() - 1}-01-01`)
   const [to, setTo] = useState(() => day(new Date(Date.now() - 86400000)))
-  const [trackings, setTrackings] = useState<Row[] | null>(null)
+  const [trackings, setTrackings] = useState<Slim[] | null>(null)
   const [tasks, setTasks] = useState<Record<string, string>>({})
   const [skipTasks, setSkipTasks] = useState<string[]>([])
   const [absences, setAbsences] = useState<Map<string, Absence[]> | null>(null)
@@ -215,10 +229,15 @@ export function TimetacImport() {
     setError('')
     setResult([])
     try {
-      const list: Row[] = []
+      // nur die nötigen Felder behalten, gleich nach UTC umgerechnet
+      const list: Slim[] = []
       for (const [start, end] of months(from, to)) {
         setBusy(`Lade Zeiten aus TimeTac … ${monthName(start)}`)
-        list.push(...(await timetac({ action: 'trackings', from: start, to: end })))
+        for (const t of await timetac({ action: 'trackings', from: start, to: end })) {
+          const s = toIso(t.start_time, t.start_time_timezone)
+          const e = toIso(t.end_time, t.end_time_timezone ?? t.start_time_timezone)
+          list.push({ uid: str(t.user_id), task: str(t.task_id), start: s ?? '', end: e ?? '' })
+        }
       }
       const taskList = await timetac({ action: 'tasks' }).catch(() => [] as Row[])
       setTrackings(list)
@@ -231,22 +250,36 @@ export function TimetacImport() {
 
   // Zeiten je TimeTac-Benutzer, umgerechnet nach UTC
   const perUser = useMemo(() => {
-    const groups = new Map<string, { start: string; end: string; task: string }[]>()
+    const groups = new Map<string, Slim[]>()
     for (const t of trackings ?? []) {
-      const task = str(t.task_id)
-      if (skipTasks.includes(task)) continue
-      const start = toIso(t.start_time, t.start_time_timezone)
-      const end = toIso(t.end_time, t.end_time_timezone ?? t.start_time_timezone)
-      if (!start || !end) continue
-      const uid = str(t.user_id)
-      groups.set(uid, [...(groups.get(uid) ?? []), { start, end, task }])
+      if (!t.start || !t.end || skipTasks.includes(t.task)) continue
+      const list = groups.get(t.uid)
+      if (list) list.push(t)
+      else groups.set(t.uid, [t])
     }
     return groups
   }, [trackings, skipTasks])
 
+  // Übersicht je Benutzer einmal berechnen, nicht bei jeder Anzeige
+  const summary = useMemo(
+    () =>
+      [...perUser.entries()].map(([uid, rows]) => {
+        let first = rows[0].start
+        let last = rows[0].start
+        let h = 0
+        for (const r of rows) {
+          if (r.start < first) first = r.start
+          if (r.start > last) last = r.start
+          h += (Date.parse(r.end) - Date.parse(r.start)) / 3600000
+        }
+        return { uid, count: rows.length, hours: h, first, last }
+      }),
+    [perUser],
+  )
+
   const taskCounts = useMemo(() => {
     const c = new Map<string, number>()
-    for (const t of trackings ?? []) c.set(str(t.task_id), (c.get(str(t.task_id)) ?? 0) + 1)
+    for (const t of trackings ?? []) c.set(t.task, (c.get(t.task) ?? 0) + 1)
     return [...c.entries()].sort((a, b) => b[1] - a[1])
   }, [trackings])
 
@@ -320,9 +353,6 @@ export function TimetacImport() {
 
   const absenceSum = (rows: Absence[], kind: string) => rows.filter((r) => r.kind === kind).reduce((s, r) => s + r.days, 0)
 
-  const hours = (rows: { start: string; end: string }[]) =>
-    rows.reduce((s, r) => s + (Date.parse(r.end) - Date.parse(r.start)) / 3600000, 0)
-
   return (
     <div>
       <div className="page-head">
@@ -394,7 +424,7 @@ export function TimetacImport() {
           </div>
           {trackings && (
             <>
-              <p className="small">{trackings.length} Buchungen gefunden.</p>
+              <p className="small">{trackings.length.toLocaleString('de-DE')} Buchungen gefunden.</p>
               {taskCounts.length > 1 && (
                 <>
                   <p className="muted small">Aufgaben, die nicht als Arbeitszeit zählen (z. B. Pause), abwählen:</p>
@@ -418,16 +448,15 @@ export function TimetacImport() {
                     <tr><th>TimeTac</th><th>Personalakte</th><th>Buchungen</th><th>Stunden</th><th>Zeitraum</th><th></th></tr>
                   </thead>
                   <tbody>
-                    {[...perUser.entries()].map(([uid, rows]) => {
+                    {summary.map(({ uid, count, hours, first, last }) => {
                       const e = empById[map[uid]]
-                      const dates = rows.map((r) => r.start).sort()
                       return (
                         <tr key={uid} className={e?.user_id ? '' : 'muted'}>
                           <td>{userName(uid)}</td>
                           <td>{e ? employeeName(e) : '–'}</td>
-                          <td>{rows.length}</td>
-                          <td>{hours(rows).toLocaleString('de-DE', { maximumFractionDigits: 1 })}</td>
-                          <td>{new Date(dates[0]).toLocaleDateString('de-DE')} – {new Date(dates[dates.length - 1]).toLocaleDateString('de-DE')}</td>
+                          <td>{count.toLocaleString('de-DE')}</td>
+                          <td>{hours.toLocaleString('de-DE', { maximumFractionDigits: 1 })}</td>
+                          <td>{new Date(first).toLocaleDateString('de-DE')} – {new Date(last).toLocaleDateString('de-DE')}</td>
                           <td className="small">{e?.user_id ? 'wird importiert' : e ? 'kein App-Benutzer' : 'nicht zugeordnet'}</td>
                         </tr>
                       )
