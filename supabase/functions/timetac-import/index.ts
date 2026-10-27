@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
     return reply(400, { error: 'In Supabase fehlen die Secrets TIMETAC_ACCOUNT, TIMETAC_CLIENT_ID und TIMETAC_CLIENT_SECRET (Edge Functions → Secrets).' })
   }
 
-  let body: { action?: string; from?: string; to?: string }
+  let body: { action?: string; from?: string; to?: string; ids?: string }
   try {
     body = await req.json()
   } catch {
@@ -102,15 +102,10 @@ Deno.serve(async (req) => {
       if (!day.test(body.from ?? '') || !day.test(body.to ?? '')) return reply(400, { error: 'Zeitraum fehlt' })
       return reply(200, await readAll(tok, ['absenceDays', 'absenceDay'], { _op__date: 'betw', date: `${body.from}|${body.to}` }))
     }
-    // Abwesenheitsanträge, die den Zeitraum berühren: liefern den Genehmiger (granted_user_id, granted_timestamp)
+    // Abwesenheitsanträge nach ID (request_id der Abwesenheitstage): liefern den Genehmiger (granted_user_id, granted_timestamp)
     if (body.action === 'requests') {
-      if (!day.test(body.from ?? '') || !day.test(body.to ?? '')) return reply(400, { error: 'Zeitraum fehlt' })
-      return reply(200, await readAll(tok, ['absences', 'absence'], {
-        _op__from_date: 'lte',
-        from_date: body.to!,
-        _op__to_date: 'gte',
-        to_date: body.from!,
-      }))
+      if (!/^\d+(\|\d+)*$/.test(body.ids ?? '')) return reply(400, { error: 'Antrags-IDs fehlen' })
+      return reply(200, await readAll(tok, ['absences', 'absence'], { _op__id: 'in', id: body.ids! }))
     }
   } catch (err) {
     return reply(502, { error: (err as Error).message })
