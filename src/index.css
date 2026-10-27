@@ -620,8 +620,8 @@ button.link.danger-link { color: var(--danger); }
 }
 
 /* Vorplanung (Grobplanung nach Kalenderwoche) */
-.view-switch { margin-bottom: 0.5rem; }
-@media (min-width: 700px) { .segmented.two.view-switch { grid-template-columns: repeat(2, minmax(0, 15rem)); } }
+.view-switch { margin-bottom: 0.75rem; }
+@media (min-width: 700px) { .segmented.four.view-switch { grid-template-columns: repeat(4, minmax(0, 13rem)); } }
 .cal-weeks { min-width: 52rem; }
 .cal-weeks td { min-width: 8rem; }
 .week-count { font-size: 0.75rem; font-weight: 600; color: var(--muted); margin: 0.1rem 0 0.3rem; }

@@ -7,7 +7,6 @@ import { supabase } from '../lib/supabase'
 import { loadMembers, useTeams, type Team, type TeamMember } from '../lib/teams'
 import {
   AREA_LABEL,
-  SERVICE_AREAS,
   addDays,
   CALENDAR_SELECT,
   appointmentMoveWarning,
@@ -280,29 +279,29 @@ export function PlanningCalendar() {
           )}
         </div>
       </div>
-      <div className="segmented two view-switch" role="radiogroup" aria-label="Kalender">
-        <button role="radio" aria-checked={view === 'tage'} className={view === 'tage' ? 'active' : ''} onClick={() => changeView('tage')}>
-          Montage &amp; Kundendienst
-        </button>
-        <button role="radio" aria-checked={view === 'einplanung'} className={view === 'einplanung' ? 'active' : ''} onClick={() => changeView('einplanung')}>
-          Vorplanung
-        </button>
-      </div>
-      {view === 'tage' && (
-        <div className="segmented three area-filter" role="radiogroup" aria-label="Bereich">
-          {(['', ...SERVICE_AREAS] as const).map((a) => (
+      <div className="segmented four view-switch" role="radiogroup" aria-label="Kalender">
+        {(['einplanung', 'montage', 'kundendienst', ''] as const).map((k) => {
+          const active = k === 'einplanung' ? view === 'einplanung' : view === 'tage' && areaFilter === k
+          return (
             <button
-              key={a || 'alle'}
+              key={k || 'alle'}
               role="radio"
-              aria-checked={areaFilter === a}
-              className={`${areaFilter === a ? 'active' : ''} ${a ? `area-btn-${a}` : ''}`}
-              onClick={() => setAreaFilter(a)}
+              aria-checked={active}
+              className={`${active ? 'active' : ''} ${k && k !== 'einplanung' ? `area-btn-${k}` : ''}`}
+              onClick={() => {
+                if (k === 'einplanung') {
+                  changeView('einplanung')
+                } else {
+                  setAreaFilter(k)
+                  changeView('tage')
+                }
+              }}
             >
-              {a ? AREA_LABEL[a] : 'Alle'}
+              {k === 'einplanung' ? 'Vorplanung' : k ? AREA_LABEL[k] : 'Kundendienst & Montage'}
             </button>
-          ))}
-        </div>
-      )}
+          )
+        })}
+      </div>
       {view === 'einplanung' ? (
         <WeekPlanning weekStart={weekStart} />
       ) : (
