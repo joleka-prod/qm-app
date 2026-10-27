@@ -105,8 +105,8 @@ export interface Ticket {
   appointment_confirmed_at: string | null
   // nur gefüllt, wenn mit select('*, ticket_positions(count)') geladen
   ticket_positions?: { count: number }[]
-  // nur gefüllt, wenn mit CALENDAR_SELECT geladen: Ort des Bauvorhabens
-  project?: { zip: string; city: string } | null
+  // nur gefüllt, wenn mit CALENDAR_SELECT (Ort) oder in der Auftragsliste (auch Nummer und Name) geladen
+  project?: { zip: string; city: string; project_number?: string; name?: string } | null
   time_entries?: { started_at: string; ended_at: string | null }[]
   status: TicketStatus
   created_by: string

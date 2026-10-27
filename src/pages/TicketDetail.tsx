@@ -54,7 +54,7 @@ import {
 } from '../lib/types'
 import { ensureCustomer } from '../lib/customers'
 import { ProjectPicker } from '../components/ProjectPicker'
-import { projectLabel, type Project } from '../lib/projects'
+import { projectAddress, projectLabel, type Project } from '../lib/projects'
 import { useProfiles } from '../lib/useProfiles'
 
 const EVENT_LABEL: Record<string, string> = {
@@ -187,7 +187,8 @@ export function TicketDetail() {
     setEvents((e.data ?? []) as TicketEvent[])
     setDeletion(d.data as DeletionRequest | null)
     setPositions((pos.data ?? []) as TicketPosition[])
-    if (tk.project_id && canUseCrm(profile?.role)) {
+    // Bauvorhaben sieht jeder, der den Auftrag sieht (auch Monteure); ändern nur CRM-Rollen
+    if (tk.project_id) {
       const { data: pr } = await supabase.from('projects').select('*').eq('id', tk.project_id).maybeSingle()
       setProject(pr as Project | null)
       setProjectDraft(pr as Project | null)
@@ -542,7 +543,12 @@ export function TicketDetail() {
             {einsatz && project && (
               <p className="small">
                 <span className="muted">Bauvorhaben: </span>
-                <Link to={`/bauvorhaben/${project.id}`}>{projectLabel(project)}</Link>
+                {canUseCrm(profile.role) ? (
+                  <Link to={`/bauvorhaben/${project.id}`}>{projectLabel(project)}</Link>
+                ) : (
+                  projectLabel(project)
+                )}
+                {projectAddress(project) && <span className="muted"> · {projectAddress(project)}</span>}
               </p>
             )}
             {einsatz && ticket.jobsite_address_different && (
