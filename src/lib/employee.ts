@@ -1,5 +1,5 @@
 // Personal nach dem Vorbild der Ninox-Mitarbeiterdatenbank (Fabian, 2026-10-26):
-// gleiche Reiter, Abschnitte, Felder und Untertabellen. Die Namen in `ninox` dienen dem Import.
+// gleiche Reiter, Abschnitte, Felder und Untertabellen. Der einmalige Ninox-Import ist abgeschlossen.
 
 export type FieldType = 'text' | 'number' | 'money' | 'date' | 'datetime' | 'choice' | 'yesno' | 'status' | 'textarea' | 'file'
 
@@ -9,8 +9,6 @@ export interface Field {
   type: FieldType
   // Vorschläge bei Auswahlfeldern (eigene Werte bleiben möglich)
   options?: string[]
-  // weitere Feldnamen in Ninox, falls abweichend vom Label
-  ninox?: string[]
   wide?: boolean
   // Einheit hinter der Zahl, z. B. "Tage"
   unit?: string
@@ -19,8 +17,6 @@ export interface Field {
 export interface SubTable {
   kind: string
   title: string
-  // Name der Ninox-Tabelle (und Varianten)
-  ninox: string[]
   columns: Field[]
   // Spalte zum Sortieren (absteigend, neueste oben)
   sortBy?: string
@@ -45,7 +41,7 @@ export const STATUS = ['Aktiv', 'nicht aktiv', 'Langzeitkrank'] as const
 export const MAIN_FIELDS: Field[] = [
   { key: 'personnel_number', label: 'Personalnummer', type: 'text' },
   { key: 'status', label: 'Status', type: 'status' },
-  { key: 'tax_class', label: 'Lohnsteuerklasse', type: 'choice', options: ['1', '2', '3', '4', '5', '6'], ninox: ['Steuerklasse'] },
+  { key: 'tax_class', label: 'Lohnsteuerklasse', type: 'choice', options: ['1', '2', '3', '4', '5', '6'] },
   { key: 'salutation', label: 'Anrede', type: 'choice', options: ['Herr', 'Frau', 'Divers'] },
   { key: 'first_name', label: 'Vorname', type: 'text' },
   { key: 'last_name', label: 'Nachname', type: 'text' },
@@ -65,7 +61,7 @@ export const MAIN_FIELDS: Field[] = [
   { key: 'specific_experience', label: 'Spezifische Berufserfahrung', type: 'text' },
   { key: 'vl_payment', label: 'VL Zahlung?', type: 'yesno' },
   { key: 'residence_title', label: 'Aufenthaltstitel', type: 'choice', options: [] },
-  { key: 'residence_valid_until', label: 'Aufenthaltstitel gültig bis:', type: 'date', ninox: ['Aufenthaltstitel gültig bis', 'Auftenthaltstitel gültig bis:', 'Auftenthaltstitel gültig bis'] },
+  { key: 'residence_valid_until', label: 'Aufenthaltstitel gültig bis:', type: 'date' },
 ]
 
 const F = Object.fromEntries(MAIN_FIELDS.map((f) => [f.key, f])) as Record<string, Field>
@@ -73,17 +69,17 @@ const pick = (...keys: string[]) => keys.map((k) => F[k])
 
 export const SUBTABLES: SubTable[] = [
   {
-    kind: 'kinder', title: 'Kinder', ninox: ['Kinder', 'Kind'], sortBy: 'birth_date',
+    kind: 'kinder', title: 'Kinder', sortBy: 'birth_date',
     columns: [
       { key: 'name', label: 'Name', type: 'text' },
       { key: 'birth_date', label: 'Geburtsdatum', type: 'date' },
     ],
   },
   {
-    kind: 'a1', title: 'A1 Bescheinigung für Luxemburg', ninox: ['A1 Bescheinigung', 'A1 Bescheinigung für Luxemburg', 'A1'], sortBy: 'valid_until',
+    kind: 'a1', title: 'A1 Bescheinigung für Luxemburg', sortBy: 'valid_until',
     columns: [
       { key: 'nr', label: 'Nr', type: 'number' },
-      { key: 'valid_until', label: 'Gültig bis:', type: 'date', ninox: ['Gültig bis'] },
+      { key: 'valid_until', label: 'Gültig bis:', type: 'date' },
       { key: 'antrag', label: 'Antrag', type: 'file' },
       { key: 'bescheinigung', label: 'Bescheinigung', type: 'file' },
       { key: 'entsendung', label: 'Entsendung', type: 'file' },
@@ -91,7 +87,7 @@ export const SUBTABLES: SubTable[] = [
     ],
   },
   {
-    kind: 'lohn', title: 'Lohn und Gehalt', ninox: ['Lohn', 'Lohn und Gehalt'], sortBy: 'from',
+    kind: 'lohn', title: 'Lohn und Gehalt', sortBy: 'from',
     columns: [
       { key: 'from', label: 'Ab Datum', type: 'date' },
       { key: 'wage', label: 'Stundenlohn / Gehalt', type: 'money' },
@@ -99,7 +95,7 @@ export const SUBTABLES: SubTable[] = [
     ],
   },
   {
-    kind: 'nebentaetigkeit', title: 'Nebentätigkeit', ninox: ['Nebentätigkeit', 'Nebentätigkeiten'], sortBy: 'start',
+    kind: 'nebentaetigkeit', title: 'Nebentätigkeit', sortBy: 'start',
     columns: [
       { key: 'nr', label: 'Nr', type: 'number' },
       { key: 'start', label: 'Start der Nebentätigkeit', type: 'date' },
@@ -108,7 +104,7 @@ export const SUBTABLES: SubTable[] = [
     ],
   },
   {
-    kind: 'praemie', title: 'Prämienzahlung', ninox: ['Prämienzahlung', 'Prämienzahlungen'], sortBy: 'date',
+    kind: 'praemie', title: 'Prämienzahlung', sortBy: 'date',
     columns: [
       { key: 'date', label: 'Datum', type: 'date' },
       { key: 'amount', label: 'Betrag', type: 'money' },
@@ -116,7 +112,7 @@ export const SUBTABLES: SubTable[] = [
     ],
   },
   {
-    kind: 'gespraech', title: 'Mitarbeitergespräche', ninox: ['Mitarbeitergespräch', 'Mitarbeitergespräche'], sortBy: 'at',
+    kind: 'gespraech', title: 'Mitarbeitergespräche', sortBy: 'at',
     columns: [
       { key: 'at', label: 'Datum + Uhrzeit', type: 'datetime' },
       { key: 'persons', label: 'Beteiligte Personen', type: 'text', wide: true },
@@ -124,7 +120,7 @@ export const SUBTABLES: SubTable[] = [
     ],
   },
   {
-    kind: 'darlehen', title: 'Mitarbeiterdarlehen', ninox: ['Mitarbeiterdarlehen'], sortBy: 'paid_out',
+    kind: 'darlehen', title: 'Mitarbeiterdarlehen', sortBy: 'paid_out',
     columns: [
       { key: 'paid_out', label: 'Ausgezahlt am', type: 'date' },
       { key: 'amount', label: 'Darlehensbetrag', type: 'money' },
@@ -132,7 +128,7 @@ export const SUBTABLES: SubTable[] = [
     ],
   },
   {
-    kind: 'vorschuss', title: 'Lohnvorschuss', ninox: ['Lohnvorschuss'], sortBy: 'date',
+    kind: 'vorschuss', title: 'Lohnvorschuss', sortBy: 'date',
     columns: [
       { key: 'date', label: 'Datum', type: 'date' },
       { key: 'payment', label: 'Zahlung', type: 'text' },
@@ -141,7 +137,7 @@ export const SUBTABLES: SubTable[] = [
     ],
   },
   {
-    kind: 'direktversicherung', title: 'Direktversicherung', ninox: ['Direktversicherung', 'Zusatzversicherung'], sortBy: 'contract_date',
+    kind: 'direktversicherung', title: 'Direktversicherung', sortBy: 'contract_date',
     columns: [
       { key: 'contract_date', label: 'Vertragsdatum', type: 'date' },
       { key: 'insurance', label: 'Versicherung', type: 'text', wide: true },
@@ -150,7 +146,7 @@ export const SUBTABLES: SubTable[] = [
     ],
   },
   {
-    kind: 'schulung', title: 'Schulungen', ninox: ['Schulungen', 'Schulung'], sortBy: 'date',
+    kind: 'schulung', title: 'Schulungen', sortBy: 'date',
     columns: [
       { key: 'date', label: 'Datum von', type: 'date' },
       { key: 'content', label: 'Schulungsinhalt', type: 'text', wide: true },
@@ -158,7 +154,7 @@ export const SUBTABLES: SubTable[] = [
     ],
   },
   {
-    kind: 'deutschkurs', title: 'Deutschkurse', ninox: ['Deutschkurse', 'Deutschkurs'], sortBy: 'date',
+    kind: 'deutschkurs', title: 'Deutschkurse', sortBy: 'date',
     columns: [
       { key: 'date', label: 'Unterrichtstermin', type: 'text' },
       { key: 'course', label: 'Kurs', type: 'text', wide: true },
@@ -167,7 +163,7 @@ export const SUBTABLES: SubTable[] = [
     ],
   },
   {
-    kind: 'schuhe', title: 'Sicherheitsschuhe', ninox: ['Sicherheitsschuhe'], sortBy: 'date',
+    kind: 'schuhe', title: 'Sicherheitsschuhe', sortBy: 'date',
     columns: [
       { key: 'date', label: 'Datum', type: 'date' },
       { key: 'amount', label: 'Betrag', type: 'number' },
@@ -175,7 +171,7 @@ export const SUBTABLES: SubTable[] = [
     ],
   },
   {
-    kind: 'kleidung', title: 'Arbeitskleidung', ninox: ['Arbeitskleidung'], sortBy: 'date',
+    kind: 'kleidung', title: 'Arbeitskleidung', sortBy: 'date',
     columns: [
       { key: 'date', label: 'Datum', type: 'date' },
       { key: 'qty', label: 'Menge', type: 'number' },
@@ -185,7 +181,7 @@ export const SUBTABLES: SubTable[] = [
     ],
   },
   {
-    kind: 'kfz', title: 'KFZ/Fahrrad', ninox: ['KFZ/Fahrrad', 'KFZ', 'Fahrrad'], sortBy: 'lease_start',
+    kind: 'kfz', title: 'KFZ/Fahrrad', sortBy: 'lease_start',
     columns: [
       { key: 'lease_start', label: 'Leasingbeginn', type: 'date' },
       { key: 'lease_end', label: 'Leasingende', type: 'date' },
@@ -195,7 +191,7 @@ export const SUBTABLES: SubTable[] = [
     ],
   },
   {
-    kind: 'unfall', title: 'Arbeitsunfälle', ninox: ['Arbeitsunfälle', 'Arbeitsunfall'], sortBy: 'date',
+    kind: 'unfall', title: 'Arbeitsunfälle', sortBy: 'date',
     columns: [
       { key: 'date', label: 'Datum', type: 'date' },
       { key: 'sick_days', label: 'Krankheitstage', type: 'number' },
@@ -203,7 +199,7 @@ export const SUBTABLES: SubTable[] = [
     ],
   },
   {
-    kind: 'krankheit', title: 'Krankheitstage', ninox: ['Krankheitstage'], sortBy: 'year',
+    kind: 'krankheit', title: 'Krankheitstage', sortBy: 'year',
     columns: [
       { key: 'year', label: 'Jahr', type: 'number' },
       { key: 'days_total', label: 'Fehltage gesamt', type: 'number' },
@@ -211,7 +207,7 @@ export const SUBTABLES: SubTable[] = [
     ],
   },
   {
-    kind: 'reha', title: 'Reha/Kur', ninox: ['Reha/Kur', 'Reha', 'Kur'], sortBy: 'start',
+    kind: 'reha', title: 'Reha/Kur', sortBy: 'start',
     columns: [
       { key: 'type', label: 'Auswahl', type: 'choice', options: ['Reha', 'Kur'] },
       { key: 'start', label: 'Datum Anfang', type: 'date' },
@@ -417,7 +413,6 @@ export function companyEmail(first: string, last: string) {
 
 export interface Employee {
   id: number
-  ninox_id: string | null
   user_id: string | null
   personnel_number: string
   status: string

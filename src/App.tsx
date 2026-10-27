@@ -22,7 +22,6 @@ import { NfcTest } from './pages/NfcTest'
 import { Terminal } from './pages/Terminal'
 import { Personnel } from './pages/Personnel'
 import { PersonnelDetail } from './pages/PersonnelDetail'
-import { EmployeeImport } from './pages/EmployeeImport'
 
 function Routed() {
   const { session, profile, loading, needsPassword } = useAuth()
@@ -63,7 +62,6 @@ function Routed() {
         <Route path="benutzer" element={<Navigate to="/personal?ansicht=benutzer" replace />} />
         {canSeePersonnel(profile) && <Route path="personal" element={<Personnel />} />}
         {canSeePersonnel(profile) && <Route path="personal/:id" element={<PersonnelDetail />} />}
-        {profile.role === 'admin' && <Route path="personal/import" element={<EmployeeImport />} />}
         {profile.role === 'admin' && <Route path="artikel" element={<Articles />} />}
         {profile.role === 'admin' && <Route path="fenster" element={<Windows />} />}
         <Route path="*" element={<Navigate to="/" replace />} />

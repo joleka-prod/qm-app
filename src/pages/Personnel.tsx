@@ -29,7 +29,6 @@ export function Personnel() {
 
 // Übersicht Personalakten (nur Admin und Benutzer mit Zugriff auf Personalakten)
 function EmployeeList() {
-  const { profile } = useAuth()
   const { byId } = useProfiles()
   const navigate = useNavigate()
   const [list, setList] = useState<Employee[]>([])
@@ -40,7 +39,7 @@ function EmployeeList() {
   useEffect(() => {
     supabase
       .from('employees')
-      .select('id, ninox_id, user_id, personnel_number, status, first_name, last_name, department, entry_date, wage_concept, extra, updated_at')
+      .select('id, user_id, personnel_number, status, first_name, last_name, department, entry_date, wage_concept, extra, updated_at')
       .then(({ data, error }) => {
         if (error) setError(error.message.includes('employees') ? 'Bitte zuerst das SQL-Update für das Personal ausführen.' : error.message)
         setList((data ?? []) as Employee[])
@@ -66,7 +65,6 @@ function EmployeeList() {
       <div className="page-head">
         <h1>Personal</h1>
         <div className="card-head-actions">
-          {profile?.role === 'admin' && <Link className="button" to="/personal/import">Aus Ninox importieren</Link>}
           <button className="primary" onClick={create}>+ Mitarbeiter</button>
         </div>
       </div>

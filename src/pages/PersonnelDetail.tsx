@@ -323,7 +323,6 @@ export function PersonnelDetail() {
       </div>
       <p className="muted small">
         App-Benutzer: {user ? `${displayName(user)} · ${user.email}` : 'keiner'}
-        {emp.ninox_id ? ' · aus Ninox übernommen' : ''}
       </p>
       <nav className="emp-tabs">
         {tabs.map((t) => (
@@ -374,7 +373,7 @@ export function PersonnelDetail() {
 
         {tab === 'mitarbeiter' && Object.keys(extra).length > 0 && (
           <div className="emp-section">
-            <h3 className="emp-heading">Weitere Felder aus Ninox</h3>
+            <h3 className="emp-heading">Weitere Felder</h3>
             <div className="emp-grid">
               {Object.keys(extra).sort((a, b) => a.localeCompare(b, 'de')).map((k) => (
                 <label key={k}>
