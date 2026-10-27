@@ -25,6 +25,7 @@ import { ROLE_LABEL, displayName } from '../lib/types'
 import { createUser, generatePassword } from '../lib/adminUsers'
 import { useProfiles } from '../lib/useProfiles'
 import { Users } from './Users'
+import { EmployeeHistory } from '../components/EmployeeHistory'
 
 type Form = Record<string, string | boolean>
 
@@ -185,10 +186,12 @@ export function PersonnelDetail() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [options, setOptions] = useState<Record<string, string[]>>({})
+  const [logVersion, setLogVersion] = useState(0)
 
   const loadEntries = useCallback(async () => {
     const { data } = await supabase.from('employee_entries').select('id, employee_id, kind, data').eq('employee_id', id).order('id')
     setEntries((data ?? []) as Entry[])
+    setLogVersion((v) => v + 1)
   }, [id])
 
   const load = useCallback(async () => {
@@ -430,6 +433,8 @@ export function PersonnelDetail() {
           <button type="button" className="primary" disabled={busy} onClick={save}>{busy ? 'Speichert…' : 'Speichern'}</button>
         </div>
       )}
+
+      <EmployeeHistory employeeId={emp.id} version={logVersion} />
 
       {me?.role === 'admin' && (
         <p><button type="button" className="danger" onClick={removeEmployee}>Mitarbeiter löschen</button></p>

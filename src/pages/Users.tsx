@@ -122,6 +122,7 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
       setError((err as Error).message)
     }
     await Promise.all([reload(), loadCreds()])
+    onChanged?.()
     setBusy(false)
   }
 

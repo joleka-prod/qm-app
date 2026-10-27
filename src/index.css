@@ -716,3 +716,6 @@ button.link.danger-link { color: var(--danger); }
 @media (max-width: 600px) { .emp-grid label.wide { grid-column: auto; } }
 .wage-items .checkbox-row { display: flex; align-items: flex-start; gap: 0.5rem; }
 .dupe-group + .dupe-group { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); }
+.emp-history > ul { list-style: none; padding: 0; margin: 0; }
+.emp-history > ul > li { padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+.emp-history-changes { margin: 0.2rem 0 0; padding-left: 1.1rem; overflow-wrap: anywhere; }
