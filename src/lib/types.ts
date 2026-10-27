@@ -80,13 +80,6 @@ export interface Ticket {
   billing_zip: string
   billing_city: string
   billing_country: string
-  jobsite_address_different: boolean
-  jobsite_name: string
-  jobsite_street: string
-  jobsite_house_no: string
-  jobsite_zip: string
-  jobsite_city: string
-  jobsite_country: string
   site_address: string
   work_report: string
   service_area: ServiceArea | null
