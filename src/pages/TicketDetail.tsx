@@ -950,16 +950,18 @@ export function TicketDetail() {
               {ticket.report_by_email && !closed && (
                 <p className="small muted">Der Bericht wird automatisch verschickt, sobald der Auftrag als erledigt gemeldet ist.</p>
               )}
-              {ticket.report_by_email && closed && (isPlanner || (isInstaller && !ticket.report_sent_at)) && (
-                <button className="link" disabled={busy} onClick={() => mailReport(!!ticket.report_sent_at)}>
-                  {ticket.report_sent_at ? 'Bericht erneut senden' : 'Bericht jetzt senden'}
-                </button>
-              )}
-              {isAdmin && (
-                <button className="link" disabled={busy} onClick={() => update({ signature_path: null })}>
-                  Unterschrift entfernen
-                </button>
-              )}
+              <div className="signature-actions">
+                {ticket.report_by_email && closed && (isPlanner || (isInstaller && !ticket.report_sent_at)) && (
+                  <button className="link" disabled={busy} onClick={() => mailReport(!!ticket.report_sent_at)}>
+                    {ticket.report_sent_at ? 'Bericht erneut senden' : 'Bericht jetzt senden'}
+                  </button>
+                )}
+                {isAdmin && (
+                  <button className="link signature-remove" disabled={busy} onClick={() => update({ signature_path: null })}>
+                    Unterschrift entfernen
+                  </button>
+                )}
+              </div>
             </>
           ) : canSign && signing ? (
             <div className="form">
