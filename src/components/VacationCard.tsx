@@ -3,15 +3,16 @@ import { supabase } from '../lib/supabase'
 import { displayName, formatDate, formatDay, type Profile } from '../lib/types'
 
 export type VacationState = 'beantragt' | 'genehmigt' | 'abgelehnt' | 'storniert'
-export type VacationKind = 'urlaub' | 'ueberstunden' | 'krank' | 'sonderurlaub' | 'feiertag'
+export type VacationKind = 'urlaub' | 'ueberstunden' | 'krank' | 'sonderurlaub'
 
-export const KIND_LABEL: Record<VacationKind, string> = { urlaub: 'Urlaubstage', ueberstunden: 'Überstunden', krank: 'Krank', sonderurlaub: 'Sonderurlaub', feiertag: 'Feiertag' }
+export const KIND_LABEL: Record<VacationKind, string> = { urlaub: 'Urlaubstage', ueberstunden: 'Überstunden', krank: 'Krank', sonderurlaub: 'Sonderurlaub' }
 
 // Arten, die Vorgesetzte und Admin direkt für Mitarbeiter eintragen (sofort genehmigt)
-const ENTER_KINDS: VacationKind[] = ['krank', 'sonderurlaub', 'feiertag']
+const ENTER_KINDS: VacationKind[] = ['urlaub', 'ueberstunden', 'krank', 'sonderurlaub']
+const ENTER_LABEL: Record<VacationKind, string> = { urlaub: 'Urlaub', ueberstunden: 'Zeitausgleich', krank: 'Krank', sonderurlaub: 'Sonderurlaub' }
 
 // Zusatz hinter dem Zeitraum (Urlaub ohne Zusatz)
-const KIND_NOTE: Record<VacationKind, string> = { urlaub: '', ueberstunden: 'über Überstunden', krank: 'Krankheit', sonderurlaub: 'Sonderurlaub', feiertag: 'Feiertag' }
+const KIND_NOTE: Record<VacationKind, string> = { urlaub: '', ueberstunden: 'über Überstunden', krank: 'Krankheit', sonderurlaub: 'Sonderurlaub' }
 
 export interface VacationRequest {
   id: number
@@ -113,7 +114,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
 
   // Krankheit, Sonderurlaub und Feiertag trägt der Vorgesetzte bzw. Admin für Mitarbeiter ein
   const canEnter = canDecide({ user_id: userId } as VacationRequest)
-  const entering = !!form && ENTER_KINDS.includes(form.kind)
+  const entering = !!form && !own
 
   const allowance = Number(byId[userId]?.vacation_days ?? 0)
   const sum = (s: VacationState) => list.filter((r) => r.state === s && r.kind === 'urlaub').reduce((a, r) => a + r.days, 0)
@@ -123,14 +124,15 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
 
   async function submit() {
     if (!form) return
-    if (ENTER_KINDS.includes(form.kind)) {
+    const days = form.half && preview === 1 ? 0.5 : preview
+    if (form.kind === 'urlaub' && days != null && days > rest && !confirm(`${entering ? 'Der Eintrag' : 'Der Antrag'} (${dayWord(days)}) ist mehr als der Resturlaub (${dayWord(rest)}). Trotzdem ${entering ? 'eintragen' : 'beantragen'}?`)) return
+    if (entering) {
       const ok = await run(() =>
         supabase.rpc('enter_absence', { p_user: userId, p_start: form.start, p_end: form.end, p_kind: form.kind, p_note: form.note, p_half: !!form.half }),
       )
       if (ok) setForm(null)
       return
     }
-    if (form.kind === 'urlaub' && preview != null && preview > rest && !confirm(`Der Antrag (${dayWord(preview)}) ist mehr als der Resturlaub (${dayWord(rest)}). Trotzdem beantragen?`)) return
     const ok = await run(() => supabase.rpc('request_vacation', { p_start: form.start, p_end: form.end, p_note: form.note, p_kind: form.kind }))
     if (ok) setForm(null)
   }
@@ -189,13 +191,13 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
           </button>
         )}
         {!own && canEnter && !form && (
-          <button onClick={() => { setError(''); setForm({ start: '', end: '', note: '', kind: 'krank' }) }}>
-            + Krankheit, Sonderurlaub oder Feiertag eintragen
+          <button onClick={() => { setError(''); setForm({ start: '', end: '', note: '', kind: 'urlaub' }) }}>
+            + Abwesenheit eintragen
           </button>
         )}
         {form && (
           <div className="form vacation-form">
-            <div className={`segmented ${entering ? 'three' : 'two'}`} role="radiogroup" aria-label={entering ? 'Art der Abwesenheit' : 'Freizeit über'}>
+            <div className={entering ? 'segmented' : 'segmented two'} role="radiogroup" aria-label={entering ? 'Art der Abwesenheit' : 'Freizeit über'}>
               {(entering ? ENTER_KINDS : (['urlaub', 'ueberstunden'] as VacationKind[])).map((k) => (
                 <button
                   type="button"
@@ -203,9 +205,9 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
                   role="radio"
                   aria-checked={form.kind === k}
                   className={form.kind === k ? 'active' : ''}
-                  onClick={() => setForm({ ...form, kind: k })}
+                  onClick={() => setForm({ ...form, kind: k, half: k === 'ueberstunden' ? false : form.half })}
                 >
-                  {KIND_LABEL[k]}
+                  {entering ? ENTER_LABEL[k] : KIND_LABEL[k]}
                 </button>
               ))}
             </div>
@@ -219,7 +221,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
                 <input type="date" value={form.end} min={form.start} onChange={(e) => setForm({ ...form, end: e.target.value })} />
               </label>
             </div>
-            {entering && preview === 1 && (
+            {entering && preview === 1 && form.kind !== 'ueberstunden' && (
               <label className="checkbox-row">
                 <input type="checkbox" checked={!!form.half} onChange={(e) => setForm({ ...form, half: e.target.checked })} /> Nur halber Tag
               </label>
@@ -231,7 +233,9 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
             {preview != null && (
               <p className="small">
                 {entering
-                  ? `${dayWord(form.half && preview === 1 ? 0.5 : preview)} ${KIND_LABEL[form.kind]}`
+                  ? form.kind === 'ueberstunden'
+                    ? `${dayWord(preview)} Zeitausgleich (${(preview * Number(byId[userId]?.weekly_hours ?? 40) / 5).toLocaleString('de-DE')} Std. vom Überstundenkonto)`
+                    : `${dayWord(form.half && preview === 1 ? 0.5 : preview)} ${ENTER_LABEL[form.kind]}`
                   : form.kind === 'urlaub'
                   ? `${dayWord(preview)} Urlaub`
                   : `${dayWord(preview)} frei über Überstunden (${(preview * Number(byId[userId]?.weekly_hours ?? 40) / 5).toLocaleString('de-DE')} Std.)`}{' '}
@@ -240,8 +244,8 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
             )}
             {entering && (
               <p className="small muted">
-                Wird sofort als genehmigt eingetragen und mindert die Soll-Zeit.
-                {form.kind === 'feiertag' && ' Gesetzliche Feiertage in Rheinland-Pfalz zählt die App schon von selbst.'}
+                Wird sofort als genehmigt eingetragen.
+                {form.kind === 'urlaub' && ' Zählt gegen den Urlaubsanspruch.'}
               </p>
             )}
             {!entering && !byId[me.id]?.supervisor_id && !isAdmin && (
