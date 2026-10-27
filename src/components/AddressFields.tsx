@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { GROUP_LABEL, searchCustomers, type Customer } from '../lib/customers'
 import type { Ticket } from '../lib/types'
+import { noAutofill } from '../lib/noAutofill'
 import { AddressSuggest } from './AddressSuggest'
 
 // Abweichende Adresse am Auftrag: Rechnungsadresse (billing_*) oder Baustellenadresse (jobsite_*)
@@ -78,14 +79,14 @@ export function AddressFields({ kind, value, onChange }: { kind: AddressKind; va
           <legend>{TITLE[kind]}</legend>
           <label>
             {nameRequired ? 'Name *' : 'Name / Bezeichnung'}
-            <input required={nameRequired} value={value.name} maxLength={150} onChange={(e) => set({ name: e.target.value })} />
+            <input required={nameRequired} {...noAutofill(`${kind}-name`)} value={value.name} maxLength={150} onChange={(e) => set({ name: e.target.value })} />
           </label>
           <div className="row street-row">
             <label>
               Straße *
               <input
                 required
-                autoComplete="off"
+                {...noAutofill(`${kind}-street`)}
                 value={value.street}
                 maxLength={150}
                 onChange={(e) => {
@@ -97,7 +98,7 @@ export function AddressFields({ kind, value, onChange }: { kind: AddressKind; va
             </label>
             <label>
               Hausnummer
-              <input value={value.house_no} maxLength={20} onChange={(e) => set({ house_no: e.target.value })} />
+              <input {...noAutofill(`${kind}-house-no`)} value={value.house_no} maxLength={20} onChange={(e) => set({ house_no: e.target.value })} />
             </label>
           </div>
           <AddressSuggest
@@ -111,14 +112,14 @@ export function AddressFields({ kind, value, onChange }: { kind: AddressKind; va
           <div className="row zip-row">
             <label>
               PLZ *
-              <input required inputMode="numeric" value={value.zip} maxLength={10} onChange={(e) => set({ zip: e.target.value })} />
+              <input required inputMode="numeric" {...noAutofill(`${kind}-zip`)} value={value.zip} maxLength={10} onChange={(e) => set({ zip: e.target.value })} />
             </label>
             <label>
               Ort *
-              <input required value={value.city} maxLength={100} onChange={(e) => set({ city: e.target.value })} />
+              <input required {...noAutofill(`${kind}-city`)} value={value.city} maxLength={100} onChange={(e) => set({ city: e.target.value })} />
             </label>
           </div>
-          <CountryInput value={value.country} onChange={(country) => set({ country })} />
+          <CountryInput field={`${kind}-country`} value={value.country} onChange={(country) => set({ country })} />
         </fieldset>
       )}
     </>
@@ -298,7 +299,7 @@ export function CustomerFields({ value, onChange, crm }: { value: CustomerData; 
           <input
             value={value.customer_number}
             maxLength={30}
-            autoComplete="off"
+            {...noAutofill('customer-number')}
             onChange={(e) => {
               setTypingName(true)
               set({ customer_number: e.target.value })
@@ -311,7 +312,7 @@ export function CustomerFields({ value, onChange, crm }: { value: CustomerData; 
           <input
             value={value.customer_name}
             maxLength={150}
-            autoComplete="off"
+            {...noAutofill('customer-name')}
             placeholder={crm && !linked ? 'Tippen für Vorschläge aus dem Kundenstamm' : ''}
             onChange={(e) => {
               setTypingName(true)
@@ -326,7 +327,7 @@ export function CustomerFields({ value, onChange, crm }: { value: CustomerData; 
         <label>
           Straße
           <input
-            autoComplete="off"
+            {...noAutofill('customer-street')}
             value={value.customer_street}
             maxLength={150}
             onChange={(e) => {
@@ -338,7 +339,7 @@ export function CustomerFields({ value, onChange, crm }: { value: CustomerData; 
         </label>
         <label>
           Nr.
-          <input value={value.customer_house_no} maxLength={20} onChange={(e) => set({ customer_house_no: e.target.value })} />
+          <input {...noAutofill('customer-house-no')} value={value.customer_house_no} maxLength={20} onChange={(e) => set({ customer_house_no: e.target.value })} />
         </label>
       </div>
       <AddressSuggest
@@ -358,22 +359,22 @@ export function CustomerFields({ value, onChange, crm }: { value: CustomerData; 
       <div className="row cust-place-row">
         <label>
           PLZ
-          <input inputMode="numeric" value={value.customer_zip} maxLength={10} onChange={(e) => set({ customer_zip: e.target.value })} />
+          <input inputMode="numeric" {...noAutofill('customer-zip')} value={value.customer_zip} maxLength={10} onChange={(e) => set({ customer_zip: e.target.value })} />
         </label>
         <label>
           Ort
-          <input value={value.customer_city} maxLength={100} onChange={(e) => set({ customer_city: e.target.value })} />
+          <input {...noAutofill('customer-city')} value={value.customer_city} maxLength={100} onChange={(e) => set({ customer_city: e.target.value })} />
         </label>
-        <CountryInput value={value.customer_country} onChange={(customer_country) => set({ customer_country })} />
+        <CountryInput field="customer-country" value={value.customer_country} onChange={(customer_country) => set({ customer_country })} />
       </div>
       <div className="row">
         <label>
           Telefon
-          <input type="tel" value={value.customer_phone} maxLength={50} onChange={(e) => set({ customer_phone: e.target.value })} />
+          <input type="tel" {...noAutofill('customer-phone')} value={value.customer_phone} maxLength={50} onChange={(e) => set({ customer_phone: e.target.value })} />
         </label>
         <label>
           Mobil
-          <input type="tel" value={value.customer_mobile} maxLength={50} onChange={(e) => set({ customer_mobile: e.target.value })} />
+          <input type="tel" {...noAutofill('customer-mobile')} value={value.customer_mobile} maxLength={50} onChange={(e) => set({ customer_mobile: e.target.value })} />
         </label>
       </div>
       <label>
@@ -381,7 +382,7 @@ export function CustomerFields({ value, onChange, crm }: { value: CustomerData; 
         <input
           type="email"
           inputMode="email"
-          autoComplete="off"
+          {...noAutofill('customer-email')}
           value={value.customer_email}
           maxLength={200}
           onChange={(e) => set({ customer_email: e.target.value })}
@@ -398,11 +399,11 @@ export function CustomerFields({ value, onChange, crm }: { value: CustomerData; 
   )
 }
 
-function CountryInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function CountryInput({ field, value, onChange }: { field: string; value: string; onChange: (v: string) => void }) {
   return (
     <label>
       Land
-      <input list="country-list" value={value} maxLength={60} onChange={(e) => onChange(e.target.value)} />
+      <input list="country-list" {...noAutofill(field)} value={value} maxLength={60} onChange={(e) => onChange(e.target.value)} />
       <datalist id="country-list">
         {COUNTRY_LIST.map((c) => (
           <option key={c} value={c} />
