@@ -352,6 +352,19 @@ export function formatEuro(n: number | null | undefined) {
   return n == null ? '–' : n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
 }
 
+// "12,50" / "1.234,5" / "12.5" -> 12.5; leer -> null; ungültig -> NaN
+export function parsePrice(s: string) {
+  const v = s.trim().replace(/\s|€/g, '')
+  if (!v) return null
+  const normalized = v.includes(',') ? v.replace(/\./g, '').replace(',', '.') : v
+  return /^\d+(\.\d{0,2})?$/.test(normalized) ? Number(normalized) : NaN
+}
+
+// 12.5 -> "12,50" (für Eingabefelder)
+export function priceText(n: number | null | undefined) {
+  return n == null ? '' : n.toFixed(2).replace('.', ',')
+}
+
 // Vorschläge für Mengeneinheiten (frei ergänzbar)
 export const UNITS = ['Stk', 'Std.', 'Lfm.', 'm', 'm²', 'km', 'pauschal']
 export const UNIT_HINT: Record<string, string> = { Stk: 'Stück', 'Std.': 'Stunden', 'Lfm.': 'Laufmeter', m: 'Meter', 'm²': 'Quadratmeter', km: 'Kilometer', pauschal: 'Pauschal' }
