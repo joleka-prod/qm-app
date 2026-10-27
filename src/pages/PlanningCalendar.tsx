@@ -9,6 +9,7 @@ import {
   AREA_LABEL,
   SERVICE_AREAS,
   addDays,
+  CALENDAR_SELECT,
   appointmentMoveWarning,
   displayName,
   formatDay,
@@ -84,11 +85,11 @@ export function PlanningCalendar() {
     const [p, u, m] = await Promise.all([
       supabase
         .from('tickets')
-        .select('*, ticket_positions(count)')
+        .select(CALENDAR_SELECT)
         .neq('ticket_type', 'qm')
         .gte('montage_date', from)
         .lte('montage_date', to),
-      supabase.from('tickets').select('*, ticket_positions(count)').neq('ticket_type', 'qm').eq('status', 'neu').order('created_at'),
+      supabase.from('tickets').select(CALENDAR_SELECT).neq('ticket_type', 'qm').eq('status', 'neu').order('created_at'),
       loadMembers(from, to),
     ])
     setPlanned(((p.data ?? []) as Ticket[]).filter((t) => t.team_id))

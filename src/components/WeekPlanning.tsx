@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react'
 import { holidayName } from '../lib/holidays'
 import { supabase } from '../lib/supabase'
-import { AREA_LABEL, addDays, formatManDays, manDays, isoDate, startOfWeek, weekNumber, type ServiceArea, type Ticket } from '../lib/types'
+import { AREA_LABEL, CALENDAR_SELECT, addDays, formatManDays, manDays, isoDate, startOfWeek, weekNumber, type ServiceArea, type Ticket } from '../lib/types'
 import { JobCard } from './JobCard'
 import { weekRange } from './WeekSelect'
 
@@ -23,10 +23,10 @@ export function WeekPlanning({ weekStart }: { weekStart: Date }) {
   const load = useCallback(async () => {
     const last = isoDate(addDays(new Date(weeks[WEEKS - 1] + 'T00:00'), 6))
     const [o, s, c] = await Promise.all([
-      supabase.from('tickets').select('*, ticket_positions(count)').eq('ticket_type', 'montageauftrag').eq('status', 'neu').order('created_at'),
+      supabase.from('tickets').select(CALENDAR_SELECT).eq('ticket_type', 'montageauftrag').eq('status', 'neu').order('created_at'),
       supabase
         .from('tickets')
-        .select('*')
+        .select(CALENDAR_SELECT)
         .eq('ticket_type', 'montageauftrag')
         .not('team_id', 'is', null)
         .gte('montage_date', weeks[0])

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { formatManDays, formatTime, manDays, ticketNo, weekLabel, type Ticket } from '../lib/types'
+import { formatManDays, formatTime, manDays, projectPlace, ticketNo, weekLabel, type Ticket } from '../lib/types'
 import { jobAddress } from './AddressFields'
 import { AreaBadge, TypeBadge } from './StatusBadge'
 
@@ -35,6 +35,7 @@ export function JobCard({ ticket: t, draggable, showAddress, showWeek }: Props) 
         </span>
       </div>
       <div className="job-title">{t.title}</div>
+      {projectPlace(t) && <div className="job-place">📍 {projectPlace(t)}</div>}
       {!done && t.appointment_state !== 'offen' && (
         <div className={`job-termin job-termin-${t.appointment_state}`}>
           {t.appointment_state === 'bestaetigt' ? '✓ Kunde hat bestätigt' : '☎ beim Kunden angemeldet'}

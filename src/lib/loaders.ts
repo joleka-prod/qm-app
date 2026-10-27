@@ -1,7 +1,7 @@
 import { signedUrls } from './photos'
 import { supabase } from './supabase'
 import { loadMembers, type TeamMember } from './teams'
-import { addDays, isoDate, startOfWeek, type Ticket, type TicketPhoto } from './types'
+import { CALENDAR_SELECT, addDays, isoDate, startOfWeek, type Ticket, type TicketPhoto } from './types'
 import { markSaved } from './offline'
 
 // Abfragen der Monteur-Seiten. Sie liegen hier, damit das Vorab-Speichern für den Offline-Modus
@@ -18,13 +18,13 @@ export async function loadInstallerWeek(installerId: string, days: string[], tod
   const [w, o] = await Promise.all([
     supabase
       .from('tickets')
-      .select('*, ticket_positions(count)')
+      .select(CALENDAR_SELECT)
       .in('team_id', teamIds)
       .gte('montage_date', days[0])
       .lte('montage_date', days[6]),
     supabase
       .from('tickets')
-      .select('*, ticket_positions(count)')
+      .select(CALENDAR_SELECT)
       .in('team_id', teamIds)
       .gte('montage_date', since)
       .lt('montage_date', today)
