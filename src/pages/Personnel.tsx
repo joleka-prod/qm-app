@@ -72,7 +72,7 @@ function EmployeeList() {
   const load = useCallback(async () => {
     const { data, error } = await supabase
       .from('employees')
-      .select('id, user_id, personnel_number, status, first_name, last_name, birth_date, department, entry_date, wage_concept, extra, updated_at')
+      .select('id, user_id, personnel_number, status, first_name, last_name, birth_date, department, entry_date, wage_concept, updated_at')
     if (error) setError(error.message.includes('employees') ? 'Bitte zuerst das SQL-Update für das Personal ausführen.' : error.message)
     setList((data ?? []) as unknown as Employee[])
   }, [])

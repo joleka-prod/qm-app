@@ -180,7 +180,6 @@ export function PersonnelDetail() {
   const [entries, setEntries] = useState<Entry[]>([])
   const [form, setForm] = useState<Form>({})
   const [wage, setWage] = useState<Record<string, boolean>>({})
-  const [extra, setExtra] = useState<Record<string, string>>({})
   const [tab, setTab] = useState('mitarbeiter')
   const [loaded, setLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -202,7 +201,6 @@ export function PersonnelDetail() {
     if (e) {
       setForm(formOf(e))
       setWage({ ...(e.wage_concept ?? {}) })
-      setExtra(Object.fromEntries(Object.entries(e.extra ?? {}).map(([k, v]) => [k, v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v)])))
     }
     await loadEntries()
     setLoaded(true)
@@ -230,10 +228,8 @@ export function PersonnelDetail() {
     if (!emp) return false
     const base = formOf(emp)
     if (MAIN_FIELDS.some((f) => base[f.key] !== form[f.key])) return true
-    if (JSON.stringify(Object.keys(wage).filter((k) => wage[k]).sort()) !== JSON.stringify(Object.keys(emp.wage_concept ?? {}).filter((k) => emp.wage_concept[k]).sort())) return true
-    const ex = emp.extra ?? {}
-    return Object.keys(extra).some((k) => extra[k] !== (ex[k] == null ? '' : typeof ex[k] === 'object' ? JSON.stringify(ex[k]) : String(ex[k])))
-  }, [emp, form, wage, extra])
+    return JSON.stringify(Object.keys(wage).filter((k) => wage[k]).sort()) !== JSON.stringify(Object.keys(emp.wage_concept ?? {}).filter((k) => emp.wage_concept[k]).sort())
+  }, [emp, form, wage])
 
   async function save() {
     if (!emp) return
@@ -253,7 +249,6 @@ export function PersonnelDetail() {
       }
     }
     row.wage_concept = Object.fromEntries(Object.entries(wage).filter(([, v]) => v))
-    row.extra = { ...(emp.extra ?? {}), ...Object.fromEntries(Object.entries(extra).map(([k, v]) => [k, v])) }
     const { error } = await supabase.from('employees').update(row).eq('id', emp.id)
     if (error) setError(error.message)
     await load()
@@ -373,20 +368,6 @@ export function PersonnelDetail() {
             ))}
           </div>
         ))}
-
-        {tab === 'mitarbeiter' && Object.keys(extra).length > 0 && (
-          <div className="emp-section">
-            <h3 className="emp-heading">Weitere Felder</h3>
-            <div className="emp-grid">
-              {Object.keys(extra).sort((a, b) => a.localeCompare(b, 'de')).map((k) => (
-                <label key={k}>
-                  {k}
-                  <input value={extra[k]} onChange={(e) => setExtra((x) => ({ ...x, [k]: e.target.value }))} />
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
 
         {tab === 'lohnkonzept' && (
           <div className="emp-section">

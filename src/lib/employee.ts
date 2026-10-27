@@ -221,7 +221,7 @@ export const SUBTABLE = Object.fromEntries(SUBTABLES.map((t) => [t.kind, t])) as
 export const TABS: Tab[] = [
   {
     key: 'mitarbeiter',
-    title: 'Mitarbeiter',
+    title: 'Stammdaten',
     sections: [
       { fields: pick('personnel_number', 'status', 'tax_class') },
       { fields: pick('salutation', 'first_name', 'last_name', 'mother_tongue') },
@@ -422,7 +422,6 @@ export interface Employee {
   entry_date: string | null
   vacation_days: number | null
   wage_concept: Record<string, boolean>
-  extra: Record<string, unknown>
   updated_at: string
   [key: string]: unknown
 }
