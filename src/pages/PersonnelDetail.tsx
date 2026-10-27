@@ -336,6 +336,32 @@ export function PersonnelDetail() {
     setBusy(false)
   }
 
+  // Mitarbeiter <-> externer Dienstleister (Fabian, 2026-10-27). Alle Daten bleiben gespeichert, nur die
+  // Ansicht wechselt; private Kontaktdaten werden beim Umwandeln in leere Kontaktfelder übernommen.
+  async function convert() {
+    if (!emp) return
+    if (dirty) return setError('Bitte zuerst speichern oder die Änderungen verwerfen.')
+    const toExternal = !isExternal(emp)
+    if (!confirm(toExternal
+      ? `${employeeName(emp)} in einen externen Dienstleister umwandeln?\n\nName, Anschrift, Bankverbindung und App-Benutzer bleiben erhalten. Die übrigen Angaben (Lohn, Logbuch …) werden ausgeblendet, aber nicht gelöscht.`
+      : `${employeeName(emp)} wieder zum Mitarbeiter machen?\n\nAlle früheren Angaben der Personalakte sind wieder sichtbar.`)) return
+    const row: Record<string, unknown> = { employee_type: toExternal ? 'extern' : 'mitarbeiter' }
+    if (toExternal) {
+      const empty = (k: string) => !String(emp[k] ?? '').trim()
+      if (empty('phone') && !empty('phone_private')) row.phone = emp.phone_private
+      if (empty('mobile') && !empty('mobile_private')) row.mobile = emp.mobile_private
+      if (empty('email') && !empty('email_private')) row.email = emp.email_private
+      if (emp.status === 'Langzeitkrank') row.status = 'Aktiv'
+    }
+    setBusy(true)
+    setError('')
+    const { error } = await supabase.from('employees').update(row).eq('id', emp.id)
+    if (error) setError(error.message)
+    setTab('mitarbeiter')
+    await Promise.all([load(), reloadProfiles()])
+    setBusy(false)
+  }
+
   async function removeEmployee() {
     if (!emp || !confirm(`${employeeName(emp)} mit allen Einträgen endgültig löschen? Ein App-Benutzer bleibt bestehen.`)) return
     const { error } = await supabase.from('employees').delete().eq('id', emp.id)
@@ -491,6 +517,10 @@ export function PersonnelDetail() {
       )}
 
       <EmployeeHistory employeeId={emp.id} version={logVersion} />
+
+      <p>
+        <button type="button" disabled={busy} onClick={convert}>{external ? 'Wieder zum Mitarbeiter machen' : 'In externen Dienstleister umwandeln'}</button>
+      </p>
 
       {me?.role === 'admin' && (
         <p><button type="button" className="danger" onClick={removeEmployee}>{external ? 'Externen Dienstleister löschen' : 'Mitarbeiter löschen'}</button></p>
