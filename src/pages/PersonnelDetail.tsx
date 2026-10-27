@@ -251,7 +251,8 @@ export function PersonnelDetail() {
     row.wage_concept = Object.fromEntries(Object.entries(wage).filter(([, v]) => v))
     const { error } = await supabase.from('employees').update(row).eq('id', emp.id)
     if (error) setError(error.message)
-    await load()
+    // Name, Urlaub und Zugang des App-Benutzers gleicht die Datenbank an
+    await Promise.all([load(), reloadProfiles()])
     setBusy(false)
   }
 
@@ -271,7 +272,6 @@ export function PersonnelDetail() {
       const created = (await createUser({ email, full_name: `${first} ${last}`, role, password })) as { id: string }
       const { error } = await supabase.from('employees').update({ user_id: created.id }).eq('id', emp.id)
       if (error) throw error
-      if (emp.vacation_days != null) await supabase.from('profiles').update({ vacation_days: emp.vacation_days }).eq('id', created.id)
       await reloadProfiles()
       await load()
       alert(`Benutzer angelegt.\n\nLogin: ${email}\nStartpasswort: ${password}\n\nBitte notieren, das Passwort wird nicht noch einmal angezeigt.`)

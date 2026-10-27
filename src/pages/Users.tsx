@@ -202,10 +202,14 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
             <li key={p.id} id={`user-${p.id}`} className="card">
               <form className="form" onSubmit={(e) => saveEdit(e, p)}>
                 <h2>Benutzer bearbeiten</h2>
-                <label>
-                  Name
-                  <input required value={edit.full_name} maxLength={100} onChange={(e) => setEdit({ ...edit, full_name: e.target.value })} />
-                </label>
+                {files[p.id] ? (
+                  <p className="muted small">Name, Urlaubsanspruch und Status kommen aus den Stammdaten der Personalakte. „Nicht aktiv“ sperrt den Zugang.</p>
+                ) : (
+                  <label>
+                    Name
+                    <input required value={edit.full_name} maxLength={100} onChange={(e) => setEdit({ ...edit, full_name: e.target.value })} />
+                  </label>
+                )}
                 <label>
                   E-Mail (Login)
                   <input type="email" required value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} />
@@ -229,14 +233,16 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
                       ))}
                   </select>
                 </label>
-                <label>
-                  Urlaubsanspruch (Tage pro Jahr)
-                  <input
-                    inputMode="decimal"
-                    value={edit.vacation_days}
-                    onChange={(e) => setEdit({ ...edit, vacation_days: e.target.value })}
-                  />
-                </label>
+                {!files[p.id] && (
+                  <label>
+                    Urlaubsanspruch (Tage pro Jahr)
+                    <input
+                      inputMode="decimal"
+                      value={edit.vacation_days}
+                      onChange={(e) => setEdit({ ...edit, vacation_days: e.target.value })}
+                    />
+                  </label>
+                )}
                 <div className="row">
                   <label>
                     Wochenstunden laut Arbeitsvertrag
@@ -305,15 +311,17 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
                     <p className="small appointment-warn">PIN wegen Fehlversuchen gesperrt bis {new Date(creds[p.id].locked_until!).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr. Eine neue PIN hebt die Sperre auf.</p>
                   )}
                 </fieldset>
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={edit.active}
-                    disabled={p.id === me?.id}
-                    onChange={(e) => setEdit({ ...edit, active: e.target.checked })}
-                  />
-                  Zugang aktiv
-                </label>
+                {!files[p.id] && (
+                  <label className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={edit.active}
+                      disabled={p.id === me?.id}
+                      onChange={(e) => setEdit({ ...edit, active: e.target.checked })}
+                    />
+                    Zugang aktiv
+                  </label>
+                )}
                 {p.id === me?.id && <p className="muted small">Die eigene Rolle und den eigenen Zugang kannst du nicht ändern.</p>}
                 {edit.email.trim().toLowerCase() !== p.email && (
                   <p className="muted small">Die Person meldet sich danach mit der neuen E-Mail-Adresse an. Das Passwort bleibt gleich.</p>
