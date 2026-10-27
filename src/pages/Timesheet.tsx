@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { AttendanceApprovals, requestText, type AttendanceRequest } from '../components/AttendanceApprovals'
 import { ClockBar } from '../components/ClockBar'
@@ -50,13 +51,28 @@ export function Timesheet() {
     return false
   }
   const choices = isPlanner ? staff : staff.filter((p) => p.id === profile?.id || isAbove(p.id))
+  const others = choices.filter((p) => p.id !== profile?.id)
+  // Mitarbeiteransicht nur für Vorgesetzte, Planer und Admin (wer andere Personen sehen darf)
+  const hasStaffView = others.length > 0 || isAdmin
 
-  const [installerId, setInstallerId] = useState(profile?.id ?? '')
-  // Person wechseln und nach oben springen, wo deren Zeiten stehen
+  // Zwei Ansichten: "Meine Zeiten" und "Mitarbeiter" (?ansicht=mitarbeiter, Person über &person=)
+  const [params, setParams] = useSearchParams()
+  const staffView = hasStaffView && params.get('ansicht') === 'mitarbeiter'
+  const staffId = params.get('person') ?? ''
+  const installerId = staffView ? staffId : profile?.id ?? ''
+  const staffTimes = useRef<HTMLDivElement>(null)
+  function switchView(staff: boolean) {
+    setEdit(null)
+    setInfo('')
+    setParams(staff ? { ansicht: 'mitarbeiter', ...(staffId ? { person: staffId } : {}) } : {}, { replace: true })
+  }
+  // Person in der Mitarbeiteransicht wählen und zu deren Zeiten springen
   function pick(id: string) {
     setEdit(null)
-    setInstallerId(id)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setInfo('')
+    setParams(id ? { ansicht: 'mitarbeiter', person: id } : { ansicht: 'mitarbeiter' }, { replace: true })
+    if (id) setTimeout(() => staffTimes.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+    else window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   const [month, setMonth] = useState(today.slice(0, 7))
   const [sessions, setSessions] = useState<Attendance[]>([])
@@ -220,26 +236,18 @@ export function Timesheet() {
     </div>
   )
 
-  return (
-    <div>
-      {profile && <ClockBar userId={profile.id} />}
+  const monthNav = (
+    <div className="week-nav">
+      <button onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Voriger Monat">←</button>
+      <button onClick={() => setMonth(today.slice(0, 7))}>{monthName}</button>
+      <button onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Nächster Monat">→</button>
+    </div>
+  )
 
-      <div className="page-head">
-        <h1>Zeiterfassung</h1>
-        <div className="week-nav">
-          <button onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Voriger Monat">←</button>
-          <button onClick={() => setMonth(today.slice(0, 7))}>{monthName}</button>
-          <button onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Nächster Monat">→</button>
-        </div>
-      </div>
-
+  // Monatsübersicht der gewählten Person (eigene Zeiten oder Mitarbeiter)
+  const timesheet = installerId && (
+    <>
       {info && <p className="info">{info}</p>}
-      {installerId !== profile?.id && (
-        <div className="viewing-other">
-          <span>Zeiterfassung von <strong>{displayName(byId[installerId])}</strong></span>
-          <button className="link" onClick={() => pick(profile?.id ?? '')}>Zurück zu meinen Zeiten</button>
-        </div>
-      )}
       {byId[installerId]?.supervisor_id && (
         <p className="small">Vorgesetzte(r): {displayName(byId[byId[installerId].supervisor_id!])}</p>
       )}
@@ -347,10 +355,33 @@ export function Timesheet() {
         <strong>{formatMinutes(sum(range.all, workOf))}</strong>
         <span className="muted small">davon auf Aufträge gebucht {formatMinutes(sum(range.all, (d) => jobsByDay[d] ?? 0))}</span>
       </div>
+    </>
+  )
 
-      {(choices.length > 1 || isAdmin) && profile && (
-        <div className="staff-section">
-          <h2>Mitarbeiter</h2>
+  return (
+    <div>
+      {profile && !staffView && <ClockBar userId={profile.id} />}
+
+      <div className="page-head">
+        <h1>Zeiterfassung</h1>
+        {!staffView && monthNav}
+      </div>
+
+      {hasStaffView && (
+        <div className="segmented two view-switch" role="radiogroup" aria-label="Ansicht">
+          <button role="radio" aria-checked={!staffView} className={staffView ? '' : 'active'} onClick={() => switchView(false)}>
+            Meine Zeiten
+          </button>
+          <button role="radio" aria-checked={staffView} className={staffView ? 'active' : ''} onClick={() => switchView(true)}>
+            Mitarbeiter
+          </button>
+        </div>
+      )}
+
+      {!staffView && timesheet}
+
+      {staffView && profile && (
+        <>
           <AttendanceApprovals me={profile} byId={byId} onChanged={load} />
           <VacationCard userId={profile.id} me={profile} byId={byId} year={Number(month.slice(0, 4))} onChanged={load} part="approvals" />
           <TeamOverview
@@ -360,17 +391,28 @@ export function Timesheet() {
             reloadKey={sessions}
           />
 
-          {choices.length > 1 && (
+          {others.length > 0 && (
             <label className="filters">
-              Zeiterfassung einer anderen Person ansehen
+              Zeiterfassung einer Person ansehen
               <select value={installerId} onChange={(e) => pick(e.target.value)} aria-label="Mitarbeiter">
-                {choices.map((p) => (
+                <option value="">– Person wählen –</option>
+                {others.map((p) => (
                   <option key={p.id} value={p.id}>{displayName(p)}</option>
                 ))}
               </select>
             </label>
           )}
-        </div>
+
+          {installerId && (
+            <div className="staff-section" ref={staffTimes}>
+              <div className="page-head">
+                <h2>Zeiterfassung von {displayName(byId[installerId])}</h2>
+                {monthNav}
+              </div>
+              {timesheet}
+            </div>
+          )}
+        </>
       )}
     </div>
   )
