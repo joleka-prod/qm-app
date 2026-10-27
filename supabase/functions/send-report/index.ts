@@ -330,6 +330,15 @@ Deno.serve(async (req) => {
   }
 
   const sentAt = new Date().toISOString()
-  await admin.from('tickets').update({ report_sent_at: sentAt, report_send_error: '' }).eq('id', t.id)
-  return reply(200, { sent_at: sentAt })
+  // Gesendetes PDF im Auftrag ablegen, damit man es später noch einmal ansehen kann.
+  // Klappt das nicht, gilt der Bericht trotzdem als gesendet.
+  const pdfPath = `${t.id}/servicebericht-${sentAt.replace(/[:.]/g, '-')}.pdf`
+  const { error: upErr } = await admin.storage
+    .from('ticket-photos')
+    .upload(pdfPath, pdf, { contentType: 'application/pdf' })
+  await admin
+    .from('tickets')
+    .update({ report_sent_at: sentAt, report_send_error: '', ...(upErr ? {} : { report_pdf_path: pdfPath }) })
+    .eq('id', t.id)
+  return reply(200, { sent_at: sentAt, ...(upErr ? { pdf_error: upErr.message } : { pdf_path: pdfPath }) })
 })

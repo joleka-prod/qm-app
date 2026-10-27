@@ -275,6 +275,8 @@ fieldset.plan label { display: flex; flex-direction: column; gap: 0.3rem; font-w
 .signature-line { position: absolute; left: 1rem; right: 1rem; top: 150px; border-top: 1px solid #98a2b3; font-size: 0.7rem; color: #98a2b3; padding-top: 0.15rem; pointer-events: none; }
 .signature-pad .link { margin-top: 0.3rem; }
 .signature-img { display: block; max-width: 100%; width: 360px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+.signature-actions { display: flex; align-items: center; gap: 0.75rem; }
+.signature-actions .signature-remove { margin-left: auto; }
 
 /* --- Positionen --- */
 .positions-editor { display: flex; flex-direction: column; gap: 0.4rem; align-items: stretch; }

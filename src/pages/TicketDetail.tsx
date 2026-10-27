@@ -133,6 +133,7 @@ export function TicketDetail() {
   const [hasInk, setHasInk] = useState(false)
   const [signing, setSigning] = useState(false)
   const [signatureUrl, setSignatureUrl] = useState('')
+  const [reportPdfUrl, setReportPdfUrl] = useState('')
   const signatureCanvas = useRef<HTMLCanvasElement>(null)
   const [positions, setPositions] = useState<TicketPosition[]>([])
   const [project, setProject] = useState<Project | null>(null)
@@ -178,9 +179,10 @@ export function TicketDetail() {
     setReport((cur) => (cur === loadedReport.current ? tk.work_report : cur))
     loadedReport.current = tk.work_report
     setArea(tk.service_area ?? '')
-    setSignatureUrl(
-      tk.signature_path ? ((await signedUrls([tk.signature_path]).catch(() => ({}) as Record<string, string>))[tk.signature_path] ?? '') : '',
-    )
+    const files = [tk.signature_path, tk.report_pdf_path].filter((f): f is string => !!f)
+    const fileUrls = await signedUrls(files).catch(() => ({}) as Record<string, string>)
+    setSignatureUrl(tk.signature_path ? (fileUrls[tk.signature_path] ?? '') : '')
+    setReportPdfUrl(tk.report_pdf_path ? (fileUrls[tk.report_pdf_path] ?? '') : '')
     setPhotos((p.data ?? []) as TicketPhoto[])
     setEvents((e.data ?? []) as TicketEvent[])
     setDeletion(d.data as DeletionRequest | null)
@@ -936,6 +938,11 @@ export function TicketDetail() {
               {ticket.report_by_email && ticket.report_sent_at && (
                 <p className="small mail-ok">✓ Bericht gesendet am {formatDate(ticket.report_sent_at)}</p>
               )}
+              {reportPdfUrl && (
+                <p className="small">
+                  <a href={reportPdfUrl} target="_blank" rel="noreferrer">📄 Gesendeten Bericht (PDF) ansehen</a>
+                </p>
+              )}
               {mailStatus && <p className={`small ${mailStatus.startsWith('Versand') ? 'mail-error' : 'muted'}`}>{mailStatus}</p>}
               {!mailStatus && ticket.report_by_email && !ticket.report_sent_at && ticket.report_send_error && (
                 <p className="small mail-error">Versand fehlgeschlagen: {ticket.report_send_error}</p>
@@ -943,16 +950,18 @@ export function TicketDetail() {
               {ticket.report_by_email && !closed && (
                 <p className="small muted">Der Bericht wird automatisch verschickt, sobald der Auftrag als erledigt gemeldet ist.</p>
               )}
-              {ticket.report_by_email && closed && (isPlanner || (isInstaller && !ticket.report_sent_at)) && (
-                <button className="link" disabled={busy} onClick={() => mailReport(!!ticket.report_sent_at)}>
-                  {ticket.report_sent_at ? 'Bericht erneut senden' : 'Bericht jetzt senden'}
-                </button>
-              )}
-              {isAdmin && (
-                <button className="link" disabled={busy} onClick={() => update({ signature_path: null })}>
-                  Unterschrift entfernen
-                </button>
-              )}
+              <div className="signature-actions">
+                {ticket.report_by_email && closed && (isPlanner || (isInstaller && !ticket.report_sent_at)) && (
+                  <button className="link" disabled={busy} onClick={() => mailReport(!!ticket.report_sent_at)}>
+                    {ticket.report_sent_at ? 'Bericht erneut senden' : 'Bericht jetzt senden'}
+                  </button>
+                )}
+                {isAdmin && (
+                  <button className="link signature-remove" disabled={busy} onClick={() => update({ signature_path: null })}>
+                    Unterschrift entfernen
+                  </button>
+                )}
+              </div>
             </>
           ) : canSign && signing ? (
             <div className="form">
