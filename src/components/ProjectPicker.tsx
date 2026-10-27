@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { projectAddress, projectLabel, sameAddress, searchProjects, type Project, type ProjectAddress } from '../lib/projects'
 import { supabase } from '../lib/supabase'
@@ -10,10 +10,12 @@ interface Props {
   customerId: number | null
   // Neuer Auftrag: ohne Auswahl wird aus der Einsatzadresse ein neues Bauvorhaben mit dieser Bezeichnung angelegt
   newProject?: { name: string; onName: (name: string) => void; address: ProjectAddress }
+  // Eingabe einer eigenen Adresse für das neue Bauvorhaben
+  children?: ReactNode
 }
 
 // Auswahl des Bauvorhabens im Auftrag
-export function ProjectPicker({ value, onChange, customerId, newProject }: Props) {
+export function ProjectPicker({ value, onChange, customerId, newProject, children }: Props) {
   const [own, setOwn] = useState<Project[]>([])
   const [searching, setSearching] = useState(false)
   const [query, setQuery] = useState('')
@@ -126,10 +128,9 @@ export function ProjectPicker({ value, onChange, customerId, newProject }: Props
                   onChange={(e) => newProject.onName(e.target.value)}
                 />
               </label>
+              {children}
               <p className="small muted customer-link">
-                {newAddress
-                  ? `Adresse des Bauvorhabens: ${newAddress} (Baustellenadresse, sonst Kundenadresse)`
-                  : 'Adresse des Bauvorhabens: wird aus Baustellen- bzw. Kundenadresse übernommen'}
+                Adresse des Bauvorhabens (Einsatzort, Grundlage für die Kilometer): {newAddress || 'noch keine, bitte Kundenadresse oder eigene Adresse eintragen'}
               </p>
             </div>
           )}

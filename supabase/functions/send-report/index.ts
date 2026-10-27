@@ -207,13 +207,21 @@ Deno.serve(async (req) => {
   if (!w.reserveW) w.text(company, { size: 11, bold: true, color: grey })
   w.text(`Servicebericht ${no}`, { size: 20, bold: true, gap: 6 })
   w.text(`${TYPE_LABEL[t.ticket_type]}: ${t.title}`, { size: 12, bold: true, gap: 8 })
+  // Einsatzort ist die Adresse des Bauvorhabens (Fabian, 2026-10-27); ohne Adresse am Bauvorhaben die Kundenadresse
+  const { data: project } = t.project_id
+    ? await admin.from('projects').select('project_number, name, street, house_no, zip, city, country').eq('id', t.project_id).maybeSingle()
+    : { data: null }
+  const customerAddr = (t.site_address ?? '').replace(/\n/g, ', ')
+  const projectAddr = project
+    ? [`${project.street} ${project.house_no}`.trim(), `${project.zip} ${project.city}`.trim(), project.country === 'Deutschland' ? '' : project.country].filter(Boolean).join(', ')
+    : ''
+  const site = projectAddr || customerAddr
   const facts: [string, string][] = [
     ['Kundennummer', t.customer_number ?? ''],
     ['Kunde', t.customer_name],
-    ['Einsatzort', t.jobsite_address_different
-      ? [t.jobsite_name, `${t.jobsite_street} ${t.jobsite_house_no}`.trim(), `${t.jobsite_zip} ${t.jobsite_city}`.trim(), t.jobsite_country === 'Deutschland' ? '' : t.jobsite_country].filter(Boolean).join(', ')
-      : (t.site_address ?? '').replace(/\n/g, ', ')],
-    ['Kundenadresse', t.jobsite_address_different ? (t.site_address ?? '').replace(/\n/g, ', ') : ''],
+    ['Bauvorhaben', project ? `${project.project_number} ${project.name}` : ''],
+    ['Einsatzort', site],
+    ['Kundenadresse', site !== customerAddr ? customerAddr : ''],
     ['Auftragsnummer', t.order_number],
     ['Team', team?.name ?? ''],
     ['Verantwortlich', leadId ? name(leadId) : ''],

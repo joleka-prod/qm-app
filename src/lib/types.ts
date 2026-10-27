@@ -27,8 +27,8 @@ export function canSeePersonnel(p: Pick<Profile, 'role' | 'hr_access' | 'active'
   return !!p && p.active && (p.role === 'admin' || p.role === 'personal' || !!p.hr_access)
 }
 
-// Kalender: Einsätze mit Anzahl Positionen und Ort des Bauvorhabens
-export const CALENDAR_SELECT = '*, ticket_positions(count), project:projects(zip, city)'
+// Kalender: Einsätze mit Anzahl Positionen und Adresse des Bauvorhabens (Einsatzort)
+export const CALENDAR_SELECT = '*, ticket_positions(count), project:projects(street, house_no, zip, city, country)'
 
 // Ort des Bauvorhabens für die Kalenderkarte, z. B. "80331 München"
 export function projectPlace(t: Pick<Ticket, 'project'>) {
@@ -105,8 +105,8 @@ export interface Ticket {
   appointment_confirmed_at: string | null
   // nur gefüllt, wenn mit select('*, ticket_positions(count)') geladen
   ticket_positions?: { count: number }[]
-  // nur gefüllt, wenn mit CALENDAR_SELECT (Ort) oder in der Auftragsliste (auch Nummer und Name) geladen
-  project?: { zip: string; city: string; project_number?: string; name?: string } | null
+  // nur gefüllt, wenn mit CALENDAR_SELECT (Adresse) oder in der Auftragsliste (Ort, Nummer und Name) geladen
+  project?: { zip: string; city: string; street?: string; house_no?: string; country?: string; project_number?: string; name?: string } | null
   time_entries?: { started_at: string; ended_at: string | null }[]
   status: TicketStatus
   created_by: string

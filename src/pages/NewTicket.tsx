@@ -23,7 +23,7 @@ import {
 } from '../lib/types'
 import { ensureCustomer, type Customer } from '../lib/customers'
 import { ProjectPicker } from '../components/ProjectPicker'
-import { sameAddress, type Project, type ProjectAddress } from '../lib/projects'
+import type { Project, ProjectAddress } from '../lib/projects'
 import { useProfiles } from '../lib/useProfiles'
 
 export function NewTicket() {
@@ -48,7 +48,7 @@ export function NewTicket() {
   const [positions, setPositions] = useState<PositionDraft[]>(() => [newPositionDraft()])
   const [cust, setCust] = useState<CustomerData>(emptyCustomer)
   const [billingAddr, setBillingAddr] = useState<AltAddress>(emptyAddress)
-  const [jobsiteAddr, setJobsiteAddr] = useState<AltAddress>(emptyAddress)
+  const [projectAddr, setProjectAddr] = useState<AltAddress>(emptyAddress)
   const [assignedTo, setAssignedTo] = useState('')
   const [teamId, setTeamId] = useState(params.get('team') ?? '')
   const [montageDate, setMontageDate] = useState(params.get('datum') ?? '')
@@ -61,28 +61,13 @@ export function NewTicket() {
 
   const einsatz = type !== 'qm'
 
-  // Bauvorhaben: ausgewählt (project) oder neu aus der Einsatzadresse mit Pflicht-Bezeichnung (newProjectName)
+  // Bauvorhaben: ausgewählt (project) oder neu mit Pflicht-Bezeichnung (newProjectName) an der Kundenadresse
+  // bzw. an einer eigenen Adresse (projectAddr). Die Adresse des Bauvorhabens ist der Einsatzort.
   const [project, setProject] = useState<Project | null>(null)
   const [newProjectName, setNewProjectName] = useState('')
-  const siteAddress: ProjectAddress = jobsiteAddr.different
-    ? { street: jobsiteAddr.street, house_no: jobsiteAddr.house_no, zip: jobsiteAddr.zip, city: jobsiteAddr.city, country: jobsiteAddr.country }
+  const siteAddress: ProjectAddress = projectAddr.different
+    ? { street: projectAddr.street, house_no: projectAddr.house_no, zip: projectAddr.zip, city: projectAddr.city, country: projectAddr.country }
     : { street: cust.customer_street, house_no: cust.customer_house_no, zip: cust.customer_zip, city: cust.customer_city, country: cust.customer_country }
-
-  // Gewähltes Bauvorhaben liegt nicht an der Kundenadresse: als Baustellenadresse übernehmen (falls noch keine eingetragen)
-  function siteFromProject(p: Project, c: CustomerData) {
-    const custAddr = { street: c.customer_street, house_no: c.customer_house_no, zip: c.customer_zip, city: c.customer_city, country: c.customer_country }
-    if (!p.street.trim() || sameAddress(p, custAddr)) return
-    setJobsiteAddr((j) =>
-      j.different && j.street.trim()
-        ? j
-        : { different: true, name: '', street: p.street, house_no: p.house_no, zip: p.zip, city: p.city, country: p.country || emptyAddress.country },
-    )
-  }
-
-  function chooseProject(p: Project | null) {
-    setProject(p)
-    if (p) siteFromProject(p, cust)
-  }
 
   // Aus der Kundenakte: /neu?kunde=<id> übernimmt den Kunden
   const fromCustomer = params.get('kunde')
@@ -111,14 +96,13 @@ export function NewTicket() {
         setProject(p)
         const owners = pcs.filter((x) => x.role === 'bauherr' && x.customers)
         if (owners.length === 1) setCust((c) => (c.customer_id || c.customer_name ? c : customerFromMaster(owners[0].customers!)))
-        if (owners.length === 1) siteFromProject(p, customerFromMaster(owners[0].customers!))
       })
   }, [fromProject])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
-    if (einsatz && !(await confirmAddresses(addressesToCheck(cust, jobsiteAddr, billingAddr)))) {
+    if (einsatz && !(await confirmAddresses(addressesToCheck(cust, crm && !project ? projectAddr : emptyAddress, billingAddr)))) {
       setBusy(false)
       return
     }
@@ -161,7 +145,6 @@ export function NewTicket() {
         ...(einsatz && projectId ? { project_id: projectId } : {}),
         site_address: '',
         ...addressColumns(einsatz ? billingAddr : emptyAddress, 'billing'),
-        ...addressColumns(einsatz ? jobsiteAddr : emptyAddress, 'jobsite'),
         assigned_to: !einsatz && assignedTo ? assignedTo : null,
         team_id: einsatz && canPlan && teamId ? Number(teamId) : null,
         montage_date: einsatz && canPlan && montageDate ? montageDate : null,
@@ -232,12 +215,13 @@ export function NewTicket() {
           {crm && (
             <ProjectPicker
               value={project}
-              onChange={chooseProject}
+              onChange={setProject}
               customerId={cust.customer_id}
               newProject={{ name: newProjectName, onName: setNewProjectName, address: siteAddress }}
-            />
+            >
+              <AddressFields kind="project" value={projectAddr} onChange={setProjectAddr} />
+            </ProjectPicker>
           )}
-          <AddressFields kind="jobsite" value={jobsiteAddr} onChange={setJobsiteAddr} />
           <AddressFields kind="billing" value={billingAddr} onChange={setBillingAddr} />
         </>
       )}

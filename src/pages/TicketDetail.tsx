@@ -16,7 +16,7 @@ import { SelfCostCard } from '../components/SelfCostCard'
 import { TimeCard, withPending, type TimeEntry } from '../components/TimeCard'
 import { DistanceLine } from '../components/DistanceLine'
 import { confirmAddresses } from '../lib/addressCheck'
-import { AddressFields, CustomerFields, customerClears, addressesToCheck, addressColumns, customerColumns, customerOf, emptyCustomer, type CustomerData, addressComplete, addressLine, addressOf, emptyAddress, jobAddress, type AltAddress } from '../components/AddressFields'
+import { AddressFields, CustomerFields, customerClears, addressesToCheck, addressColumns, customerColumns, customerOf, emptyCustomer, type CustomerData, addressComplete, addressLine, addressOf, emptyAddress, type AltAddress } from '../components/AddressFields'
 import { StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { deletePhoto, signedUrls, uploadPhotos, uploadSignature } from '../lib/photos'
 import { sendReport } from '../lib/reportMail'
@@ -120,7 +120,6 @@ export function TicketDetail() {
   const [wantsEmail, setWantsEmail] = useState(false)
   const [signEmail, setSignEmail] = useState('')
   const [billingAddr, setBillingAddr] = useState<AltAddress>(emptyAddress)
-  const [jobsiteAddr, setJobsiteAddr] = useState<AltAddress>(emptyAddress)
   const [teamId, setTeamId] = useState('')
   const [montageDate, setMontageDate] = useState('')
   const [plannedWeek, setPlannedWeek] = useState('')
@@ -161,7 +160,6 @@ export function TicketDetail() {
     setPositionNumber(tk.position_number)
     setCust(customerOf(tk))
     setBillingAddr(addressOf(tk, 'billing'))
-    setJobsiteAddr(addressOf(tk, 'jobsite'))
     setTeamId(tk.team_id ? String(tk.team_id) : '')
     if (tk.team_id && tk.montage_date) {
       const { data: m } = await loadCrew(tk.team_id, tk.montage_date)
@@ -447,7 +445,6 @@ export function TicketDetail() {
             {einsatz && canEditBase && (
               <>
                 <CustomerFields value={cust} onChange={setCust} crm={canUseCrm(profile.role)} />
-                <AddressFields kind="jobsite" value={jobsiteAddr} onChange={setJobsiteAddr} />
                 <AddressFields kind="billing" value={billingAddr} onChange={setBillingAddr} />
                 {canUseCrm(profile.role) && project && (
                   <ProjectPicker value={projectDraft} onChange={(p) => p && setProjectDraft(p)} customerId={cust.customer_id} />
@@ -470,7 +467,6 @@ export function TicketDetail() {
                   setPositionNumber(ticket.position_number)
                   setCust(customerOf(ticket))
                   setBillingAddr(addressOf(ticket, 'billing'))
-                  setJobsiteAddr(addressOf(ticket, 'jobsite'))
                   setProjectDraft(project)
                 }}
               >
@@ -478,17 +474,17 @@ export function TicketDetail() {
               </button>
               <button
                 className="primary"
-                disabled={busy || !title.trim() || (einsatz && ((!!cust.customer_email.trim() && !isEmail(cust.customer_email)) || !addressComplete(billingAddr, 'billing') || !addressComplete(jobsiteAddr, 'jobsite')))}
+                disabled={busy || !title.trim() || (einsatz && ((!!cust.customer_email.trim() && !isEmail(cust.customer_email)) || !addressComplete(billingAddr, 'billing')))}
                 onClick={async () => {
                   const ref = { order_number: orderNumber.trim(), position_number: positionNumber.trim() }
                   const base = { ...ref, title: title.trim(), description: description.trim() }
                   if (einsatz && canEditBase) {
-                    const before = addressesToCheck(customerOf(ticket), addressOf(ticket, 'jobsite'), addressOf(ticket, 'billing'))
-                    if (!(await confirmAddresses(addressesToCheck(cust, jobsiteAddr, billingAddr), before))) return
+                    const before = addressesToCheck(customerOf(ticket), emptyAddress, addressOf(ticket, 'billing'))
+                    if (!(await confirmAddresses(addressesToCheck(cust, emptyAddress, billingAddr), before))) return
                   }
                   const linked = einsatz && canEditBase && canUseCrm(profile.role) ? await ensureCustomer(cust) : cust
                   const unlink = customerClears(customerOf(ticket), linked)
-                  const site = einsatz ? { ...customerColumns(linked), ...unlink, ...addressColumns(billingAddr, 'billing'), ...addressColumns(jobsiteAddr, 'jobsite') } : {}
+                  const site = einsatz ? { ...customerColumns(linked), ...unlink, ...addressColumns(billingAddr, 'billing') } : {}
                   const moved = einsatz && projectDraft && projectDraft.id !== ticket.project_id ? { project_id: projectDraft.id } : {}
                   const patch = canEditBase ? { ...base, ...site, ...moved } : ref
                   if (await update(patch)) setEditing(false)
@@ -548,19 +544,18 @@ export function TicketDetail() {
                 ) : (
                   projectLabel(project)
                 )}
-                {projectAddress(project) && <span className="muted"> · {projectAddress(project)}</span>}
-              </p>
-            )}
-            {einsatz && ticket.jobsite_address_different && (
-              <p className="small">
-                <span className="muted">Baustelle: </span>
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(jobAddress(ticket))}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {addressLine(addressOf(ticket, 'jobsite'))}
-                </a>
+                {projectAddress(project) && (
+                  <>
+                    {' · '}
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(projectAddress(project))}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {projectAddress(project)}
+                    </a>
+                  </>
+                )}
               </p>
             )}
             {einsatz && ticket.billing_address_different && (
@@ -569,7 +564,7 @@ export function TicketDetail() {
                 {addressLine(addressOf(ticket, 'billing'))}
               </p>
             )}
-            {einsatz && <DistanceLine ticket={ticket} onChanged={load} />}
+            {einsatz && <DistanceLine ticket={ticket} project={project} onChanged={load} />}
             <p className="muted small">
               Erstellt {formatDate(ticket.created_at)} von {displayName(byId[ticket.created_by])}
               {ticket.closed_at && <> · {einsatz ? 'Erledigt' : 'Abgeschlossen'} {formatDate(ticket.closed_at)}</>}
