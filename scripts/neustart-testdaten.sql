@@ -114,7 +114,6 @@ begin
         ticket_type, service_area, title, order_number, created_by, team_id, montage_date, montage_time,
         customer_number, customer_name, customer_street, customer_house_no, customer_zip, customer_city, customer_country,
         customer_email,
-        jobsite_address_different, jobsite_name, jobsite_street, jobsite_house_no, jobsite_zip, jobsite_city, jobsite_country,
         billing_address_different, billing_name, billing_street, billing_house_no, billing_zip, billing_city, billing_country
       ) values (
         v_type,
@@ -133,14 +132,7 @@ begin
         cities[1 + c % 8],
         'Deutschland',
         case when i % 3 <> 1 then 'test' || c || '@example.de' else '' end,
-        -- Jeder 5. Auftrag mit abweichender Baustelle, jeder 7. mit abweichender Rechnungsadresse
-        i % 5 = 0,
-        case when i % 5 = 0 then 'Neubau ' || customers[c] else '' end,
-        case when i % 5 = 0 then streets[1 + (c + 3) % 10] else '' end,
-        case when i % 5 = 0 then (2 + c % 20)::text else '' end,
-        case when i % 5 = 0 then zips[1 + (c + 2) % 8] else '' end,
-        case when i % 5 = 0 then cities[1 + (c + 2) % 8] else '' end,
-        'Deutschland',
+        -- Jeder 7. Auftrag mit abweichender Rechnungsadresse
         i % 7 = 0,
         case when i % 7 = 0 then 'Hausverwaltung Eifel GmbH' else '' end,
         case when i % 7 = 0 then 'Bahnhofstraße' else '' end,

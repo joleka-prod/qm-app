@@ -6,7 +6,7 @@ import { noAutofill } from '../lib/noAutofill'
 import { AddressSuggest } from './AddressSuggest'
 
 // Abweichende Adresse: Rechnungsadresse am Auftrag (billing_*) oder Adresse eines neuen Bauvorhabens.
-// Die frühere Baustellenadresse (jobsite_*) wird nicht mehr erfasst, der Einsatzort ist das Bauvorhaben (Fabian, 2026-10-27).
+// Eine abweichende Baustellenadresse gibt es nicht mehr, der Einsatzort ist das Bauvorhaben (Fabian, 2026-10-27).
 export type AddressKind = 'billing' | 'project'
 
 export interface AltAddress {

@@ -237,7 +237,6 @@ begin
         ticket_type, service_area, title, order_number, created_by, team_id, montage_date, montage_time, project_id,
         customer_id, customer_number, customer_name, customer_street, customer_house_no, customer_zip, customer_city,
         customer_country, customer_email, customer_phone, customer_mobile,
-        jobsite_address_different, jobsite_name, jobsite_street, jobsite_house_no, jobsite_zip, jobsite_city, jobsite_country,
         billing_address_different, billing_name, billing_street, billing_house_no, billing_zip, billing_city, billing_country
       )
       select v_type, v_area, '[TEST] ' || job_titles[1 + (i + t * 4) % 14],
@@ -246,8 +245,6 @@ begin
              case when v_team is not null then time '07:30' + ((i % 4) * interval '2 hours') end,
              v_pid,
              c.id, c.customer_number, trim(c.name || ' ' || c.name2), c.street, c.house_no, c.zip, c.city, c.country, c.email, c.phone, c.mobile,
-             -- Baustelle = Bauvorhaben, wenn es nicht die Kundenadresse ist
-             (p.street, p.zip) is distinct from (c.street, c.zip), p.name, p.street, p.house_no, p.zip, p.city, p.country,
              i % 6 = 0, case when i % 6 = 0 then 'Hausverwaltung Eifel GmbH' else '' end,
              case when i % 6 = 0 then 'Bahnhofstraße' else '' end, case when i % 6 = 0 then '10' else '' end,
              case when i % 6 = 0 then '54568' else '' end, case when i % 6 = 0 then 'Gerolstein' else '' end, 'Deutschland'
