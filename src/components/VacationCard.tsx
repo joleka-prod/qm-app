@@ -3,12 +3,15 @@ import { supabase } from '../lib/supabase'
 import { displayName, formatDate, formatDay, type Profile } from '../lib/types'
 
 export type VacationState = 'beantragt' | 'genehmigt' | 'abgelehnt' | 'storniert'
-export type VacationKind = 'urlaub' | 'ueberstunden' | 'krank' | 'sonderurlaub'
+export type VacationKind = 'urlaub' | 'ueberstunden' | 'krank' | 'sonderurlaub' | 'feiertag'
 
-export const KIND_LABEL: Record<VacationKind, string> = { urlaub: 'Urlaubstage', ueberstunden: 'Überstunden', krank: 'Krank', sonderurlaub: 'Sonderurlaub' }
+export const KIND_LABEL: Record<VacationKind, string> = { urlaub: 'Urlaubstage', ueberstunden: 'Überstunden', krank: 'Krank', sonderurlaub: 'Sonderurlaub', feiertag: 'Feiertag' }
+
+// Arten, die Vorgesetzte und Admin direkt für Mitarbeiter eintragen (sofort genehmigt)
+const ENTER_KINDS: VacationKind[] = ['krank', 'sonderurlaub', 'feiertag']
 
 // Zusatz hinter dem Zeitraum (Urlaub ohne Zusatz)
-const KIND_NOTE: Record<VacationKind, string> = { urlaub: '', ueberstunden: 'über Überstunden', krank: 'Krankheit', sonderurlaub: 'Sonderurlaub' }
+const KIND_NOTE: Record<VacationKind, string> = { urlaub: '', ueberstunden: 'über Überstunden', krank: 'Krankheit', sonderurlaub: 'Sonderurlaub', feiertag: 'Feiertag' }
 
 export interface VacationRequest {
   id: number
@@ -54,7 +57,7 @@ interface Props {
 export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }: Props) {
   const [list, setList] = useState<VacationRequest[]>([])
   const [pending, setPending] = useState<VacationRequest[]>([])
-  const [form, setForm] = useState<{ start: string; end: string; note: string; kind: VacationKind } | null>(null)
+  const [form, setForm] = useState<{ start: string; end: string; note: string; kind: VacationKind; half?: boolean } | null>(null)
   const [preview, setPreview] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -108,6 +111,10 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
     return !error
   }
 
+  // Krankheit, Sonderurlaub und Feiertag trägt der Vorgesetzte bzw. Admin für Mitarbeiter ein
+  const canEnter = canDecide({ user_id: userId } as VacationRequest)
+  const entering = !!form && ENTER_KINDS.includes(form.kind)
+
   const allowance = Number(byId[userId]?.vacation_days ?? 0)
   const sum = (s: VacationState) => list.filter((r) => r.state === s && r.kind === 'urlaub').reduce((a, r) => a + r.days, 0)
   const approved = sum('genehmigt')
@@ -116,6 +123,13 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
 
   async function submit() {
     if (!form) return
+    if (ENTER_KINDS.includes(form.kind)) {
+      const ok = await run(() =>
+        supabase.rpc('enter_absence', { p_user: userId, p_start: form.start, p_end: form.end, p_kind: form.kind, p_note: form.note, p_half: !!form.half }),
+      )
+      if (ok) setForm(null)
+      return
+    }
     if (form.kind === 'urlaub' && preview != null && preview > rest && !confirm(`Der Antrag (${dayWord(preview)}) ist mehr als der Resturlaub (${dayWord(rest)}). Trotzdem beantragen?`)) return
     const ok = await run(() => supabase.rpc('request_vacation', { p_start: form.start, p_end: form.end, p_note: form.note, p_kind: form.kind }))
     if (ok) setForm(null)
@@ -174,10 +188,15 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
             + Urlaub beantragen
           </button>
         )}
+        {!own && canEnter && !form && (
+          <button onClick={() => { setError(''); setForm({ start: '', end: '', note: '', kind: 'krank' }) }}>
+            + Krankheit, Sonderurlaub oder Feiertag eintragen
+          </button>
+        )}
         {form && (
           <div className="form vacation-form">
-            <div className="segmented two" role="radiogroup" aria-label="Freizeit über">
-              {(['urlaub', 'ueberstunden'] as VacationKind[]).map((k) => (
+            <div className={`segmented ${entering ? 'three' : 'two'}`} role="radiogroup" aria-label={entering ? 'Art der Abwesenheit' : 'Freizeit über'}>
+              {(entering ? ENTER_KINDS : (['urlaub', 'ueberstunden'] as VacationKind[])).map((k) => (
                 <button
                   type="button"
                   key={k}
@@ -200,24 +219,37 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
                 <input type="date" value={form.end} min={form.start} onChange={(e) => setForm({ ...form, end: e.target.value })} />
               </label>
             </div>
+            {entering && preview === 1 && (
+              <label className="checkbox-row">
+                <input type="checkbox" checked={!!form.half} onChange={(e) => setForm({ ...form, half: e.target.checked })} /> Nur halber Tag
+              </label>
+            )}
             <label>
               Bemerkung
               <input value={form.note} maxLength={300} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="optional" />
             </label>
             {preview != null && (
               <p className="small">
-                {form.kind === 'urlaub'
+                {entering
+                  ? `${dayWord(form.half && preview === 1 ? 0.5 : preview)} ${KIND_LABEL[form.kind]}`
+                  : form.kind === 'urlaub'
                   ? `${dayWord(preview)} Urlaub`
                   : `${dayWord(preview)} frei über Überstunden (${(preview * Number(byId[userId]?.weekly_hours ?? 40) / 5).toLocaleString('de-DE')} Std.)`}{' '}
                 (ohne Wochenenden und Feiertage in Rheinland-Pfalz)
               </p>
             )}
-            {!byId[me.id]?.supervisor_id && !isAdmin && (
+            {entering && (
+              <p className="small muted">
+                Wird sofort als genehmigt eingetragen und mindert die Soll-Zeit.
+                {form.kind === 'feiertag' && ' Gesetzliche Feiertage in Rheinland-Pfalz zählt die App schon von selbst.'}
+              </p>
+            )}
+            {!entering && !byId[me.id]?.supervisor_id && !isAdmin && (
               <p className="small muted">Dir ist noch kein Vorgesetzter zugeordnet. Der Antrag geht an den Admin.</p>
             )}
             <div className="actions">
               <button disabled={busy} onClick={() => setForm(null)}>Abbrechen</button>
-              <button className="primary" disabled={busy || !form.start || !form.end || !preview} onClick={submit}>Beantragen</button>
+              <button className="primary" disabled={busy || !form.start || !form.end || !preview} onClick={submit}>{entering ? 'Eintragen' : 'Beantragen'}</button>
             </div>
           </div>
         )}
