@@ -236,6 +236,7 @@ fieldset.plan label { display: flex; flex-direction: column; gap: 0.3rem; font-w
 .job-meta { white-space: nowrap; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
 .job-title { font-weight: 600; margin-top: 0.15rem; }
 .job-sub { color: var(--muted); }
+.job-place { font-weight: 500; }
 .job-termin { font-size: 0.75rem; font-weight: 600; margin-top: 0.15rem; }
 .job-termin-angemeldet { color: #93370d; }
 .job-termin-bestaetigt { color: #05603a; }
