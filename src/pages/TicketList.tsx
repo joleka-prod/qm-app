@@ -17,6 +17,7 @@ import {
   formatTime,
   isoDate,
   orderRef,
+  projectPlace,
   ticketNo,
   type Ticket,
   type TicketStatus,
@@ -45,7 +46,7 @@ export function TicketList() {
       .then(({ data }) => setDeletionIds(new Set((data ?? []).map((d) => d.ticket_id as number))))
     supabase
       .from('tickets')
-      .select('*, ticket_positions(count), time_entries(started_at, ended_at), ticket_costs(total)')
+      .select('*, ticket_positions(count), time_entries(started_at, ended_at), ticket_costs(total), project:projects(project_number, name, zip, city)')
       .neq('ticket_type', 'qm')
       .order('created_at', { ascending: false })
       .then(({ data }) => {
@@ -97,6 +98,7 @@ export function TicketList() {
         t.position_number.toLowerCase().includes(q) ||
         t.customer_name.toLowerCase().includes(q) ||
         (t.customer_number ?? '').toLowerCase().includes(q) ||
+        (t.project ? `${t.project.project_number} ${t.project.name}`.toLowerCase().includes(q) : false) ||
         ticketNo(t.id, t.ticket_type).toLowerCase().includes(q)
       )
     })
@@ -182,6 +184,12 @@ export function TicketList() {
                 <div className="ticket-title">{t.title}</div>
                 {(orderRef(t) || t.customer_name) && (
                   <div className="small">{[t.customer_name, orderRef(t)].filter(Boolean).join(' · ')}</div>
+                )}
+                {t.project && (
+                  <div className="small">
+                    <span className="muted">Bauvorhaben: </span>
+                    {[`${t.project.project_number} ${t.project.name}`.trim(), projectPlace(t)].filter(Boolean).join(' · ')}
+                  </div>
                 )}
                 {!!t.ticket_positions?.[0]?.count && (
                   <div className="small muted">{t.ticket_positions[0].count} Position(en)</div>
