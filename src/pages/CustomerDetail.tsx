@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { AddressSuggest } from '../components/AddressSuggest'
 import { CustomerProjectsCard, type CustomerProject } from '../components/CustomerProjectsCard'
+import { confirmAddresses } from '../lib/addressCheck'
 import {
   CUSTOMER_GROUPS,
   GROUP_LABEL,
@@ -117,6 +118,9 @@ export function CustomerDetail() {
     if (form.email.trim() && !isEmail(form.email)) return setError('Bitte eine gültige E-Mail-Adresse eingeben.')
     setBusy(true)
     setError('')
+    // Adresse über die Navigation prüfen (bei Änderungen nur, wenn die Adresse geändert wurde)
+    const addr = (c: CustomerForm) => ({ label: 'Kundenadresse', street: c.street, house_no: c.house_no, zip: c.zip, city: c.city, country: c.country })
+    if (!(await confirmAddresses([addr(form)], !isNew && customer ? [addr(formOf(customer))] : []))) return setBusy(false)
     const row = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v]))
     const res = isNew
       ? await supabase.from('customers').insert(row).select('id').single()

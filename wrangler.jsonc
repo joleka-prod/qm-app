@@ -6,5 +6,7 @@
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
-  }
+  },
+  // Vorschau-Builds für Pull Requests (wrangler preview); darf leer sein
+  "previews": {}
 }

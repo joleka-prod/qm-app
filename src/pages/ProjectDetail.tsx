@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { AddressSuggest } from '../components/AddressSuggest'
+import { confirmAddresses } from '../lib/addressCheck'
 import { StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { GROUP_LABEL, searchCustomers, type Customer, type CustomerContact, type CustomerNote } from '../lib/customers'
 import { PROJECT_ROLES, ROLE_LABEL, projectAddress, roleForGroup, type Project, type ProjectCustomer, type ProjectRole } from '../lib/projects'
@@ -87,6 +88,9 @@ export function ProjectDetail() {
     if (!form) return
     setBusy(true)
     setError('')
+    // Adresse über die Navigation prüfen (bei Änderungen nur, wenn die Adresse geändert wurde)
+    const addr = (p: ProjectForm) => ({ label: 'Adresse des Bauvorhabens', street: p.street, house_no: p.house_no, zip: p.zip, city: p.city, country: p.country })
+    if (!(await confirmAddresses([addr(form)], !isNew && project ? [addr(project)] : []))) return setBusy(false)
     const row = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v]))
     const res = isNew
       ? await supabase.from('projects').insert(row).select('id').single()
