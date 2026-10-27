@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
-import { STATUS, employeeName, isExternal, missingPayroll, norm, type Employee } from '../lib/employee'
+import { STATUS, employeeName, isExternal, isManagingDirector, missingPayroll, norm, type Employee } from '../lib/employee'
 import { supabase } from '../lib/supabase'
 import { displayName } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
@@ -27,6 +27,48 @@ function duplicateGroups(list: Employee[]) {
   const groups = new Map<number, Employee[]>()
   for (const e of list) groups.set(find(e.id), [...(groups.get(find(e.id)) ?? []), e])
   return [...groups.values()].filter((g) => g.length > 1)
+}
+
+const num = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+
+// Kennzahlen oben in der Übersicht (Fabian, 2026-10-27), nur aktive Mitarbeiter (ohne Externe):
+// Durchschnittsalter mit Geschäftsführung; Krankheitstage ohne Geschäftsführung als Mittel der
+// Jahresdurchschnitte je Mitarbeiter (wie im Reiter Fehlzeiten), damit kurze Zugehörigkeit nicht verzerrt.
+function KeyFigures({ list }: { list: Employee[] }) {
+  const [sick, setSick] = useState<Map<number, number> | null>(null)
+  const [sickError, setSickError] = useState('')
+
+  useEffect(() => {
+    supabase.rpc('employees_sick_days_avg').then(({ data, error }) => {
+      if (error) setSickError(error.message.includes('employees_sick_days_avg') ? 'SQL-Update fehlt' : error.message)
+      setSick(new Map(((data ?? []) as { employee_id: number; avg_days: number }[]).map((r) => [r.employee_id, Number(r.avg_days)])))
+    })
+  }, [])
+
+  const active = list.filter((e) => e.status === 'Aktiv')
+  const now = Date.now()
+  const ages = active.filter((e) => e.birth_date).map((e) => (now - new Date(String(e.birth_date) + 'T00:00').getTime()) / (365.2425 * 864e5))
+  const sickAvgs = active.filter((e) => !isManagingDirector(e) && sick?.has(e.id)).map((e) => sick!.get(e.id)!)
+  const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length
+
+  return (
+    <div className="key-figures">
+      <section className="card key-figure">
+        <div className="muted small">Durchschnittsalter</div>
+        <div className="key-figure-value">{ages.length ? `${num(avg(ages))} Jahre` : '–'}</div>
+        <div className="muted small">
+          {ages.length} aktive Mitarbeiter{ages.length < active.length ? `, ${active.length - ages.length} ohne Geburtsdatum` : ''}
+        </div>
+      </section>
+      <section className="card key-figure">
+        <div className="muted small">Ø Krankheitstage pro Jahr</div>
+        <div className="key-figure-value">{sickError ? '–' : sick === null ? '…' : sickAvgs.length ? `${num(avg(sickAvgs))} Tage` : '–'}</div>
+        <div className="muted small">
+          {sickError || `je Mitarbeiter, ${sickAvgs.length} aktive Mitarbeiter mit Zeiterfassung, ohne Geschäftsführung`}
+        </div>
+      </section>
+    </div>
+  )
 }
 
 const IGNORE_KEY = 'personal-keine-doppelten'
@@ -229,6 +271,7 @@ function EmployeeList() {
         </div>
       </div>
       {error && <p className="error">{error}</p>}
+      <KeyFigures list={list} />
       {dupes.length > 0 && (
         <section className="card">
           <h2>Mögliche doppelte Mitarbeiter ({dupes.length})</h2>

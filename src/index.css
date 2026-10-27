@@ -726,3 +726,8 @@ button.link.danger-link { color: var(--danger); }
 
 /* Personalakte: fehlende Angaben für die Lohnabrechnung */
 .emp-missing { border: 1px solid var(--danger); border-radius: 8px; padding: 0.6rem 0.8rem; margin: 0 0 0.75rem; }
+
+/* Kennzahlen oben in der Personal-Übersicht */
+.key-figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+.key-figures .key-figure { margin: 0; }
+.key-figure-value { font-size: 1.75rem; font-weight: 700; margin: 0.2rem 0; }
