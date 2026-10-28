@@ -21,7 +21,7 @@ Kommunikation und Bauvorhaben bleiben in der App pflegbar.
    `powershell -ExecutionPolicy Bypass -File C:\JOLEKA\3e-sync\sync-3e.ps1 -Probe`
    Ändert nichts. `vorschau.csv` zeigt, welche App-Kunden mit welchem 3E-Kunden verknüpft bzw. neu angelegt würden.
 4. Passt die Vorschau: einmal ohne `-Probe` ausführen.
-5. Geplante Aufgabe (Aufgabenplanung) anlegen, z. B. alle 30 Minuten:
+5. Geplante Aufgabe (Aufgabenplanung) anlegen, z. B. stündlich:
    Programm `powershell.exe`, Argumente `-ExecutionPolicy Bypass -File C:\JOLEKA\3e-sync\sync-3e.ps1`,
    „Unabhängig von der Benutzeranmeldung ausführen“.
 

@@ -212,3 +212,6 @@ $$;
 
 revoke all on function public.import_3e_customers(jsonb, boolean) from public, anon, authenticated;
 grant execute on function public.import_3e_customers(jsonb, boolean) to service_role;
+
+-- Zuordnung über Name + PLZ beim ersten Abgleich (über 20.000 Kunden)
+create index customers_name_zip_idx on public.customers (lower(name), zip);
