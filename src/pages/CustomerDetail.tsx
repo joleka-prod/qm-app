@@ -7,6 +7,7 @@ import { confirmAddresses } from '../lib/addressCheck'
 import { noAutofill } from '../lib/noAutofill'
 import {
   CUSTOMER_GROUPS,
+  CUSTOMER_ORIGINS,
   GROUP_LABEL,
   NOTE_KINDS,
   NOTE_KIND_LABEL,
@@ -25,7 +26,7 @@ import type { Project } from '../lib/projects'
 
 type CustomerForm = Pick<
   Customer,
-  'customer_number' | 'customer_group' | 'name' | 'name2' | 'street' | 'house_no' | 'zip' | 'city' | 'country' | 'phone' | 'mobile' | 'email' | 'website' | 'notes' | 'active'
+  'customer_number' | 'customer_group' | 'name' | 'name2' | 'street' | 'house_no' | 'zip' | 'city' | 'country' | 'phone' | 'mobile' | 'email' | 'website' | 'notes' | 'origin' | 'active'
 >
 
 const emptyForm: CustomerForm = {
@@ -43,6 +44,7 @@ const emptyForm: CustomerForm = {
   email: '',
   website: '',
   notes: '',
+  origin: '',
   active: true,
 }
 
@@ -55,8 +57,8 @@ const NAME_LABEL: Record<CustomerGroup, [string, string]> = {
 }
 
 function formOf(c: Customer): CustomerForm {
-  const { customer_number, customer_group, name, name2, street, house_no, zip, city, country, phone, mobile, email, website, notes, active } = c
-  return { customer_number, customer_group, name, name2, street, house_no, zip, city, country, phone, mobile, email, website, notes, active }
+  const { customer_number, customer_group, name, name2, street, house_no, zip, city, country, phone, mobile, email, website, notes, origin, active } = c
+  return { customer_number, customer_group, name, name2, street, house_no, zip, city, country, phone, mobile, email, website, notes, origin, active }
 }
 
 // Kundenakte: Stammdaten, Ansprechpartner, Kommunikationsverlauf, Aufträge. /kunden/neu legt an.
@@ -205,6 +207,15 @@ export function CustomerDetail() {
           <input maxLength={200} value={form.website} onChange={(e) => set({ website: e.target.value })} />
         </label>
       </div>
+      <div className="field">
+        <span>Herkunft</span>
+        <select value={form.origin} onChange={(e) => set({ origin: e.target.value })}>
+          <option value="">–</option>
+          {[...new Set([...CUSTOMER_ORIGINS, form.origin].filter(Boolean))].map((o) => (
+            <option key={o} value={o}>{o}</option>
+          ))}
+        </select>
+      </div>
       </fieldset>
       <label>
         Bemerkung
@@ -259,6 +270,7 @@ export function CustomerDetail() {
             </p>
           )}
           <ContactLine phone={customer.phone} mobile={customer.mobile} email={customer.email} website={customer.website} />
+          {customer.origin && <p className="small muted">Herkunft: {customer.origin}</p>}
           {customer.notes && <p className="pre small customer-notes">{customer.notes}</p>}
           <div className="actions">
             <button onClick={() => { setError(''); setForm(formOf(customer)) }}>Bearbeiten</button>

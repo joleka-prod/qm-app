@@ -37,7 +37,7 @@ try {
   $table.Load($cmd.ExecuteReader())
   $conn.Close()
 
-  $fields = 'ext_id', 'customer_number', 'name', 'name2', 'street', 'house_no', 'zip', 'city', 'country', 'phone', 'mobile', 'email', 'website', 'active', 'customer_group'
+  $fields = 'ext_id', 'customer_number', 'name', 'name2', 'street', 'house_no', 'zip', 'city', 'country', 'phone', 'mobile', 'email', 'website', 'origin', 'active', 'customer_group'
   $rows = foreach ($r in $table.Rows) {
     $o = [ordered]@{}
     foreach ($f in $fields) {

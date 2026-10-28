@@ -30,6 +30,12 @@ SELECT
   COALESCE(NULLIF(LTRIM(RTRIM(a.Mobil)), ''), a.MobilPriv) AS mobile,
   a.Email AS email,
   a.Internet AS website,
+  CASE k.Klassifikation1
+    WHEN '001' THEN 'Bestandskunde' WHEN '002' THEN 'wiederkehrender Kunde' WHEN '003' THEN 'Empfehlung'
+    WHEN '004' THEN 'Google Internetseite' WHEN '005' THEN 'Social Media' WHEN '006' THEN 'Printmedien'
+    WHEN '007' THEN 'Fahrzeugwerbung / Bauschild / Plakatwerbung' WHEN '008' THEN 'über Mitarbeiter'
+    WHEN '009' THEN 'über Kundendienst' WHEN '010' THEN 'Messen / Inhouseveranstaltung' WHEN '011' THEN 'Profine Website'
+    ELSE ISNULL(k.Klassifikation1, '') END AS origin,
   CASE WHEN ISNULL(k.Gesperrt, 0) = 0 THEN 1 ELSE 0 END AS active
 FROM dbo.S_Kunde k
 LEFT JOIN dbo.S_Adressen a ON a.Mandant = k.Mandant AND a.Kennung = 1000 AND a.Code = k.KundenAdrCode

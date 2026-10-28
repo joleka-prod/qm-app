@@ -6,7 +6,9 @@
 alter table public.customers
   add column source text not null default 'app' check (source in ('app', '3e')),
   add column ext_id text,
-  add column synced_at timestamptz;
+  add column synced_at timestamptz,
+  -- Kundenherkunft (in 3E: Klassifikation 1), z. B. Empfehlung, Google Internetseite
+  add column origin text not null default '';
 
 create unique index customers_ext_id_unique on public.customers (ext_id) where ext_id is not null;
 
@@ -37,6 +39,7 @@ begin
     or new.city is distinct from old.city or new.country is distinct from old.country
     or new.phone is distinct from old.phone or new.mobile is distinct from old.mobile
     or new.email is distinct from old.email or new.website is distinct from old.website
+    or new.origin is distinct from old.origin
   ) then
     raise exception 'Stammdaten aus 3E können nur in 3E geändert werden.';
   end if;
@@ -68,7 +71,7 @@ create trigger customers_3e_no_delete
   for each row execute function public.customers_3e_no_delete();
 
 -- Abgleich: p_rows ist ein JSON-Array mit ext_id (Pflicht, eindeutiger Schlüssel in 3E), customer_number, name,
--- name2, street, house_no, zip, city, country, phone, mobile, email, website, active, customer_group (optional).
+-- name2, street, house_no, zip, city, country, phone, mobile, email, website, origin, active, customer_group (optional).
 -- Zuordnung: 1. ext_id, 2. gleiche Kundennummer bei einem App-Kunden, 3. gleicher Name + PLZ bei einem App-Kunden.
 -- Sonst neu anlegen. p_dry_run = true ändert nichts und liefert nur die Vorschau.
 create function public.import_3e_customers(p_rows jsonb, p_dry_run boolean default true)
@@ -152,6 +155,7 @@ begin
        and v_old.country = coalesce(nullif(trim(r ->> 'country'), ''), 'Deutschland')
        and v_old.phone = coalesce(trim(r ->> 'phone'), '') and v_old.mobile = coalesce(trim(r ->> 'mobile'), '')
        and v_old.email = coalesce(trim(r ->> 'email'), '') and v_old.website = coalesce(trim(r ->> 'website'), '')
+       and v_old.origin = coalesce(trim(r ->> 'origin'), '')
        and v_old.active = v_active
     then
       v_same := v_same + 1;
@@ -176,12 +180,12 @@ begin
     begin
       if v_id is null then
         insert into public.customers (source, ext_id, synced_at, customer_number, customer_group, name, name2, street, house_no,
-                                      zip, city, country, phone, mobile, email, website, active, created_by)
+                                      zip, city, country, phone, mobile, email, website, origin, active, created_by)
         values ('3e', v_ext, now(), v_number, coalesce(v_group, 'privat'), v_name, coalesce(trim(r ->> 'name2'), ''),
                 coalesce(trim(r ->> 'street'), ''), coalesce(trim(r ->> 'house_no'), ''), v_zip,
                 coalesce(trim(r ->> 'city'), ''), coalesce(trim(r ->> 'country'), ''), coalesce(trim(r ->> 'phone'), ''),
                 coalesce(trim(r ->> 'mobile'), ''), coalesce(trim(r ->> 'email'), ''), coalesce(trim(r ->> 'website'), ''),
-                v_active, null);
+                coalesce(trim(r ->> 'origin'), ''), v_active, null);
       else
         update public.customers set
           source = '3e', ext_id = v_ext, synced_at = now(),
@@ -191,6 +195,7 @@ begin
           city = coalesce(trim(r ->> 'city'), ''), country = coalesce(trim(r ->> 'country'), ''),
           phone = coalesce(trim(r ->> 'phone'), ''), mobile = coalesce(trim(r ->> 'mobile'), ''),
           email = coalesce(trim(r ->> 'email'), ''), website = coalesce(trim(r ->> 'website'), ''),
+          origin = coalesce(trim(r ->> 'origin'), ''),
           active = v_active,
           -- Kundengruppe nur beim ersten Verknüpfen aus 3E übernehmen, danach pflegt sie die App
           customer_group = case when v_how <> 'vorhanden' and v_group is not null then v_group else customer_group end
