@@ -108,19 +108,12 @@ export function customerAddress(c: Pick<Customer, 'street' | 'house_no' | 'zip' 
     .join(', ')
 }
 
-// Suche im Kundenstamm (Name, Zusatz, Kundennummer, Ort)
+// Suche im Kundenstamm (Name, Zusatz, Kundennummer, Adresse, Kontakt) über die RPC, schnell auch bei über 20.000 Kunden
 export async function searchCustomers(query: string, limit = 8) {
-  const q = query.trim().replace(/[%_,()]/g, ' ').trim()
+  const q = query.trim()
   if (q.length < 2) return []
-  const like = `%${q}%`
-  const { data } = await supabase
-    .from('customers')
-    .select('*')
-    .eq('active', true)
-    .or(`name.ilike.${like},name2.ilike.${like},customer_number.ilike.${like},city.ilike.${like}`)
-    .order('name')
-    .limit(limit)
-  return (data ?? []) as Customer[]
+  const { data } = await supabase.rpc('search_customers', { p_query: q, p_limit: limit })
+  return ((data as { rows?: Customer[] } | null)?.rows ?? []) as Customer[]
 }
 
 // Beim Speichern eines Auftrags: unbekannten Kunden im Kundenstamm anlegen bzw. über die Kundennummer verknüpfen.

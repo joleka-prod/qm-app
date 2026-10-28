@@ -36,7 +36,11 @@ SELECT
     WHEN '007' THEN 'Fahrzeugwerbung / Bauschild / Plakatwerbung' WHEN '008' THEN 'über Mitarbeiter'
     WHEN '009' THEN 'über Kundendienst' WHEN '010' THEN 'Messen / Inhouseveranstaltung' WHEN '011' THEN 'Profine Website'
     ELSE ISNULL(k.Klassifikation1, '') END AS origin,
-  CASE WHEN ISNULL(k.Gesperrt, 0) = 0 THEN 1 ELSE 0 END AS active
+  -- gesperrte Kunden und leere Datensätze (weder Firma noch Name noch Kurzbezeichnung) sind in der App inaktiv
+  CASE WHEN ISNULL(k.Gesperrt, 0) <> 0 THEN 0
+       WHEN ISNULL(LTRIM(RTRIM(a.Firma)), '') = '' AND ISNULL(LTRIM(RTRIM(a.Name)), '') = ''
+        AND ISNULL(LTRIM(RTRIM(a.Vorname)), '') = '' AND ISNULL(LTRIM(RTRIM(k.KundenBez)), '') = '' THEN 0
+       ELSE 1 END AS active
 FROM dbo.S_Kunde k
 LEFT JOIN dbo.S_Adressen a ON a.Mandant = k.Mandant AND a.Kennung = 1000 AND a.Code = k.KundenAdrCode
 WHERE k.Mandant = '000'

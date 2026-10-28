@@ -26,41 +26,27 @@ export function Customers() {
 
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [total, setTotal] = useState(0)
+  const [error, setError] = useState('')
 
-  // Seit dem 3E-Abgleich sind es über 20.000 Kunden: Suche und Filter laufen auf dem Server, angezeigt werden höchstens LIMIT
+  // Seit dem 3E-Abgleich sind es über 20.000 Kunden: Suche, Gruppen und Zähler macht die Datenbank (RPC search_customers)
   useEffect(() => {
     let stale = false
     const t = setTimeout(async () => {
       setLoading(true)
-      const q = query.trim().replace(/[%_,()]/g, ' ').trim()
-      let ids: number[] = []
-      if (q.length >= 2) {
-        const { data } = await supabase.from('customer_contacts').select('customer_id').ilike('name', `%${q}%`).limit(50)
-        ids = [...new Set((data ?? []).map((r) => r.customer_id as number))]
-      }
-      const filtered = (sel: string, head = false) => {
-        let b = supabase.from('customers').select(sel, { count: 'exact', head })
-        if (!showInactive) b = b.eq('active', true)
-        if (q) {
-          const like = `%${q}%`
-          const ors = ['customer_number', 'name', 'name2', 'city', 'zip', 'street', 'email', 'phone'].map((f) => `${f}.ilike.${like}`)
-          if (ids.length) ors.push(`id.in.(${ids.join(',')})`)
-          b = b.or(ors.join(','))
-        }
-        return b
-      }
-      let list = filtered('*, tickets(count), customer_notes(count), customer_contacts(name)')
-      if (group) list = list.eq('customer_group', group)
-      const [res, ...groupCounts] = await Promise.all([
-        list.order('name').limit(LIMIT),
-        ...CUSTOMER_GROUPS.map((g) => filtered('id', true).eq('customer_group', g)),
-      ])
+      const { data, error } = await supabase.rpc('search_customers', {
+        p_query: query.trim(),
+        p_group: group,
+        p_inactive: showInactive,
+        p_limit: LIMIT,
+      })
       if (stale) return
-      setRows((res.data ?? []) as unknown as Row[])
-      setTotal(res.count ?? 0)
-      setCounts(Object.fromEntries(CUSTOMER_GROUPS.map((g, i) => [g, groupCounts[i].count ?? 0])))
+      setError(error ? `Suche fehlgeschlagen: ${error.message}` : '')
+      const res = (data ?? {}) as { rows?: Row[]; total?: number; counts?: Record<string, number> }
+      setRows(res.rows ?? [])
+      setTotal(res.total ?? 0)
+      setCounts(res.counts ?? {})
       setLoading(false)
-    }, query ? 250 : 0)
+    }, query ? 300 : 0)
     return () => {
       stale = true
       clearTimeout(t)
@@ -108,6 +94,7 @@ export function Customers() {
         </label>
       </div>
 
+      {error && <p className="error">{error}</p>}
       {loading ? (
         <p className="muted">Lädt…</p>
       ) : visible.length === 0 ? (
