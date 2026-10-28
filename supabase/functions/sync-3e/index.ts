@@ -4,8 +4,9 @@
 // Secret: SYNC_3E_KEY (langes Zufallspasswort, gleich wie in der Einstellungsdatei des Sync-Programms), Header x-sync-key.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
+// charset nötig: Windows PowerShell 5.1 liest die Antwort sonst als ISO-8859-1 (Umlaute in Vorschau und Log kaputt)
 function reply(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8' } })
 }
 
 // Vergleich ohne frühen Abbruch, damit der Schlüssel nicht über die Antwortzeit erraten werden kann
