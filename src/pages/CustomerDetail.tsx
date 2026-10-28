@@ -685,7 +685,7 @@ export function NotesCard({ customerId, projectId, customers = [], projects = []
                 <div className="note-head">
                   <span className="note-kind">{NOTE_KIND_LABEL[n.kind]}</span>
                   <span className="muted small">
-                    {formatDate(n.created_at)} · {n.created_by ? displayName(byId[n.created_by]) : '–'}
+                    {formatDate(n.created_at)} · {n.mail_direction ? `automatisch über ${n.mail_mailbox}` : n.created_by ? displayName(byId[n.created_by]) : '–'}
                   </span>
                 </div>
                 {projectId && customerById[n.customer_id] && (
@@ -705,8 +705,23 @@ export function NotesCard({ customerId, projectId, customers = [], projects = []
                     {ticket && <Link to={`/ticket/${ticket.id}`}>{ticketNo(ticket.id, ticket.ticket_type)} {ticket.title}</Link>}
                   </div>
                 )}
+                {n.mail_direction && (
+                  <div className="small muted">
+                    {n.mail_direction === 'eingang' ? `Eingang von ${n.mail_from}` : `Ausgang an ${n.mail_to}`}
+                  </div>
+                )}
                 {n.subject && <div className="note-subject">{n.subject}</div>}
-                {n.body && <p className="pre">{n.body}</p>}
+                {n.body && n.mail_direction && n.body.length > 400 ? (
+                  <details className="note-mail">
+                    <summary className="pre">{n.body.slice(0, 300).trimEnd()} …</summary>
+                    <p className="pre">{n.body}</p>
+                  </details>
+                ) : (
+                  n.body && <p className="pre">{n.body}</p>
+                )}
+                {n.mail_attachments?.length > 0 && (
+                  <div className="small muted">📎 {n.mail_attachments.join(', ')} (in Outlook)</div>
+                )}
                 {n.follow_up_date && (
                   <div className="note-follow small">
                     {n.follow_up_done_at ? (

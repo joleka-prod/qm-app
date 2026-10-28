@@ -564,6 +564,9 @@ button.link.danger-link { color: var(--danger); }
 .note-kind { font-weight: 700; font-size: 0.85rem; }
 .note-subject { font-weight: 600; margin-top: 0.2rem; }
 .note-follow { margin-top: 0.3rem; }
+.note-mail summary { cursor: pointer; list-style: none; }
+.note-mail summary::after { content: ' mehr anzeigen'; color: var(--primary); font-size: 0.85rem; }
+.note-mail[open] summary { display: none; }
 .customer-ticket { display: inline-flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
 .customer-box { gap: 0.55rem; }
 .customer-box .cust-name-row { grid-template-columns: 7.5rem 1fr; }
