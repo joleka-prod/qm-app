@@ -21,6 +21,10 @@ export interface Customer {
   website: string
   notes: string
   active: boolean
+  // '3e' = Stammdaten kommen aus 3E Look und sind in der App schreibgeschützt
+  source: 'app' | '3e'
+  ext_id: string | null
+  synced_at: string | null
   created_by: string | null
   created_at: string
   updated_at: string

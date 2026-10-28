@@ -151,6 +151,7 @@ export function CustomerDetail() {
   if (!profile || (!isNew && !customer)) return <p className="muted">Lädt…</p>
 
   const set = (patch: Partial<CustomerForm>) => form && setForm({ ...form, ...patch })
+  const from3e = customer?.source === '3e'
 
   const editor = form && (
     <form className="card form" onSubmit={save}>
@@ -163,6 +164,8 @@ export function CustomerDetail() {
           ))}
         </select>
       </div>
+      {from3e && <p className="small muted">Stammdaten kommen aus 3E und lassen sich nur dort ändern.</p>}
+      <fieldset className="plain-fieldset" disabled={from3e}>
       <label>
         Kundennummer
         <input
@@ -202,6 +205,7 @@ export function CustomerDetail() {
           <input maxLength={200} value={form.website} onChange={(e) => set({ website: e.target.value })} />
         </label>
       </div>
+      </fieldset>
       <label>
         Bemerkung
         <textarea rows={3} maxLength={4000} value={form.notes} onChange={(e) => set({ notes: e.target.value })} placeholder="Dauerhafte Hinweise, z. B. Zahlungsweise, Zufahrt, Besonderheiten" />
@@ -246,6 +250,7 @@ export function CustomerDetail() {
           <h1 className="ticket-heading">{customer.name}</h1>
           {customer.name2 && <p className="muted customer-name2">{customer.name2}</p>}
           {!customer.active && <p className="small error">Nicht mehr aktiv</p>}
+          {from3e && <p className="small muted">Aus 3E{customer.synced_at ? `, abgeglichen ${formatDate(customer.synced_at)}` : ''}</p>}
           {address && (
             <p className="small">
               <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`} target="_blank" rel="noreferrer">
@@ -279,7 +284,7 @@ export function CustomerDetail() {
       />
 
       {error && <p className="error">{error}</p>}
-      {profile.role === 'admin' && (
+      {profile.role === 'admin' && !from3e && (
         <div className="actions danger-zone">
           <button className="danger" onClick={remove}>Kunde löschen</button>
         </div>

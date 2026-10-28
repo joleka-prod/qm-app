@@ -1,0 +1,6 @@
+{
+  "Datenbank": "Server=JOL-DB01\\EEE;Database=JOLEKA_LIVE_STD;User Id=LESE_BENUTZER;Password=HIER_PASSWORT;Connect Timeout=60;TrustServerCertificate=True",
+  "SupabaseUrl": "https://zcsinntrwaqmidyenuee.supabase.co",
+  "SyncSchluessel": "HIER_DENSELBEN_WERT_WIE_SYNC_3E_KEY",
+  "KundenAbfrage": "kunden.sql"
+}
