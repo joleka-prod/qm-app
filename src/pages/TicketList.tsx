@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth'
+import { ErpOrderList } from '../components/ErpOrdersCard'
 import { AreaBadge, StatusBadge, TypeBadge } from '../components/StatusBadge'
 import { minutesOf } from '../components/TimeCard'
 import { formatMinutes } from '../lib/clock'
@@ -23,8 +24,12 @@ import {
   type TicketStatus,
   type TicketType,
   isPlannerRole,
+  canUseCrm,
 } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
+
+// Belegarten der 3E-Aufträge (Anfang der Bezeichnung, gilt für alle Firmen)
+const ERP_KINDS = ['Serviceauftrag', 'Produktionsauftrag', 'Zukaufauftrag', 'Restarbeiten']
 
 type Filter = 'offen' | 'meine' | 'alle' | 'loeschung' | 'nicht_angemeldet' | 'termin_angemeldet' | 'termin_bestaetigt' | 'zur_berechnung' | TicketStatus
 
@@ -37,7 +42,10 @@ export function TicketList() {
   const [deletionIds, setDeletionIds] = useState<Set<number>>(new Set())
   const [filter, setFilter] = useState<Filter>(profile?.role === 'monteur' ? 'meine' : 'offen')
   const [query, setQuery] = useState('')
-  const [typeFilter, setTypeFilter] = useState<TicketType | ''>('')
+  // '3e' zeigt statt der App-Aufträge die Aufträge aus 3E (nur mit CRM-Recht)
+  const [typeFilter, setTypeFilter] = useState<TicketType | '' | '3e'>('')
+  const [erpKind, setErpKind] = useState('')
+  const erp = typeFilter === '3e'
 
   useEffect(() => {
     supabase
@@ -142,6 +150,14 @@ export function TicketList() {
         <Link to="/neu" className="button primary">+ Neu</Link>
       </div>
       <div className="filters">
+        {erp ? (
+          <select value={erpKind} onChange={(e) => setErpKind(e.target.value)} aria-label="Belegart">
+            <option value="">Alle 3E-Aufträge</option>
+            {ERP_KINDS.map((k) => (
+              <option key={k} value={k}>{k}</option>
+            ))}
+          </select>
+        ) : (
         <select value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
           <option value="offen">Alle offenen</option>
           <option value="meine">Meine</option>
@@ -155,15 +171,19 @@ export function TicketList() {
           <option value="termin_bestaetigt">Termin von Kunde bestätigt</option>
           <option value="zur_berechnung">Zur Berechnung</option>
         </select>
-        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as TicketType | '')} aria-label="Art">
+        )}
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as TicketType | '' | '3e')} aria-label="Art">
           <option value="">Alle Arten</option>
           {TICKET_TYPES.map((t) => (
             <option key={t} value={t}>{TYPE_LABEL[t]}</option>
           ))}
+          {canUseCrm(profile?.role) && <option value="3e">Aufträge aus 3E</option>}
         </select>
         <input type="search" placeholder="Suchen…" value={query} onChange={(e) => setQuery(e.target.value)} />
       </div>
-      {loading ? (
+      {erp ? (
+        <ErpOrderList query={query} kind={erpKind} tickets={tickets} />
+      ) : loading ? (
         <p className="muted">Lädt…</p>
       ) : visible.length === 0 ? (
         <p className="muted">Keine Aufträge gefunden.</p>
