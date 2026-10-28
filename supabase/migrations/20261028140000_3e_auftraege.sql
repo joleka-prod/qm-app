@@ -9,9 +9,11 @@ create table public.erp_documents (
   doc_type text not null default 'auftrag' check (doc_type in ('auftrag', 'angebot', 'rechnung')),
   ext_id text not null,
   doc_number text not null default '',
+  -- Belegart in 3E im Klartext, z. B. "Serviceauftrag JOLEKA", "Restarbeiten KALVERKAMP"
+  doc_kind text not null default '',
   title text not null default '',
   doc_date date,
-  delivery_date date,
+  delivery_date date, -- Wunschtermin
   status text not null default '',
   amount_net numeric(14, 2),
   notes text not null default '',
@@ -32,7 +34,7 @@ alter table public.erp_documents enable row level security;
 create policy "3E-Belege sehen" on public.erp_documents for select to authenticated using (public.can_use_crm());
 revoke insert, update, delete, truncate on public.erp_documents from anon, authenticated;
 
--- Abgleich: p_rows ist ein JSON-Array mit ext_id (Pflicht), number, title, doc_date, delivery_date (JJJJ-MM-TT),
+-- Abgleich: p_rows ist ein JSON-Array mit ext_id (Pflicht), number, kind, title, doc_date, delivery_date (JJJJ-MM-TT),
 -- status, amount_net, notes, customer_ext_id (Kundennummer = customers.ext_id), project_ext_id (ProjektID = projects.ext_id).
 -- Fehlt die Kundennummer, gilt der Kunde des Bauvorhabens. p_dry_run = true ändert nichts.
 create function public.import_3e_documents(p_rows jsonb, p_doc_type text default 'auftrag', p_dry_run boolean default true)
@@ -45,6 +47,7 @@ declare
   r jsonb;
   v_ext text;
   v_number text;
+  v_kind text;
   v_title text;
   v_date date;
   v_delivery date;
@@ -79,6 +82,7 @@ begin
         raise exception 'ext_id fehlt';
       end if;
       v_number := left(coalesce(trim(r ->> 'number'), ''), 50);
+      v_kind := left(coalesce(trim(r ->> 'kind'), ''), 100);
       v_title := left(coalesce(trim(r ->> 'title'), ''), 300);
       v_date := nullif(left(trim(coalesce(r ->> 'doc_date', '')), 10), '')::date;
       v_delivery := nullif(left(trim(coalesce(r ->> 'delivery_date', '')), 10), '')::date;
@@ -102,7 +106,7 @@ begin
 
       select * into v_old from public.erp_documents where doc_type = p_doc_type and ext_id = v_ext;
       if found then
-        if v_old.doc_number = v_number and v_old.title = v_title and v_old.doc_date is not distinct from v_date
+        if v_old.doc_number = v_number and v_old.doc_kind = v_kind and v_old.title = v_title and v_old.doc_date is not distinct from v_date
            and v_old.delivery_date is not distinct from v_delivery and v_old.status = v_status
            and v_old.amount_net is not distinct from v_amount and v_old.notes = v_notes
            and v_old.customer_ext_id is not distinct from v_cust_ext and v_old.project_ext_id is not distinct from v_proj_ext
@@ -115,7 +119,7 @@ begin
         v_new := v_new + 1;
         if jsonb_array_length(v_preview) < 2000 then
           v_preview := v_preview || jsonb_build_object(
-            'nummer_3e', v_number, 'bezeichnung_3e', v_title, 'datum', v_date, 'status', v_status, 'netto', v_amount,
+            'nummer_3e', v_number, 'art', v_kind, 'bezeichnung_3e', v_title, 'datum', v_date, 'status', v_status, 'netto', v_amount,
             'kundennummer_3e', v_cust_ext,
             'kunde', coalesce((select name from public.customers where id = v_cust_id), '(Kunde nicht in der App)'),
             'projekt_3e', v_proj_ext, 'bauvorhaben', coalesce(v_proj.project_number || ' ' || v_proj.name, '(Bauvorhaben nicht in der App)'));
@@ -126,12 +130,12 @@ begin
         continue;
       end if;
 
-      insert into public.erp_documents as d (doc_type, ext_id, doc_number, title, doc_date, delivery_date, status, amount_net,
+      insert into public.erp_documents as d (doc_type, ext_id, doc_number, doc_kind, title, doc_date, delivery_date, status, amount_net,
                                              notes, customer_ext_id, project_ext_id, customer_id, project_id, synced_at)
-      values (p_doc_type, v_ext, v_number, v_title, v_date, v_delivery, v_status, v_amount,
+      values (p_doc_type, v_ext, v_number, v_kind, v_title, v_date, v_delivery, v_status, v_amount,
               v_notes, v_cust_ext, v_proj_ext, v_cust_id, v_proj.id, now())
       on conflict (doc_type, ext_id) do update set
-        doc_number = excluded.doc_number, title = excluded.title, doc_date = excluded.doc_date,
+        doc_number = excluded.doc_number, doc_kind = excluded.doc_kind, title = excluded.title, doc_date = excluded.doc_date,
         delivery_date = excluded.delivery_date, status = excluded.status, amount_net = excluded.amount_net,
         notes = excluded.notes, customer_ext_id = excluded.customer_ext_id, project_ext_id = excluded.project_ext_id,
         customer_id = excluded.customer_id, project_id = excluded.project_id, synced_at = now();

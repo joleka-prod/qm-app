@@ -50,8 +50,8 @@ die Adresse des Kunden, ziehen seine Bauvorhaben beim nächsten Lauf mit.
 
 ## Aufträge
 
-Danach liest es alle Belege vom Typ **Auftrag** (`auftraege.sql`, aus `JOLEKA_LIVE_BWG`, deshalb mit vollem Tabellennamen;
-der Lese-Benutzer braucht dort ebenfalls `db_datareader`). Sie landen schreibgeschützt in `erp_documents`
+Danach liest es alle Belege vom Typ **Auftrag** (`auftraege.sql`, `OBE_Beleg` mit BelegTyp 1 in `JOLEKA_LIVE_STD`:
+Service-, Produktions-, Zukaufaufträge und Restarbeiten aller Firmen; Auftragsbestätigungen sind nur Druckfassungen). Sie landen schreibgeschützt in `erp_documents`
 (Migration `20261028140000_3e_auftraege.sql`) und erscheinen im Bauvorhaben und beim Kunden unter „Aufträge aus 3E“.
 Zuordnung über die 3E-ProjektID (Bauvorhaben) und die Kundennummer; fehlt die Kundennummer, gilt der Kunde des Bauvorhabens.
 Über „+ Montageauftrag anlegen“ entsteht daraus ein normaler Auftrag mit der 3E-Auftragsnummer. Nur diesen Teil prüfen:

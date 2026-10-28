@@ -6,6 +6,7 @@ import { formatDay, ticketNo, type Ticket } from '../lib/types'
 interface ErpOrder {
   id: number
   doc_number: string
+  doc_kind: string
   title: string
   doc_date: string | null
   delivery_date: string | null
@@ -46,13 +47,13 @@ export function ErpOrdersCard({ projectId, customerId, tickets }: { projectId?: 
             <li key={o.id}>
               <span className="customer-ticket">
                 <strong>{o.doc_number || 'ohne Nummer'}</strong>
-                {o.status && <span className="muted small"> · {o.status}</span>}
+                {[o.doc_kind, o.status].filter(Boolean).map((x) => <span key={x} className="muted small"> · {x}</span>)}
               </span>
               <span>{o.title}</span>
               <span className="muted small">
                 {[
                   o.doc_date && `vom ${formatDay(o.doc_date)}`,
-                  o.delivery_date && `Liefertermin ${formatDay(o.delivery_date)}`,
+                  o.delivery_date && `Wunschtermin ${formatDay(o.delivery_date)}`,
                   o.amount_net != null && `${euro(Number(o.amount_net))} netto`,
                   !projectId && o.projects && `Bauvorhaben ${[o.projects.project_number, o.projects.name].filter(Boolean).join(' ')}`,
                 ]
