@@ -10,7 +10,7 @@ import { minutesOf, toLocalInput, type TimeEntry } from '../components/TimeCard'
 import { clockTime, fixedBreakMinutes, formatMinutes, minutesBetween, useClockChanged, workMinutes, type Attendance } from '../lib/clock'
 import { holidayName } from '../lib/holidays'
 import { supabase } from '../lib/supabase'
-import { displayName, formatDay, isPlannerRole, isoDate, parseDate, weekNumber } from '../lib/types'
+import { canSeePersonnel, displayName, formatDay, isPlannerRole, isoDate, parseDate, weekNumber } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 
 // Gesetzliche Mindestpause (ArbZG): über 6 Std. 30 Min., über 9 Std. 45 Min.
@@ -43,6 +43,8 @@ export function Timesheet() {
   const staff = profiles.filter((p) => p.active)
   const isPlanner = isPlannerRole(profile?.role)
   const isAdmin = profile?.role === 'admin'
+  // Personalabteilung sieht die Zeiten aller Mitarbeiter (nur lesen)
+  const isHr = canSeePersonnel(profile)
   const today = isoDate(new Date())
   // Vorgesetzte sehen die Zeiten ihrer Mitarbeiter (auch über mehrere Ebenen)
   const isAbove = (id: string) => {
@@ -50,9 +52,9 @@ export function Timesheet() {
     for (let i = 0; up && i < 10; i++, up = byId[up]?.supervisor_id) if (up === profile?.id) return true
     return false
   }
-  const choices = isPlanner ? staff : staff.filter((p) => p.id === profile?.id || isAbove(p.id))
+  const choices = isPlanner || isHr ? staff : staff.filter((p) => p.id === profile?.id || isAbove(p.id))
   const others = choices.filter((p) => p.id !== profile?.id)
-  // Mitarbeiteransicht nur für Vorgesetzte, Planer und Admin (wer andere Personen sehen darf)
+  // Mitarbeiteransicht nur für Vorgesetzte, Planer, Personalabteilung und Admin (wer andere Personen sehen darf)
   const hasStaffView = others.length > 0 || isAdmin
 
   // Zwei Ansichten: "Meine Zeiten" und "Mitarbeiter" (?ansicht=mitarbeiter, Person über &person=)
@@ -385,7 +387,7 @@ export function Timesheet() {
           <AttendanceApprovals me={profile} byId={byId} onChanged={load} />
           <VacationCard userId={profile.id} me={profile} byId={byId} year={Number(month.slice(0, 4))} onChanged={load} part="approvals" />
           <TeamOverview
-            members={staff.filter((p) => p.id !== profile?.id && (isAbove(p.id) || isAdmin))}
+            members={staff.filter((p) => p.id !== profile?.id && (isAbove(p.id) || isAdmin || isHr))}
             selected={installerId}
             onPick={pick}
             reloadKey={sessions}
