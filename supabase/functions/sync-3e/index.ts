@@ -1,6 +1,7 @@
 // Abgleich aus 3E Look (Fabian, 2026-10-28): Das Sync-Programm auf dem 3E-Server (tools/3e-sync) schickt die Kunden
 // per POST { customers: [...], dry_run: true|false } bzw. die Projekte als Bauvorhaben per POST { projects: [...], dry_run }
-// hierher; geschrieben wird über die RPCs import_3e_customers bzw. import_3e_projects.
+// hierher, die Aufträge per POST { orders: [...], dry_run }; geschrieben wird über die RPCs import_3e_customers,
+// import_3e_projects bzw. import_3e_documents (Belegart auftrag).
 // Secret: SYNC_3E_KEY (langes Zufallspasswort, gleich wie in der Einstellungsdatei des Sync-Programms), Header x-sync-key.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
@@ -24,12 +25,15 @@ Deno.serve(async (req) => {
   if (!sameKey(req.headers.get('x-sync-key') ?? '', key)) return reply(401, { error: 'Falscher Sync-Schlüssel' })
 
   const body = await req.json().catch(() => null)
-  const projects = Array.isArray(body?.projects)
-  const rows = projects ? body.projects : body?.customers
-  if (!Array.isArray(rows)) return reply(400, { error: 'customers oder projects fehlt' })
+  const dryRun = body?.dry_run !== false
+  let call: [string, Record<string, unknown>]
+  if (Array.isArray(body?.orders)) call = ['import_3e_documents', { p_rows: body.orders, p_doc_type: 'auftrag', p_dry_run: dryRun }]
+  else if (Array.isArray(body?.projects)) call = ['import_3e_projects', { p_rows: body.projects, p_dry_run: dryRun }]
+  else if (Array.isArray(body?.customers)) call = ['import_3e_customers', { p_rows: body.customers, p_dry_run: dryRun }]
+  else return reply(400, { error: 'customers, projects oder orders fehlt' })
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
-  const { data, error } = await admin.rpc(projects ? 'import_3e_projects' : 'import_3e_customers', { p_rows: rows, p_dry_run: body.dry_run !== false })
+  const { data, error } = await admin.rpc(...call)
   if (error) return reply(500, { error: error.message })
   return reply(200, data)
 })

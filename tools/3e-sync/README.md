@@ -1,4 +1,4 @@
-# Abgleich 3E Look → JOLEKA 360° (Kunden und Bauvorhaben)
+# Abgleich 3E Look → JOLEKA 360° (Kunden, Bauvorhaben und Aufträge)
 
 3E bleibt führend. Dieses Programm läuft auf dem 3E-Server (Windows), liest die Kunden aus `JOLEKA_LIVE_STD`
 (nur lesend) und schickt sie an die App. In der App sind die Stammdaten dieser Kunden dann schreibgeschützt
@@ -47,3 +47,12 @@ Kunden, die in 3E gelöscht werden, bleiben in der App erhalten (Aufträge und V
 Bauvorhaben: 1. gleiche 3E-ID (`ProjektID`) → aktualisieren, 2. sonst App-Bauvorhaben mit gleicher Nummer → verknüpfen,
 3. sonst neu anlegen. Abgeschlossene oder stornierte Projekte werden als „abgeschlossen“ übernommen. Ändert sich in 3E
 die Adresse des Kunden, ziehen seine Bauvorhaben beim nächsten Lauf mit.
+
+## Aufträge
+
+Danach liest es alle Belege vom Typ **Auftrag** (`auftraege.sql`, aus `JOLEKA_LIVE_BWG`, deshalb mit vollem Tabellennamen;
+der Lese-Benutzer braucht dort ebenfalls `db_datareader`). Sie landen schreibgeschützt in `erp_documents`
+(Migration `20261028140000_3e_auftraege.sql`) und erscheinen im Bauvorhaben und beim Kunden unter „Aufträge aus 3E“.
+Zuordnung über die 3E-ProjektID (Bauvorhaben) und die Kundennummer; fehlt die Kundennummer, gilt der Kunde des Bauvorhabens.
+Über „+ Montageauftrag anlegen“ entsteht daraus ein normaler Auftrag mit der 3E-Auftragsnummer. Nur diesen Teil prüfen:
+`-Nur Auftraege -Probe` (Vorschau in `vorschau-auftraege.csv`). Angebote und Rechnungen folgen später in derselben Tabelle.
