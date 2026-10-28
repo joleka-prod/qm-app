@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { JobCard } from '../components/JobCard'
+import { scrollToToday, useRemembered, useScrollMemory } from '../lib/calendarMemory'
 import { holidayName } from '../lib/holidays'
 import { loadInstallerWeek, weekDays } from '../lib/loaders'
 import { useOfflineSynced } from '../lib/offline'
@@ -22,7 +23,12 @@ export function InstallerCalendar() {
   const installerId = id ?? profile?.id ?? ''
   const own = installerId === profile?.id
 
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
+  // Woche und Scrollposition bleiben beim Wechsel in andere Menüs erhalten
+  const memo = own ? 'cal-mein' : 'cal-monteur'
+  const [week, setWeek] = useRemembered(`${memo}-week`, () => isoDate(startOfWeek(new Date())))
+  const weekStart = useMemo(() => new Date(week + 'T00:00'), [week])
+  const setWeekStart = (d: Date) => setWeek(isoDate(d))
+  const [loaded, setLoaded] = useState(false)
   const [jobs, setJobs] = useState<Ticket[]>([])
   const [overdue, setOverdue] = useState<Ticket[]>([])
   const [members, setMembers] = useState<TeamMember[]>([])
@@ -38,7 +44,14 @@ export function InstallerCalendar() {
     setJobs(r.jobs)
     setOverdue(r.overdue)
     setMembers(r.members)
+    setLoaded(true)
   }, [installerId, days, today])
+  useScrollMemory(`${memo}-scroll`, loaded)
+
+  function goToday() {
+    setWeekStart(startOfWeek(new Date()))
+    scrollToToday()
+  }
 
   useEffect(() => {
     load()
@@ -69,6 +82,7 @@ export function InstallerCalendar() {
           <button onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Vorige Woche">←</button>
           <button onClick={() => setWeekStart(startOfWeek(new Date()))}>KW {weekNumber(weekStart)}</button>
           <button onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Nächste Woche">→</button>
+          <button className="today-btn" onClick={goToday}>Heute</button>
         </div>
       </div>
       {!own && <Link to="/kalender" className="back">← Gesamtkalender</Link>}
