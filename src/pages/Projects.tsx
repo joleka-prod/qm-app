@@ -3,39 +3,41 @@ import { Link } from 'react-router-dom'
 import { ROLE_LABEL, projectAddress, type Project, type ProjectRole } from '../lib/projects'
 import { supabase } from '../lib/supabase'
 
+const LIMIT = 100
+
 type Row = Project & {
   project_customers: { role: ProjectRole; customers: { name: string; customer_number: string } | null }[]
   tickets: { count: number }[]
 }
 
-// Bauvorhaben: Liste mit Suche und Status
+// Bauvorhaben: Liste mit Suche und Status. Seit dem 3E-Abgleich über 18.000: Suche macht die Datenbank (RPC search_projects)
 export function Projects() {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<'aktiv' | 'abgeschlossen' | ''>('aktiv')
+  const [total, setTotal] = useState(0)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    supabase
-      .from('projects')
-      .select('*, project_customers(role, customers(name, customer_number)), tickets(count)')
-      .order('id', { ascending: false })
-      .then(({ data }) => {
-        setRows((data ?? []) as Row[])
-        setLoading(false)
-      })
-  }, [])
+    let stale = false
+    const t = setTimeout(async () => {
+      setLoading(true)
+      const { data, error } = await supabase.rpc('search_projects', { p_query: query.trim(), p_status: status, p_limit: LIMIT })
+      if (stale) return
+      setError(error ? `Suche fehlgeschlagen: ${error.message}` : '')
+      const res = (data ?? {}) as { rows?: Row[]; total?: number }
+      setRows(res.rows ?? [])
+      setTotal(res.total ?? 0)
+      setLoading(false)
+    }, query ? 300 : 0)
+    return () => {
+      stale = true
+      clearTimeout(t)
+    }
+  }, [query, status])
 
-  const q = query.trim().toLowerCase()
-  const visible = rows.filter(
-    (p) =>
-      (!status || p.status === status) &&
-      (!q ||
-        [p.project_number, p.name, p.street, p.zip, p.city, ...p.project_customers.map((x) => `${x.customers?.name} ${x.customers?.customer_number}`)]
-          .join(' ')
-          .toLowerCase()
-          .includes(q)),
-  )
+  const visible = rows
 
   return (
     <div>
@@ -51,11 +53,14 @@ export function Projects() {
           <option value="">Alle</option>
         </select>
       </div>
+      {error && <p className="error">{error}</p>}
       {loading ? (
         <p className="muted">Lädt…</p>
       ) : visible.length === 0 ? (
         <p className="muted">Keine Bauvorhaben gefunden.</p>
       ) : (
+        <>
+        {total > visible.length && <p className="small muted">{visible.length} von {total} Bauvorhaben angezeigt. Bitte Suche eingrenzen.</p>}
         <ul className="ticket-list">
           {visible.map((p) => (
             <li key={p.id}>
@@ -81,6 +86,7 @@ export function Projects() {
             </li>
           ))}
         </ul>
+        </>
       )}
     </div>
   )

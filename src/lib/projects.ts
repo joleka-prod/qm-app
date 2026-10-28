@@ -14,6 +14,10 @@ export interface Project {
   country: string
   status: 'aktiv' | 'abgeschlossen'
   notes: string
+  // aus 3E abgeglichen: Nummer, Bezeichnung, Status und Adresse (vom Kunden) nur in 3E änderbar
+  source: 'app' | '3e'
+  ext_id: string | null
+  synced_at: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -61,18 +65,12 @@ export function projectLabel(p: Pick<Project, 'project_number' | 'name'>) {
   return `${p.project_number} ${p.name}`
 }
 
-// Suche nach Nummer, Name, Ort, Straße
+// Suche nach Nummer, Name, Ort, Straße und beteiligtem Kunden (RPC search_projects, über 18.000 Bauvorhaben aus 3E)
 export async function searchProjects(query: string, limit = 8) {
-  const q = query.trim().replace(/[%_,()]/g, ' ').trim()
+  const q = query.trim()
   if (q.length < 2) return []
-  const like = `%${q}%`
-  const { data } = await supabase
-    .from('projects')
-    .select('*')
-    .or(`name.ilike.${like},project_number.ilike.${like},city.ilike.${like},street.ilike.${like}`)
-    .order('status')
-    .order('name')
-    .limit(limit)
-  return (data ?? []) as Project[]
+  const { data } = await supabase.rpc('search_projects', { p_query: q, p_status: '', p_limit: limit })
+  const rows = ((data ?? {}) as { rows?: Project[] }).rows ?? []
+  // laufende zuerst
+  return rows.sort((a, b) => (a.status === b.status ? 0 : a.status === 'aktiv' ? -1 : 1))
 }
-

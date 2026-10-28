@@ -89,6 +89,14 @@ export function ProjectDetail() {
     if (!form) return
     setBusy(true)
     setError('')
+    // Aus 3E: nur die Bemerkung ist in der App pflegbar
+    if (from3e) {
+      const { error } = await supabase.from('projects').update({ notes: form.notes.trim() }).eq('id', projectId)
+      setBusy(false)
+      if (error) return setError(error.message)
+      setForm(null)
+      return load()
+    }
     // Adresse über die Navigation prüfen (bei Änderungen nur, wenn die Adresse geändert wurde)
     const addr = (p: ProjectForm) => ({ label: 'Adresse des Bauvorhabens', street: p.street, house_no: p.house_no, zip: p.zip, city: p.city, country: p.country })
     if (!(await confirmAddresses([addr(form)], !isNew && project ? [addr(project)] : []))) return setBusy(false)
@@ -120,6 +128,7 @@ export function ProjectDetail() {
   if (!profile || (!isNew && !project)) return <p className="muted">Lädt…</p>
 
   const set = (patch: Partial<ProjectForm>) => form && setForm({ ...form, ...patch })
+  const from3e = project?.source === '3e'
 
   const editor = form && (
     <form className="card form" onSubmit={save}>
@@ -129,12 +138,17 @@ export function ProjectDetail() {
           Beteiligt: {fromCustomer.customer_number} {fromCustomer.name} als {ROLE_LABEL[roleForGroup(fromCustomer.customer_group)]}
         </p>
       )}
-      <label>
-        Bezeichnung *
-        <input required maxLength={200} {...noAutofill('project-name')} value={form.name} placeholder="z. B. Wohnpark Daun, Haus 3 oder Neubau Familie Müller" onChange={(e) => set({ name: e.target.value })} />
-      </label>
-      <ProjectAddressFields form={form} set={set} />
-      {!isNew && (
+      {from3e && <p className="small muted">Bezeichnung, Status und Adresse (vom Kunden) kommen aus 3E und lassen sich nur dort ändern.</p>}
+      {!from3e && (
+        <>
+          <label>
+            Bezeichnung *
+            <input required maxLength={200} {...noAutofill('project-name')} value={form.name} placeholder="z. B. Wohnpark Daun, Haus 3 oder Neubau Familie Müller" onChange={(e) => set({ name: e.target.value })} />
+          </label>
+          <ProjectAddressFields form={form} set={set} />
+        </>
+      )}
+      {!isNew && !from3e && (
         <label>
           Status
           <select value={form.status} onChange={(e) => set({ status: e.target.value as ProjectForm['status'] })}>
@@ -190,6 +204,7 @@ export function ProjectDetail() {
             </p>
           )}
           {project.notes && <p className="pre small customer-notes">{project.notes}</p>}
+          {from3e && <p className="small muted">Aus 3E{project.synced_at ? `, abgeglichen ${formatDay(project.synced_at.slice(0, 10))}` : ''}</p>}
           <div className="actions">
             <button
               onClick={() => {
@@ -260,7 +275,7 @@ export function ProjectDetail() {
       )}
 
       {error && <p className="error">{error}</p>}
-      {profile.role === 'admin' && tickets.length === 0 && (
+      {profile.role === 'admin' && tickets.length === 0 && !from3e && (
         <div className="actions danger-zone">
           <button className="danger" onClick={remove}>Bauvorhaben löschen</button>
         </div>
