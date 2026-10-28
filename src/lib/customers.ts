@@ -57,6 +57,12 @@ export interface CustomerNote {
   follow_up_done_by: string | null
   created_by: string | null
   created_at: string
+  // nur bei automatisch zugeordneten E-Mails (sync-mail)
+  mail_direction: 'eingang' | 'ausgang' | null
+  mail_mailbox: string | null
+  mail_from: string | null
+  mail_to: string | null
+  mail_attachments: string[]
 }
 
 export const GROUP_LABEL: Record<CustomerGroup, string> = {
