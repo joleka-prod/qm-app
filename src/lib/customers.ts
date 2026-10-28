@@ -20,7 +20,12 @@ export interface Customer {
   email: string
   website: string
   notes: string
+  origin: string
   active: boolean
+  // '3e' = Stammdaten kommen aus 3E Look und sind in der App schreibgeschützt
+  source: 'app' | '3e'
+  ext_id: string | null
+  synced_at: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -71,6 +76,21 @@ export const GROUP_PLURAL: Record<CustomerGroup, string> = {
 }
 
 export const CUSTOMER_GROUPS = Object.keys(GROUP_LABEL) as CustomerGroup[]
+
+// Kundenherkunft wie in 3E (Klassifikation 1)
+export const CUSTOMER_ORIGINS = [
+  'Bestandskunde',
+  'wiederkehrender Kunde',
+  'Empfehlung',
+  'Google Internetseite',
+  'Social Media',
+  'Printmedien',
+  'Fahrzeugwerbung / Bauschild / Plakatwerbung',
+  'über Mitarbeiter',
+  'über Kundendienst',
+  'Messen / Inhouseveranstaltung',
+  'Profine Website',
+]
 
 export const NOTE_KIND_LABEL: Record<NoteKind, string> = {
   telefon: 'Telefonat',

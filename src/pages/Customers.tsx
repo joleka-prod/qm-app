@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { FollowUpList } from '../components/FollowUpList'
 import { CUSTOMER_GROUPS, GROUP_LABEL, GROUP_PLURAL, customerAddress, type Customer, type CustomerGroup } from '../lib/customers'
 import { supabase } from '../lib/supabase'
+
+const LIMIT = 100
 
 type Row = Customer & { tickets: { count: number }[]; customer_notes: { count: number }[]; customer_contacts: { name: string }[] }
 
@@ -22,16 +24,48 @@ export function Customers() {
   const [query, setQuery] = useState('')
   const [showInactive, setShowInactive] = useState(false)
 
+  const [counts, setCounts] = useState<Record<string, number>>({})
+  const [total, setTotal] = useState(0)
+
+  // Seit dem 3E-Abgleich sind es über 20.000 Kunden: Suche und Filter laufen auf dem Server, angezeigt werden höchstens LIMIT
   useEffect(() => {
-    supabase
-      .from('customers')
-      .select('*, tickets(count), customer_notes(count), customer_contacts(name)')
-      .order('name')
-      .then(({ data }) => {
-        setRows((data ?? []) as Row[])
-        setLoading(false)
-      })
-  }, [])
+    let stale = false
+    const t = setTimeout(async () => {
+      setLoading(true)
+      const q = query.trim().replace(/[%_,()]/g, ' ').trim()
+      let ids: number[] = []
+      if (q.length >= 2) {
+        const { data } = await supabase.from('customer_contacts').select('customer_id').ilike('name', `%${q}%`).limit(50)
+        ids = [...new Set((data ?? []).map((r) => r.customer_id as number))]
+      }
+      const filtered = (sel: string, head = false) => {
+        let b = supabase.from('customers').select(sel, { count: 'exact', head })
+        if (!showInactive) b = b.eq('active', true)
+        if (q) {
+          const like = `%${q}%`
+          const ors = ['customer_number', 'name', 'name2', 'city', 'zip', 'street', 'email', 'phone'].map((f) => `${f}.ilike.${like}`)
+          if (ids.length) ors.push(`id.in.(${ids.join(',')})`)
+          b = b.or(ors.join(','))
+        }
+        return b
+      }
+      let list = filtered('*, tickets(count), customer_notes(count), customer_contacts(name)')
+      if (group) list = list.eq('customer_group', group)
+      const [res, ...groupCounts] = await Promise.all([
+        list.order('name').limit(LIMIT),
+        ...CUSTOMER_GROUPS.map((g) => filtered('id', true).eq('customer_group', g)),
+      ])
+      if (stale) return
+      setRows((res.data ?? []) as unknown as Row[])
+      setTotal(res.count ?? 0)
+      setCounts(Object.fromEntries(CUSTOMER_GROUPS.map((g, i) => [g, groupCounts[i].count ?? 0])))
+      setLoading(false)
+    }, query ? 250 : 0)
+    return () => {
+      stale = true
+      clearTimeout(t)
+    }
+  }, [query, group, showInactive])
 
   function chooseGroup(g: CustomerGroup | '') {
     setGroup(g)
@@ -42,23 +76,8 @@ export function Customers() {
     }
   }
 
-  const active = rows.filter((c) => showInactive || c.active)
-  const counts = useMemo(() => {
-    const m: Record<string, number> = {}
-    for (const c of active) m[c.customer_group] = (m[c.customer_group] ?? 0) + 1
-    return m
-  }, [active])
-
-  const q = query.trim().toLowerCase()
-  const visible = active.filter(
-    (c) =>
-      (!group || c.customer_group === group) &&
-      (!q ||
-        [c.customer_number, c.name, c.name2, c.city, c.zip, c.street, c.email, c.phone, ...c.customer_contacts.map((p) => p.name)]
-          .join(' ')
-          .toLowerCase()
-          .includes(q)),
-  )
+  const all = Object.values(counts).reduce((a, b) => a + b, 0)
+  const visible = rows
 
   return (
     <div>
@@ -73,7 +92,7 @@ export function Customers() {
 
       <div className="chip-row" role="group" aria-label="Kundengruppe">
         <button type="button" className={group === '' ? 'chip active' : 'chip'} onClick={() => chooseGroup('')}>
-          Alle <span className="chip-count">{active.length}</span>
+          Alle <span className="chip-count">{all}</span>
         </button>
         {CUSTOMER_GROUPS.map((g) => (
           <button type="button" key={g} className={group === g ? `chip active group-${g}` : `chip group-${g}`} onClick={() => chooseGroup(g)}>
@@ -92,8 +111,10 @@ export function Customers() {
       {loading ? (
         <p className="muted">Lädt…</p>
       ) : visible.length === 0 ? (
-        <p className="muted">{rows.length === 0 ? 'Noch keine Kunden angelegt.' : 'Keine Kunden gefunden.'}</p>
+        <p className="muted">{all === 0 && !query ? 'Noch keine Kunden angelegt.' : 'Keine Kunden gefunden.'}</p>
       ) : (
+        <>
+        {total > visible.length && <p className="small muted">{visible.length} von {total} Kunden angezeigt. Bitte Suche eingrenzen.</p>}
         <ul className="ticket-list">
           {visible.map((c) => (
             <li key={c.id}>
@@ -123,6 +144,7 @@ export function Customers() {
             </li>
           ))}
         </ul>
+        </>
       )}
     </div>
   )
