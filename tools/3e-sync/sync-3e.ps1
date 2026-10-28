@@ -1,12 +1,13 @@
 ﻿# Abgleich 3E Look -> JOLEKA 360° (nur lesend gegenüber 3E).
-# Liest die Kunden (kunden.sql) und danach die Projekte als Bauvorhaben (projekte.sql) und schickt sie an die Edge Function sync-3e.
+# Liest die Kunden (kunden.sql), danach die Projekte als Bauvorhaben (projekte.sql) und die Aufträge (auftraege.sql)
+# und schickt sie an die Edge Function sync-3e.
 #
-#   .\sync-3e.ps1 -Probe                    Probelauf: ändert nichts, schreibt die Vorschau nach vorschau.csv bzw. vorschau-bauvorhaben.csv
+#   .\sync-3e.ps1 -Probe                    Probelauf: ändert nichts, schreibt die Vorschau nach vorschau.csv, vorschau-bauvorhaben.csv, vorschau-auftraege.csv
 #   .\sync-3e.ps1                           Abgleich (für die geplante Aufgabe)
-#   .\sync-3e.ps1 -Nur Bauvorhaben -Probe   nur einen Teil (Kunden oder Bauvorhaben)
+#   .\sync-3e.ps1 -Nur Bauvorhaben -Probe   nur einen Teil (Kunden, Bauvorhaben oder Auftraege)
 #
 # Einstellungen stehen in einstellungen.json im selben Ordner (Vorlage: einstellungen.beispiel.json).
-param([switch]$Probe, [ValidateSet('', 'Kunden', 'Bauvorhaben')][string]$Nur = '')
+param([switch]$Probe, [ValidateSet('', 'Kunden', 'Bauvorhaben', 'Auftraege')][string]$Nur = '')
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -55,7 +56,7 @@ function Sync($label, $queryFile, $key, $fields, $previewFile) {
   # --- an die App schicken (in Paketen) ---
   $url = $cfg.SupabaseUrl.TrimEnd('/') + '/functions/v1/sync-3e'
   $headers = @{ 'x-sync-key' = $cfg.SyncSchluessel }
-  $sum = [ordered]@{ neu = 0; verknuepft = 0; aktualisiert = 0; unveraendert = 0; uebersprungen = 0; ohne_kunde = 0 }
+  $sum = [ordered]@{ neu = 0; verknuepft = 0; aktualisiert = 0; unveraendert = 0; uebersprungen = 0; ohne_kunde = 0; ohne_bauvorhaben = 0 }
   $preview = @()
   $errors = @()
   $size = 500
@@ -70,7 +71,9 @@ function Sync($label, $queryFile, $key, $fields, $previewFile) {
   }
 
   $mode = if ($Probe) { 'Probelauf (nichts geändert)' } else { 'Abgleich' }
-  $extra = if ($key -eq 'projects') { ", ohne Kunde in der App $($sum.ohne_kunde)" } else { '' }
+  $extra = if ($key -eq 'projects') { ", ohne Kunde in der App $($sum.ohne_kunde)" }
+    elseif ($key -eq 'orders') { ", ohne Kunde in der App $($sum.ohne_kunde), ohne Bauvorhaben in der App $($sum.ohne_bauvorhaben)" }
+    else { '' }
   Log "$mode $label`: neu $($sum.neu), verknüpft $($sum.verknuepft), aktualisiert $($sum.aktualisiert), unverändert $($sum.unveraendert), übersprungen $($sum.uebersprungen)$extra"
   foreach ($e in $errors) { Log "  Fehler: $($e | ConvertTo-Json -Compress -Depth 4)" }
   if ($Probe) {
@@ -90,7 +93,7 @@ catch {
 }
 
 # Kunden zuerst, damit neue Bauvorhaben ihren Kunden schon vorfinden
-if ($Nur -ne 'Bauvorhaben') {
+if ($Nur -eq '' -or $Nur -eq 'Kunden') {
   try {
     Sync 'Kunden' $cfg.KundenAbfrage 'customers' @('ext_id', 'customer_number', 'name', 'name2', 'street', 'house_no', 'zip', 'city', 'country', 'phone', 'mobile', 'email', 'website', 'origin', 'active', 'customer_group') 'vorschau.csv'
   }
@@ -100,14 +103,27 @@ if ($Nur -ne 'Bauvorhaben') {
   }
 }
 
+# Bauvorhaben vor den Aufträgen, damit neue Aufträge ihr Bauvorhaben schon vorfinden.
 # Bauvorhaben: Abfrage aus den Einstellungen (ProjektAbfrage), sonst projekte.sql, wenn vorhanden
 $projectQuery = if ($cfg.ProjektAbfrage) { $cfg.ProjektAbfrage } else { 'projekte.sql' }
-if ($Nur -ne 'Kunden' -and (Test-Path (Join-Path $dir $projectQuery))) {
+if (($Nur -eq '' -or $Nur -eq 'Bauvorhaben') -and (Test-Path (Join-Path $dir $projectQuery))) {
   try {
     Sync 'Bauvorhaben' $projectQuery 'projects' @('ext_id', 'project_number', 'name', 'customer_ext_id', 'status') 'vorschau-bauvorhaben.csv'
   }
   catch {
     Log "FEHLER Bauvorhaben: $($_.Exception.Message)"
+    $failed = $true
+  }
+}
+
+# Aufträge: Abfrage aus den Einstellungen (AuftragAbfrage), sonst auftraege.sql, wenn vorhanden.
+$orderQuery = if ($cfg.AuftragAbfrage) { $cfg.AuftragAbfrage } else { 'auftraege.sql' }
+if (($Nur -eq '' -or $Nur -eq 'Auftraege') -and (Test-Path (Join-Path $dir $orderQuery))) {
+  try {
+    Sync 'Aufträge' $orderQuery 'orders' @('ext_id', 'number', 'kind', 'title', 'doc_date', 'delivery_date', 'status', 'amount_net', 'notes', 'customer_ext_id', 'project_ext_id') 'vorschau-auftraege.csv'
+  }
+  catch {
+    Log "FEHLER Aufträge: $($_.Exception.Message)"
     $failed = $true
   }
 }

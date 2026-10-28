@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { AddressSuggest } from '../components/AddressSuggest'
 import { CustomerProjectsCard, type CustomerProject } from '../components/CustomerProjectsCard'
+import { ErpOrdersCard } from '../components/ErpOrdersCard'
 import { confirmAddresses } from '../lib/addressCheck'
 import { noAutofill } from '../lib/noAutofill'
 import {
@@ -281,6 +282,8 @@ export function CustomerDetail() {
       <ContactsCard customerId={customer.id} contacts={contacts} onChanged={load} />
 
       <CustomerProjectsCard customerId={customer.id} rows={projects} tickets={tickets} />
+
+      <ErpOrdersCard customerId={customer.id} tickets={tickets} />
 
       <NotesCard
         customerId={customer.id}

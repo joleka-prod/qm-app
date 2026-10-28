@@ -38,9 +38,10 @@ export function NewTicket() {
   const [type, setType] = useState<TicketType>(
     TICKET_TYPES.includes(params.get('art') as TicketType) ? (params.get('art') as TicketType) : 'restarbeit',
   )
-  const [title, setTitle] = useState('')
+  // aus einem 3E-Auftrag (Liste „Aufträge aus 3E“): /neu?art=montageauftrag&auftrag=<Nummer>&titel=<Bezeichnung>
+  const [title, setTitle] = useState(() => (params.get('titel') ?? '').slice(0, 150))
   const [description, setDescription] = useState('')
-  const [orderNumber, setOrderNumber] = useState('')
+  const [orderNumber, setOrderNumber] = useState(() => (params.get('auftrag') ?? '').slice(0, 50))
   const [positionNumber, setPositionNumber] = useState('')
   const [area, setArea] = useState<ServiceArea | null>(
     SERVICE_AREAS.includes(params.get('bereich') as ServiceArea) ? (params.get('bereich') as ServiceArea) : null,

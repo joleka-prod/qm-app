@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { AddressSuggest } from '../components/AddressSuggest'
+import { ErpOrdersCard } from '../components/ErpOrdersCard'
 import { confirmAddresses } from '../lib/addressCheck'
 import { noAutofill } from '../lib/noAutofill'
 import { StatusBadge, TypeBadge } from '../components/StatusBadge'
@@ -253,6 +254,8 @@ export function ProjectDetail() {
           ))
         )}
       </section>
+
+      <ErpOrdersCard projectId={project.id} tickets={tickets} />
 
       {customers.length > 0 ? (
         <NotesCard

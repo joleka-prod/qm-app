@@ -3,5 +3,6 @@
   "SupabaseUrl": "https://zcsinntrwaqmidyenuee.supabase.co",
   "SyncSchluessel": "HIER_DENSELBEN_WERT_WIE_SYNC_3E_KEY",
   "KundenAbfrage": "kunden.sql",
-  "ProjektAbfrage": "projekte.sql"
+  "ProjektAbfrage": "projekte.sql",
+  "AuftragAbfrage": "auftraege.sql"
 }
