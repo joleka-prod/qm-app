@@ -84,8 +84,9 @@ export function Timesheet() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const now = Date.now()
-  // Nachtragen/Korrigieren darf man für sich selbst (mit Genehmigung), Planer und Vorgesetzte auch für andere
-  const canCorrect = installerId === profile?.id || isPlanner || isAbove(installerId)
+  // Nachtragen/Korrigieren darf man für sich selbst (mit Genehmigung), Planer, Personalabteilung und Vorgesetzte auch für andere.
+  // Genehmigen bleibt beim Vorgesetzten oder Admin.
+  const canCorrect = installerId === profile?.id || isPlanner || isHr || isAbove(installerId)
   const [requests, setRequests] = useState<AttendanceRequest[]>([])
   const [info, setInfo] = useState('')
 
