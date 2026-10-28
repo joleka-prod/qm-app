@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState, type DragEvent } f
 import { Link } from 'react-router-dom'
 import { JobCard } from '../components/JobCard'
 import { WeekPlanning } from '../components/WeekPlanning'
+import { scrollToToday, useRemembered, useScrollMemory } from '../lib/calendarMemory'
 import { holidayName } from '../lib/holidays'
 import { supabase } from '../lib/supabase'
 import { loadMembers, useTeams, type Team, type TeamMember } from '../lib/teams'
@@ -32,14 +33,18 @@ function byTime(a: Ticket, b: Ticket) {
 export function PlanningCalendar() {
   const { installers, byId } = useProfiles()
   const { teams } = useTeams()
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
+  // Woche, Bereich und Scrollposition bleiben beim Wechsel in andere Menüs erhalten
+  const [week, setWeek] = useRemembered('cal-week', () => isoDate(startOfWeek(new Date())))
+  const weekStart = useMemo(() => new Date(week + 'T00:00'), [week])
+  const setWeekStart = (d: Date) => setWeek(isoDate(d))
+  const [loaded, setLoaded] = useState(false)
   const [planned, setPlanned] = useState<Ticket[]>([])
   const [unplanned, setUnplanned] = useState<Ticket[]>([])
   const [members, setMembers] = useState<TeamMember[]>([])
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [dropTarget, setDropTarget] = useState('')
-  const [areaFilter, setAreaFilter] = useState<ServiceArea | ''>('')
+  const [areaFilter, setAreaFilter] = useRemembered<ServiceArea | ''>('cal-area', () => '')
   // Ansicht gedreht: Teams als Spalten, Tage als Zeilen (Einstellung bleibt im Browser gespeichert)
   const [transposed, setTransposed] = useState(() => {
     try {
@@ -95,7 +100,14 @@ export function PlanningCalendar() {
     // vorgemerkte Wochen zuerst, danach nach Eingang
     setUnplanned(((u.data ?? []) as Ticket[]).sort((a, b) => (a.planned_week ?? '9').localeCompare(b.planned_week ?? '9')))
     setMembers(m)
+    setLoaded(true)
   }, [weekStart])
+  useScrollMemory('cal-scroll', loaded)
+
+  function goToday() {
+    setWeekStart(startOfWeek(new Date()))
+    scrollToToday()
+  }
 
   useEffect(() => {
     load()
@@ -272,6 +284,7 @@ export function PlanningCalendar() {
           <button onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Vorige Woche">←</button>
           <button onClick={() => setWeekStart(startOfWeek(new Date()))}>KW {weekNumber(weekStart)}</button>
           <button onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Nächste Woche">→</button>
+          <button className="today-btn" onClick={goToday}>Heute</button>
           {view === 'tage' && (
             <button onClick={toggleTransposed} title="Zeilen und Spalten tauschen">
               {transposed ? '⇄ Teams als Zeilen' : '⇄ Teams oben'}

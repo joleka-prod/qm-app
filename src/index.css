@@ -209,6 +209,7 @@ fieldset.plain-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; displa
 /* --- Kalender --- */
 .week-nav { display: flex; gap: 0.35rem; }
 .week-nav button { min-width: 44px; }
+.week-nav .today-btn { font-weight: 600; }
 .calendar-page .page-head { flex-wrap: wrap; }
 .cal-scroll { overflow-x: auto; margin: 0 -1rem 1rem; padding: 0 1rem; -webkit-overflow-scrolling: touch; }
 .cal { table-layout: fixed; border-collapse: separate; border-spacing: 0; width: 100%; min-width: 760px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
