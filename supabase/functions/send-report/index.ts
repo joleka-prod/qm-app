@@ -4,10 +4,16 @@
 // Testsystem: TEST_MAIL_TO (Pflicht außerhalb des Live-Projekts) – alle Berichte gehen dann nur an diese Adresse.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'npm:pdf-lib@1.17.1'
-import { encodeBase64 } from 'jsr:@std/encoding@1/base64'
 
 // Supabase-Projekt des Livesystems (zcsinntrwaqmidyenuee.supabase.co)
 const LIVE_PROJECT_REF = 'zcsinntrwaqmidyenuee'
+
+// Base64 ohne Zusatzbibliothek (jsr.io lief beim Hochladen der Funktion wiederholt in einen Timeout)
+function encodeBase64(bytes: Uint8Array) {
+  let bin = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return btoa(bin)
+}
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
