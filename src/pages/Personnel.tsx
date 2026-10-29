@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { MAIN_FIELDS, STATUS, employeeName, isExternal, isManagingDirector, missingPayroll, norm, show, type Employee } from '../lib/employee'
 import { supabase } from '../lib/supabase'
-import { displayName, type Profile } from '../lib/types'
+import { ROLE_LABEL, displayName, type Profile } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 import { Users } from './Users'
 
@@ -96,7 +96,7 @@ function ignored(): string[] {
 }
 
 // Spalten der Personaltabelle frei wählbar (Fabian, 2026-10-29); Auswahl je Benutzer im Browser gespeichert.
-// Name ist immer sichtbar, die übrigen Spalten erscheinen in der Reihenfolge dieser Liste.
+// Name ist immer sichtbar; Auswahl und Tabelle alphabetisch (Fabian, 2026-10-29), nur Nr. steht vorn.
 type Column = { key: string; label: string; num?: boolean; value: (e: Employee, byId: Record<string, Profile>) => string }
 
 const yearsSince = (d: unknown) =>
@@ -111,26 +111,28 @@ const FIELD_COLUMNS: Column[] = MAIN_FIELDS
     value: (e) => show(f, e[f.key]) || '–',
   }))
 
-const COLUMNS: Column[] = [
-  ...FIELD_COLUMNS.filter((c) => c.key === 'personnel_number').map((c) => ({ ...c, label: 'Nr.' })),
-  ...FIELD_COLUMNS.filter((c) => ['status', 'department', 'entry_date'].includes(c.key)),
+// Angaben aus dem App-Benutzer (Reiter App-Benutzer der Personalakte)
+const userColumn = (key: string, label: string, value: (p: Profile, byId: Record<string, Profile>) => string): Column => ({
+  key,
+  label,
+  value: (e, byId) => (e.user_id && byId[e.user_id] ? value(byId[e.user_id], byId) : '–'),
+})
+
+const COLUMNS = ([
+  ...FIELD_COLUMNS,
   {
     key: 'app_user',
     label: 'App-Benutzer',
     value: (e, byId) => (e.user_id ? (byId[e.user_id] ? `${displayName(byId[e.user_id])} (${byId[e.user_id].email})` : 'ja') : '–'),
   },
-  {
-    key: 'supervisor',
-    label: 'Vorgesetzte(r)',
-    value: (e, byId) => {
-      const sup = e.user_id ? byId[e.user_id]?.supervisor_id : null
-      return sup && byId[sup] ? displayName(byId[sup]) : '–'
-    },
-  },
+  userColumn('role', 'Rolle', (p) => ROLE_LABEL[p.role] ?? p.role),
+  userColumn('supervisor', 'Vorgesetzte(r)', (p, byId) => (p.supervisor_id && byId[p.supervisor_id] ? displayName(byId[p.supervisor_id]) : '–')),
+  userColumn('montage_capacity', 'Zählt bei Kapazitätsplanung', (p) => (p.role === 'monteur' ? ((p.montage_capacity ?? true) ? 'Ja' : 'Nein') : '–')),
   { key: 'age', label: 'Alter', num: true, value: (e) => { const y = yearsSince(e.birth_date); return y === null ? '–' : `${y} Jahre` } },
   { key: 'seniority', label: 'Betriebszugehörigkeit', num: true, value: (e) => { const y = yearsSince(e.entry_date); return y === null ? '–' : `${y} Jahre` } },
-  ...FIELD_COLUMNS.filter((c) => !['personnel_number', 'status', 'department', 'entry_date'].includes(c.key)),
-]
+] as Column[])
+  .map((c) => (c.key === 'personnel_number' ? { ...c, label: 'Nr.' } : c))
+  .sort((a, b) => (a.key === 'personnel_number' ? -1 : b.key === 'personnel_number' ? 1 : a.label.localeCompare(b.label, 'de')))
 const DEFAULT_COLUMNS = ['personnel_number', 'status', 'department', 'entry_date', 'app_user']
 
 const columnsKey = (userId?: string) => `personal-spalten:${userId ?? ''}`
