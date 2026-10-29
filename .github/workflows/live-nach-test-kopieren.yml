@@ -46,6 +46,8 @@ jobs:
         if: github.event.inputs.modus == 'erstmalig'
         run: |
           supabase db dump --db-url "$LIVE_DB_URL" -f roles.sql --role-only
+          # Rollen-Einstellungen wie log_min_messages darf im neuen Projekt nur Supabase selbst setzen
+          sed -i '/^ALTER ROLE .* SET /d' roles.sql
           supabase db dump --db-url "$LIVE_DB_URL" -f schema.sql
           supabase db dump --db-url "$LIVE_DB_URL" -f data.sql --use-copy --data-only
           supabase db dump --db-url "$LIVE_DB_URL" -f history_schema.sql --schema supabase_migrations
