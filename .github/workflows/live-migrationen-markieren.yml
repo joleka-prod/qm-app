@@ -1,0 +1,31 @@
+# Einmalig: Trägt alle Migrationen aus supabase/migrations im Livesystem als "bereits gelaufen" ein.
+# Die bisherigen Migrationen wurden per Hand im SQL-Editor ausgeführt; ohne diesen Schritt
+# wüsste "supabase db push" nicht, was schon drin ist.
+# NUR ausführen, wenn wirklich alle Migrationen bis zur neuesten im Livesystem gelaufen sind.
+name: 'Live: Migrationen als gelaufen markieren'
+
+on:
+  workflow_dispatch:
+    inputs:
+      bestaetigung:
+        description: 'Alle Migrationen sind im Livesystem ausgeführt. Zum Bestätigen JA eingeben.'
+        required: true
+
+jobs:
+  markieren:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.bestaetigung == 'JA'
+    env:
+      DB_URL: ${{ secrets.LIVE_DB_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Migrationen eintragen
+        run: |
+          versionen=$(ls supabase/migrations/*.sql | xargs -n1 basename | cut -d_ -f1)
+          echo "$versionen" | wc -l
+          supabase migration repair --status applied $versionen --db-url "$DB_URL" --yes
+      - name: Ergebnis
+        run: supabase migration list --db-url "$DB_URL"
