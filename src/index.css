@@ -719,6 +719,8 @@ button.link.danger-link { color: var(--danger); }
 .emp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0.6rem 0.9rem; align-items: end; }
 .emp-grid label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.85rem; min-width: 0; }
 .emp-grid label.wide { grid-column: span 2; }
+.emp-checks { display: flex; flex-wrap: wrap; gap: 0.2rem 1.6rem; margin-bottom: 0.6rem; }
+.emp-checks label.checkbox-row { font-size: 0.9rem; min-height: 36px; }
 .emp-grid input[readonly] { background: var(--bg); }
 .choice-custom { display: flex; gap: 0.4rem; align-items: center; }
 .choice-custom input { flex: 1; min-width: 0; }

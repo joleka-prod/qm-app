@@ -466,14 +466,19 @@ export function PersonnelDetail() {
         {current.sections.map((s, i) => (
           <div key={i} className="emp-section">
             {s.title && <h3 className="emp-heading">{s.title}</h3>}
-            {(s.fields?.length || s.computed?.length) ? (
-              <div className="emp-grid">
-                {s.fields?.map((f) => f.type === 'check' ? (
-                  <label key={f.key} className="checkbox-row wide">
+            {s.fields?.some((f) => f.type === 'check') && (
+              <div className="emp-checks">
+                {s.fields.filter((f) => f.type === 'check').map((f) => (
+                  <label key={f.key} className="checkbox-row">
                     <input type="checkbox" checked={!!form[f.key]} onChange={(e) => set(f.key, e.target.checked)} />
                     {f.label}
                   </label>
-                ) : (
+                ))}
+              </div>
+            )}
+            {(s.fields?.some((f) => f.type !== 'check') || s.computed?.length) ? (
+              <div className="emp-grid">
+                {s.fields?.filter((f) => f.type !== 'check').map((f) => (
                   <label key={f.key} className={f.wide ? 'wide' : f.type === 'status' ? 'wide' : ''}>
                     {f.label}
                     <Input field={f} value={form[f.key] ?? ''} options={f.type === 'choice' ? options[f.key] ?? f.options ?? [] : undefined} onChange={(v) => set(f.key, v)} />
