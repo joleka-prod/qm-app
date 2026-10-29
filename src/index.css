@@ -652,6 +652,8 @@ button.link.danger-link { color: var(--danger); }
 .month-capacity { display: flex; flex-direction: column; gap: 0.1rem; flex: 1 1 14rem; font-size: 0.85rem; }
 .month-capacity .capacity-bar span { background: #12b76a; }
 .month-capacity.over .capacity-bar span { background: var(--danger); }
+.planning-settings { flex: 1 1 100%; }
+.planning-settings-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
 
 /* Offline-Modus */
 .offline-bar { position: relative; }

@@ -313,10 +313,13 @@ export function formatManDays(n: number) {
   return `${n.toLocaleString('de-DE', { maximumFractionDigits: 1 })} ${n === 1 ? 'Manntag' : 'Manntage'}`
 }
 
-// Vorplanung rechnet in Stunden: ein Manntag = 9 Stunden (Fabian, 2026-10-29)
-export const HOURS_PER_MAN_DAY = 9
-// Referenzwert der Montage-Kapazität je Kalenderwoche (Fabian, 2026-10-29)
-export const REFERENCE_HOURS_PER_WEEK = 720
+// Vorplanung rechnet in Stunden (Fabian, 2026-10-29). Die Werte stellt der Admin in der Vorplanung ein
+// (Tabelle planning_settings); diese hier gelten nur, solange sie nicht geladen sind.
+export interface PlanningSettings {
+  hours_per_man_day: number
+  reference_hours_per_week: number
+}
+export const DEFAULT_PLANNING_SETTINGS: PlanningSettings = { hours_per_man_day: 9, reference_hours_per_week: 720 }
 
 export function formatHours(n: number) {
   return `${n.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Std.`
