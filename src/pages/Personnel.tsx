@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
-import { MAIN_FIELDS, STATUS, TABS, employeeName, isExternal, isManagingDirector, missingPayroll, norm, show, type Employee } from '../lib/employee'
+import { MAIN_FIELDS, STATUS, TABS, employeeName, isExternal, isManagingDirector, missingPayroll, norm, parse, show, toInput, type Employee, type Field } from '../lib/employee'
 import { supabase } from '../lib/supabase'
 import { ROLE_LABEL, displayName, type Profile } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
@@ -98,7 +98,8 @@ function ignored(): string[] {
 // Spalten der Personaltabelle frei wählbar (Fabian, 2026-10-29); Auswahl je Benutzer im Browser gespeichert.
 // Name ist immer sichtbar. Auswahl gegliedert wie die Personalakte (Reiter Stammdaten mit seinen Abschnitten,
 // Reiter App-Benutzer), innerhalb alphabetisch, nur Nr. steht vorn (Fabian, 2026-10-29).
-type Column = { key: string; label: string; group?: string; num?: boolean; value: (e: Employee, byId: Record<string, Profile>) => string }
+// field: Feld der Personalakte, im Bearbeiten-Modus direkt in der Tabelle änderbar
+type Column = { key: string; label: string; group?: string; num?: boolean; field?: Field; value: (e: Employee, byId: Record<string, Profile>) => string }
 
 const APP_USER = 'App-Benutzer'
 // Abschnitt der Personalakte je Feld; Abschnitte ohne Überschrift heißen "Allgemein"
@@ -119,6 +120,7 @@ const FIELD_COLUMNS: Column[] = MAIN_FIELDS
     key: f.key,
     label: f.label.replace(/:$/, ''),
     num: f.type === 'number' || f.type === 'money',
+    field: f,
     value: (e) => show(f, e[f.key]) || '–',
   }))
 
@@ -163,6 +165,70 @@ function savedColumns(userId?: string): string[] {
   } catch {
     return DEFAULT_COLUMNS
   }
+}
+
+// Zelle im Bearbeiten-Modus (Fabian, 2026-10-29): speichert beim Verlassen des Feldes bzw. bei Auswahl
+// direkt in der Personalakte. Esc verwirft die Eingabe.
+function EditCell({ e, field, options, onSaved }: { e: Employee; field: Field; options?: string[]; onSaved: (value: unknown) => void }) {
+  const initial = field.type === 'yesno' ? (e[field.key] ? 'ja' : 'nein') : toInput(field, e[field.key])
+  const [v, setV] = useState(initial)
+  const [state, setState] = useState<'' | 'busy' | 'ok' | 'error'>('')
+  const [msg, setMsg] = useState('')
+
+  async function save(next: string) {
+    if (next === initial) return
+    let value: unknown
+    if (field.type === 'yesno') value = next === 'ja'
+    else {
+      value = parse(field, next)
+      if ((field.type === 'number' || field.type === 'money') && typeof value === 'string') {
+        setState('error')
+        return setMsg('Bitte eine Zahl eintragen.')
+      }
+      if (value === null && !['date', 'number', 'money'].includes(field.type)) value = ''
+    }
+    setState('busy')
+    const { error } = await supabase.from('employees').update({ [field.key]: value }).eq('id', e.id)
+    if (error) {
+      setState('error')
+      setMsg(error.message)
+    } else {
+      setState('ok')
+      setMsg('')
+      onSaved(value)
+    }
+  }
+
+  const common = {
+    className: `cell-edit ${state}`,
+    title: msg || field.label,
+    'aria-label': field.label,
+    disabled: state === 'busy',
+  }
+  if (field.type === 'status' || field.type === 'yesno' || (field.type === 'choice' && options)) {
+    const opts = field.type === 'status' ? [...STATUS] : field.type === 'yesno' ? ['ja', 'nein'] : options!
+    const all = v && !opts.includes(v) ? [v, ...opts] : opts
+    return (
+      <select {...common} value={v} onChange={(ev) => { setV(ev.target.value); void save(ev.target.value) }}>
+        {field.type !== 'status' && field.type !== 'yesno' && <option value="">–</option>}
+        {all.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+    )
+  }
+  return (
+    <input
+      {...common}
+      type={field.type === 'date' ? 'date' : 'text'}
+      inputMode={field.type === 'number' || field.type === 'money' ? 'decimal' : undefined}
+      value={v}
+      onChange={(ev) => { setV(ev.target.value); setState('') }}
+      onBlur={() => void save(v)}
+      onKeyDown={(ev) => {
+        if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur()
+        if (ev.key === 'Escape') { setV(initial); setState('') }
+      }}
+    />
+  )
 }
 
 // Menüpunkt Personal: Mitarbeiter, externe Dienstleister (Fabian, 2026-10-27) und (nur Admin) App-Benutzer mit Stempel-Terminals
@@ -276,6 +342,7 @@ function EmployeeList() {
 
   const [colKeys, setColKeys] = useState<string[]>(() => savedColumns(profile?.id))
   const [pickCols, setPickCols] = useState(false)
+  const [editing, setEditing] = useState(false)
   const cols = useMemo(() => COLUMNS.filter((c) => colKeys.includes(c.key)), [colKeys])
   const tableCols = useMemo(
     () => [...cols.filter((c) => c.key === 'personnel_number'), NAME_COLUMN, ...cols.filter((c) => c.key !== 'personnel_number')],
@@ -360,6 +427,20 @@ function EmployeeList() {
     }
     return m
   }, [tableCols, byStatus, byId])
+
+  // Vorschläge für Auswahlfelder im Bearbeiten-Modus: feste Werte plus alles, was schon eingetragen ist
+  const fieldOptions = useMemo(() => {
+    const out: Record<string, string[]> = {}
+    for (const f of MAIN_FIELDS.filter((f) => f.type === 'choice')) {
+      const seen = new Set(f.options ?? [])
+      for (const e of list) if (e[f.key]) seen.add(String(e[f.key]))
+      out[f.key] = [...seen]
+    }
+    return out
+  }, [list])
+
+  const saved = (id: number, key: string, value: unknown) =>
+    setList((l) => l.map((x) => (x.id === id ? ({ ...x, [key]: value } as Employee) : x)))
 
   const activeFilters = useMemo(() => tableCols.filter((c) => colFilter[c.key]), [tableCols, colFilter])
 
@@ -455,6 +536,7 @@ function EmployeeList() {
           <option value="">Alle</option>
         </select>
         <button type="button" onClick={() => setPickCols(!pickCols)}>Spalten ({cols.length + 1})</button>
+        <button type="button" className={editing ? 'primary' : ''} onClick={() => setEditing(!editing)}>{editing ? 'Bearbeiten beenden' : 'Bearbeiten'}</button>
       </div>
       {pickCols && (
         <section className="card">
@@ -489,6 +571,12 @@ function EmployeeList() {
         </section>
       )}
       <section className="card">
+        {editing && (
+          <p className="muted small">
+            Änderungen werden beim Verlassen des Feldes (oder mit Enter) direkt in der Personalakte gespeichert, Esc verwirft die Eingabe.
+            Alter, Betriebszugehörigkeit und die Angaben zum App-Benutzer änderst du in der Personalakte.
+          </p>
+        )}
         <div className="cal-scroll">
           <table className="import-table">
             <thead>
@@ -520,7 +608,9 @@ function EmployeeList() {
                   {tableCols.map((c) =>
                     c.key === 'name'
                       ? <td key={c.key}><Link to={`/personal/${e.id}`}>{nameOf(e)}</Link></td>
-                      : <td key={c.key} className={c.num ? 'num' : ''}>{c.value(e, byId)}</td>,
+                      : editing && c.field
+                        ? <td key={c.key}><EditCell e={e} field={c.field} options={fieldOptions[c.key]} onSaved={(v) => saved(e.id, c.key, v)} /></td>
+                        : <td key={c.key} className={c.num ? 'num' : ''}>{c.value(e, byId)}</td>,
                   )}
                 </tr>
               ))}
