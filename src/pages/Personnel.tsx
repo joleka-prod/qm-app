@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
-import { STATUS, employeeName, isExternal, isManagingDirector, missingPayroll, norm, type Employee } from '../lib/employee'
+import { MAIN_FIELDS, STATUS, employeeName, isExternal, isManagingDirector, missingPayroll, norm, show, type Employee } from '../lib/employee'
 import { supabase } from '../lib/supabase'
-import { displayName } from '../lib/types'
+import { displayName, type Profile } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 import { Users } from './Users'
 
@@ -92,6 +92,54 @@ function ignored(): string[] {
     return JSON.parse(localStorage.getItem(IGNORE_KEY) ?? '[]')
   } catch {
     return []
+  }
+}
+
+// Spalten der Personaltabelle frei wählbar (Fabian, 2026-10-29); Auswahl je Benutzer im Browser gespeichert.
+// Name ist immer sichtbar, die übrigen Spalten erscheinen in der Reihenfolge dieser Liste.
+type Column = { key: string; label: string; num?: boolean; value: (e: Employee, byId: Record<string, Profile>) => string }
+
+const yearsSince = (d: unknown) =>
+  d ? Math.floor((Date.now() - new Date(String(d).slice(0, 10) + 'T00:00').getTime()) / (365.2425 * 864e5)) : null
+
+const FIELD_COLUMNS: Column[] = MAIN_FIELDS
+  .filter((f) => !['first_name', 'last_name', 'company', 'trade', 'phone', 'mobile', 'email', 'vat_id', 'tax_number', 'note'].includes(f.key))
+  .map((f) => ({
+    key: f.key,
+    label: f.label.replace(/:$/, ''),
+    num: f.type === 'number' || f.type === 'money',
+    value: (e) => show(f, e[f.key]) || '–',
+  }))
+
+const COLUMNS: Column[] = [
+  ...FIELD_COLUMNS.filter((c) => c.key === 'personnel_number').map((c) => ({ ...c, label: 'Nr.' })),
+  ...FIELD_COLUMNS.filter((c) => ['status', 'department', 'entry_date'].includes(c.key)),
+  {
+    key: 'app_user',
+    label: 'App-Benutzer',
+    value: (e, byId) => (e.user_id ? (byId[e.user_id] ? `${displayName(byId[e.user_id])} (${byId[e.user_id].email})` : 'ja') : '–'),
+  },
+  {
+    key: 'supervisor',
+    label: 'Vorgesetzte(r)',
+    value: (e, byId) => {
+      const sup = e.user_id ? byId[e.user_id]?.supervisor_id : null
+      return sup && byId[sup] ? displayName(byId[sup]) : '–'
+    },
+  },
+  { key: 'age', label: 'Alter', num: true, value: (e) => { const y = yearsSince(e.birth_date); return y === null ? '–' : `${y} Jahre` } },
+  { key: 'seniority', label: 'Betriebszugehörigkeit', num: true, value: (e) => { const y = yearsSince(e.entry_date); return y === null ? '–' : `${y} Jahre` } },
+  ...FIELD_COLUMNS.filter((c) => !['personnel_number', 'status', 'department', 'entry_date'].includes(c.key)),
+]
+const DEFAULT_COLUMNS = ['personnel_number', 'status', 'department', 'entry_date', 'app_user']
+
+const columnsKey = (userId?: string) => `personal-spalten:${userId ?? ''}`
+function savedColumns(userId?: string): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(columnsKey(userId)) ?? 'null')
+    return Array.isArray(v) ? v.filter((k) => COLUMNS.some((c) => c.key === k)) : DEFAULT_COLUMNS
+  } catch {
+    return DEFAULT_COLUMNS
   }
 }
 
@@ -203,6 +251,19 @@ function EmployeeList() {
 
   const [withWage, setWithWage] = useState<Set<number>>(new Set())
   const [showMissing, setShowMissing] = useState(false)
+
+  const [colKeys, setColKeys] = useState<string[]>(() => savedColumns(profile?.id))
+  const [pickCols, setPickCols] = useState(false)
+  const cols = COLUMNS.filter((c) => colKeys.includes(c.key))
+
+  function chooseColumns(next: string[]) {
+    setColKeys(next)
+    try {
+      localStorage.setItem(columnsKey(profile?.id), JSON.stringify(next))
+    } catch {
+      // ohne Speicher gilt die Auswahl nur bis zum Neuladen
+    }
+  }
 
   const load = useCallback(async () => {
     const [{ data, error }, wages] = await Promise.all([
@@ -347,22 +408,51 @@ function EmployeeList() {
           {STATUS.map((s) => <option key={s} value={s}>{s}</option>)}
           <option value="">Alle</option>
         </select>
+        <button type="button" onClick={() => setPickCols(!pickCols)}>Spalten ({cols.length + 1})</button>
       </div>
+      {pickCols && (
+        <section className="card">
+          <div className="card-head">
+            <h2>Spalten auswählen</h2>
+            <div className="card-head-actions">
+              <button type="button" className="link" onClick={() => chooseColumns(COLUMNS.map((c) => c.key))}>Alle</button>
+              <button type="button" className="link" onClick={() => chooseColumns([])}>Keine</button>
+              <button type="button" className="link" onClick={() => chooseColumns(DEFAULT_COLUMNS)}>Standard</button>
+              <button type="button" onClick={() => setPickCols(false)}>Fertig</button>
+            </div>
+          </div>
+          <p className="muted small">Der Name wird immer angezeigt. Deine Auswahl bleibt in diesem Browser gespeichert.</p>
+          <div className="column-picker">
+            <label className="checkbox"><input type="checkbox" checked disabled /> Name</label>
+            {COLUMNS.map((c) => (
+              <label key={c.key} className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={colKeys.includes(c.key)}
+                  onChange={(ev) => chooseColumns(ev.target.checked ? [...colKeys, c.key] : colKeys.filter((k) => k !== c.key))}
+                />
+                {c.label}
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
       <section className="card">
         <div className="cal-scroll">
           <table className="import-table">
             <thead>
-              <tr><th>Nr.</th><th>Name</th><th>Status</th><th>Abteilung</th><th>Firmeneintritt</th><th>App-Benutzer</th></tr>
+              <tr>
+                {cols[0]?.key === 'personnel_number' && <th>{cols[0].label}</th>}
+                <th>Name</th>
+                {cols.filter((c) => c.key !== 'personnel_number').map((c) => <th key={c.key} className={c.num ? 'num' : ''}>{c.label}</th>)}
+              </tr>
             </thead>
             <tbody>
               {shown.map((e) => (
                 <tr key={e.id} className={e.status === 'Aktiv' ? '' : 'muted'}>
-                  <td>{String(e.personnel_number || '–')}</td>
+                  {cols[0]?.key === 'personnel_number' && <td>{cols[0].value(e, byId)}</td>}
                   <td><Link to={`/personal/${e.id}`}>{e.last_name || e.first_name ? `${e.last_name}, ${e.first_name}` : employeeName(e)}</Link></td>
-                  <td>{String(e.status)}</td>
-                  <td>{String(e.department || '–')}</td>
-                  <td>{fmt(e.entry_date)}</td>
-                  <td>{e.user_id ? (byId[e.user_id] ? `${displayName(byId[e.user_id])} (${byId[e.user_id].email})` : 'ja') : '–'}</td>
+                  {cols.filter((c) => c.key !== 'personnel_number').map((c) => <td key={c.key} className={c.num ? 'num' : ''}>{c.value(e, byId)}</td>)}
                 </tr>
               ))}
             </tbody>

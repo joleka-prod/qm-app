@@ -705,6 +705,8 @@ button.link.danger-link { color: var(--danger); }
 .import-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .import-table th, .import-table td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
 .import-table th.num, .import-table td.num { text-align: right; }
+.column-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 0.4rem 1rem; }
+.column-picker .checkbox { min-height: 32px; }
 .import-table tr.import-error td { color: var(--danger); }
 .import-table tr.clickable { cursor: pointer; }
 .import-table tr.clickable:hover td { background: var(--info-bg); }
