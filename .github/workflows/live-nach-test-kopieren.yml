@@ -1,5 +1,5 @@
 # Kopiert die Daten des Livesystems ins Testsystem (nur von Hand gestartet).
-#   erstmalig: Rollen, Struktur, Migrationsliste und alle Daten in das LEERE Testprojekt
+#   erstmalig: Struktur, Migrationsliste und alle Daten in das LEERE Testprojekt
 #   daten:     Testdaten löschen und Daten (Tabellen + Benutzer) neu aus Live holen; die Struktur
 #              im Test bleibt, wie sie ist (sie wird über den Branch "test" gepflegt)
 # Fotos und Dateien (Storage) werden nicht kopiert.
@@ -45,15 +45,14 @@ jobs:
       - name: Erstmalig - Struktur und Daten kopieren
         if: github.event.inputs.modus == 'erstmalig'
         run: |
-          supabase db dump --db-url "$LIVE_DB_URL" -f roles.sql --role-only
-          # Rollen-Einstellungen wie log_min_messages darf im neuen Projekt nur Supabase selbst setzen
-          sed -i '/^ALTER ROLE .* SET /d' roles.sql
+          # Ohne roles.sql: Die App legt keine eigenen Rollen an, und die Einstellungen der
+          # Standardrollen (z. B. log_min_messages) darf im neuen Projekt nur Supabase setzen.
           supabase db dump --db-url "$LIVE_DB_URL" -f schema.sql
           supabase db dump --db-url "$LIVE_DB_URL" -f data.sql --use-copy --data-only
           supabase db dump --db-url "$LIVE_DB_URL" -f history_schema.sql --schema supabase_migrations
           supabase db dump --db-url "$LIVE_DB_URL" -f history_data.sql --use-copy --data-only --schema supabase_migrations
           psql --single-transaction --variable ON_ERROR_STOP=1 \
-            --file roles.sql --file schema.sql \
+            --file schema.sql \
             --command 'SET session_replication_role = replica' \
             --file data.sql \
             --dbname "$TEST_DB_URL"
