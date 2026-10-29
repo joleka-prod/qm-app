@@ -1,12 +1,10 @@
 {
-  // Cloudflare Workers: liefert die gebaute App aus dist/ aus.
-  // Unbekannte Pfade wie /ticket/12 bekommen index.html, damit die App selbst routet.
+  // Cloudflare Worker der ALTEN Adresse qm-app.fabian-rieder.workers.dev.
+  // Die App selbst läuft seit 29.10.2026 über Cloudflare Pages unter https://360.joleka.de;
+  // dieser Worker leitet nur noch dorthin weiter (worker/umleitung.js).
   "name": "qm-app",
   "compatibility_date": "2026-09-01",
-  "assets": {
-    "directory": "./dist",
-    "not_found_handling": "single-page-application"
-  },
+  "main": "worker/umleitung.js",
   // Vorschau-Builds für Pull Requests (wrangler preview); darf leer sein
   "previews": {}
 }

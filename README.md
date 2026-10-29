@@ -74,14 +74,17 @@ unter dem Filter „Löschung beantragt“.
 
 ### 4. App veröffentlichen
 
-Die App ist eine statische Seite und kann z. B. auf Cloudflare Pages kostenlos gehostet werden:
+Die App läuft auf Cloudflare Pages (Projekt `qm-app`, Adresse https://360.joleka.de über einen CNAME bei Host Europe
+auf `qm-app-cq4.pages.dev`):
 
 - Build-Befehl: `npm run build`
 - Ausgabeordner: `dist`
-- Umgebungsvariablen: `VITE_SUPABASE_URL` und `VITE_SUPABASE_ANON_KEY` (aus *Project Settings → API*)
+- Umgebungsvariablen: `NODE_VERSION` (22), `VITE_SUPABASE_URL` und `VITE_SUPABASE_ANON_KEY` (aus *Project Settings → API*)
 
-Damit Links wie `/ticket/12` direkt funktionieren, ist in `wrangler.jsonc` die Single-Page-Weiterleitung eingestellt
-(für Cloudflare Workers mit Deploy-Befehl `npx wrangler deploy`). Bei Cloudflare Pages greift sie automatisch.
+Links wie `/ticket/12` funktionieren bei Pages automatisch (Single-Page-Weiterleitung).
+
+Der frühere Cloudflare Worker unter `qm-app.fabian-rieder.workers.dev` leitet nur noch auf die neue Adresse weiter
+(`wrangler.jsonc`, `worker/umleitung.js`) und meldet den alten Service Worker auf den Geräten ab.
 
 ## Lokale Entwicklung
 
