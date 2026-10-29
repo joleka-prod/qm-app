@@ -419,16 +419,6 @@ export function PlanningCalendar() {
         </>
       )}
 
-      {installers.length > 0 && (
-        <section className="card">
-          <h2>Kalender je Monteur</h2>
-          <div className="installer-links">
-            {installers.map((p) => (
-              <Link key={p.id} to={`/monteur/${p.id}`}>{displayName(p)}</Link>
-            ))}
-          </div>
-        </section>
-      )}
     </div>
   )
 }
