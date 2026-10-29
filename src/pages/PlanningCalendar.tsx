@@ -148,7 +148,7 @@ export function PlanningCalendar() {
         const { error } = await supabase.from('team_members').insert({ team_id: team.id, day: d, installer_id: installerId })
         if (error) skipped.push(formatDay(d))
       }
-      if (skipped.length) setInfo(`${name} konnte nicht eingeplant werden am ${skipped.join(', ')} (schon in einem anderen Team oder Team voll).`)
+      if (skipped.length) setInfo(`${name} konnte nicht eingeplant werden am ${skipped.join(', ')} (schon in einem anderen Team, Team voll oder keine Arbeitserlaubnis für das Land).`)
     }
     load()
   }
