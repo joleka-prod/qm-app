@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
   const grey: [number, number, number] = [0.4, 0.44, 0.5]
 
   // Firmenlogo oben rechts (PNG oder JPG); fehlt es, bleibt der Platz frei
-  const logoUrl = Deno.env.get('LOGO_URL') ?? 'https://qm-app.fabian-rieder.workers.dev/logo.jpg'
+  const logoUrl = Deno.env.get('LOGO_URL') ?? 'https://360.joleka.de/logo.jpg'
   try {
     const res = await fetch(logoUrl)
     if (res.ok) {
