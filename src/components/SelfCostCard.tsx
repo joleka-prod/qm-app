@@ -81,7 +81,7 @@ export function SelfCostCard({ ticket, byId, onChanged }: { ticket: Ticket; byId
           </p>
         </>
       ) : (
-        <p className="small muted">Fahrstrecke × 0,90 €/km + Arbeitszeit aller Monteure × 55,00 €/Std. + Positionspreise.</p>
+        <p className="small muted">Fahrstrecke × 0,39 €/km + Arbeitszeit aller Monteure × 42,00 €/Std. + Positionspreise.</p>
       )}
       {ticket.distance_km == null && <p className="small appointment-warn">Die Fahrstrecke ist noch nicht berechnet.</p>}
       <button className={costs ? '' : 'primary'} disabled={busy || ticket.distance_km == null} onClick={calc}>
