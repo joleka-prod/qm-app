@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
-import { MAIN_FIELDS, STATUS, TABS, employeeName, isExternal, isManagingDirector, missingPayroll, norm, show, type Employee } from '../lib/employee'
+import { MAIN_FIELDS, STATUS, TABS, employeeName, isExternal, isManagingDirector, missingPayroll, norm, parse, show, toInput, type Employee, type Field } from '../lib/employee'
 import { supabase } from '../lib/supabase'
 import { ROLE_LABEL, displayName, type Profile } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
@@ -98,7 +98,8 @@ function ignored(): string[] {
 // Spalten der Personaltabelle frei wählbar (Fabian, 2026-10-29); Auswahl je Benutzer im Browser gespeichert.
 // Name ist immer sichtbar. Auswahl gegliedert wie die Personalakte (Reiter Stammdaten mit seinen Abschnitten,
 // Reiter App-Benutzer), innerhalb alphabetisch, nur Nr. steht vorn (Fabian, 2026-10-29).
-type Column = { key: string; label: string; group?: string; num?: boolean; value: (e: Employee, byId: Record<string, Profile>) => string }
+// field: Feld der Personalakte, im Bearbeiten-Modus direkt in der Tabelle änderbar
+type Column = { key: string; label: string; group?: string; num?: boolean; field?: Field; value: (e: Employee, byId: Record<string, Profile>) => string }
 
 const APP_USER = 'App-Benutzer'
 // Abschnitt der Personalakte je Feld; Abschnitte ohne Überschrift heißen "Allgemein"
@@ -119,6 +120,7 @@ const FIELD_COLUMNS: Column[] = MAIN_FIELDS
     key: f.key,
     label: f.label.replace(/:$/, ''),
     num: f.type === 'number' || f.type === 'money',
+    field: f,
     value: (e) => show(f, e[f.key]) || '–',
   }))
 
@@ -148,6 +150,11 @@ const COLUMNS = ([
   .sort((a, b) =>
     GROUPS.indexOf(a.group!) - GROUPS.indexOf(b.group!) ||
     (a.key === 'personnel_number' ? -1 : b.key === 'personnel_number' ? 1 : a.label.localeCompare(b.label, 'de')))
+const FIELD = Object.fromEntries(MAIN_FIELDS.map((f) => [f.key, f])) as Record<string, Field>
+// berechnete Spalten: im Bearbeiten-Modus wird das zugrunde liegende Datum geändert
+const EDIT_VIA: Record<string, string> = { age: 'birth_date', seniority: 'entry_date' }
+const PROFILE_EDIT = ['role', 'supervisor', 'montage_capacity']
+
 const nameOf = (e: Employee) => (e.last_name || e.first_name ? `${e.last_name}, ${e.first_name}` : employeeName(e))
 const NAME_COLUMN: Column = { key: 'name', label: 'Name', value: nameOf }
 // Spalten mit wenigen verschiedenen Werten bekommen im Kopf eine Auswahl, alle anderen ein Suchfeld
@@ -163,6 +170,108 @@ function savedColumns(userId?: string): string[] {
   } catch {
     return DEFAULT_COLUMNS
   }
+}
+
+// Zelle im Bearbeiten-Modus (Fabian, 2026-10-29): speichert beim Verlassen des Feldes bzw. bei Auswahl
+// direkt in der Personalakte. Esc verwirft die Eingabe.
+function EditCell({ e, field, options, onSaved }: { e: Employee; field: Field; options?: string[]; onSaved: (value: unknown) => void }) {
+  const initial = field.type === 'yesno' ? (e[field.key] ? 'ja' : 'nein') : toInput(field, e[field.key])
+  const [v, setV] = useState(initial)
+  const [state, setState] = useState<'' | 'busy' | 'ok' | 'error'>('')
+  const [msg, setMsg] = useState('')
+
+  async function save(next: string) {
+    if (next === initial) return
+    let value: unknown
+    if (field.type === 'yesno') value = next === 'ja'
+    else {
+      value = parse(field, next)
+      if ((field.type === 'number' || field.type === 'money') && typeof value === 'string') {
+        setState('error')
+        return setMsg('Bitte eine Zahl eintragen.')
+      }
+      if (value === null && !['date', 'number', 'money'].includes(field.type)) value = ''
+    }
+    setState('busy')
+    const { error } = await supabase.from('employees').update({ [field.key]: value }).eq('id', e.id)
+    if (error) {
+      setState('error')
+      setMsg(error.message)
+    } else {
+      setState('ok')
+      setMsg('')
+      onSaved(value)
+    }
+  }
+
+  const common = {
+    className: `cell-edit ${state}`,
+    title: msg || field.label,
+    'aria-label': field.label,
+    disabled: state === 'busy',
+  }
+  if (field.type === 'status' || field.type === 'yesno' || (field.type === 'choice' && options)) {
+    const opts = field.type === 'status' ? [...STATUS] : field.type === 'yesno' ? ['ja', 'nein'] : options!
+    const all = v && !opts.includes(v) ? [v, ...opts] : opts
+    return (
+      <select {...common} value={v} onChange={(ev) => { setV(ev.target.value); void save(ev.target.value) }}>
+        {field.type !== 'status' && field.type !== 'yesno' && <option value="">–</option>}
+        {all.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+    )
+  }
+  return (
+    <input
+      {...common}
+      type={field.type === 'date' ? 'date' : 'text'}
+      inputMode={field.type === 'number' || field.type === 'money' ? 'decimal' : undefined}
+      placeholder={field.label}
+      value={v}
+      onChange={(ev) => { setV(ev.target.value); setState('') }}
+      onBlur={() => void save(v)}
+      onKeyDown={(ev) => {
+        if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur()
+        if (ev.key === 'Escape') { setV(initial); setState('') }
+      }}
+    />
+  )
+}
+
+// App-Benutzer-Angabe im Bearbeiten-Modus (Rolle, Vorgesetzte(r), Kapazitätsplanung): speichert direkt im Profil.
+// Die Regeln der Datenbank gelten wie in der Benutzerverwaltung (z. B. eigene Rolle nicht änderbar).
+function ProfileCell({ p, field, label, value, options, onSaved }: {
+  p: Profile
+  field: 'role' | 'supervisor_id' | 'montage_capacity'
+  label: string
+  value: string
+  options: { value: string; label: string }[]
+  onSaved: () => void
+}) {
+  const [v, setV] = useState(value)
+  const [state, setState] = useState<'' | 'busy' | 'ok' | 'error'>('')
+  const [msg, setMsg] = useState('')
+
+  async function save(next: string) {
+    setV(next)
+    setState('busy')
+    const val = field === 'montage_capacity' ? next === 'ja' : field === 'supervisor_id' ? next || null : next
+    const { error } = await supabase.from('profiles').update({ [field]: val }).eq('id', p.id)
+    if (error) {
+      setV(value)
+      setState('error')
+      setMsg(error.message)
+    } else {
+      setState('ok')
+      setMsg('')
+      onSaved()
+    }
+  }
+
+  return (
+    <select className={`cell-edit ${state}`} title={msg || label} aria-label={label} disabled={state === 'busy'} value={v} onChange={(ev) => void save(ev.target.value)}>
+      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  )
 }
 
 // Menüpunkt Personal: Mitarbeiter, externe Dienstleister (Fabian, 2026-10-27) und (nur Admin) App-Benutzer mit Stempel-Terminals
@@ -261,7 +370,7 @@ function ExternalList() {
 // Übersicht Personalakten (nur Admin und Benutzer mit Zugriff auf Personalakten)
 function EmployeeList() {
   const { profile } = useAuth()
-  const { byId } = useProfiles()
+  const { profiles, byId, reload: reloadProfiles } = useProfiles()
   const navigate = useNavigate()
   const [list, setList] = useState<Employee[]>([])
   const [error, setError] = useState('')
@@ -276,6 +385,7 @@ function EmployeeList() {
 
   const [colKeys, setColKeys] = useState<string[]>(() => savedColumns(profile?.id))
   const [pickCols, setPickCols] = useState(false)
+  const [editing, setEditing] = useState(false)
   const cols = useMemo(() => COLUMNS.filter((c) => colKeys.includes(c.key)), [colKeys])
   const tableCols = useMemo(
     () => [...cols.filter((c) => c.key === 'personnel_number'), NAME_COLUMN, ...cols.filter((c) => c.key !== 'personnel_number')],
@@ -360,6 +470,53 @@ function EmployeeList() {
     }
     return m
   }, [tableCols, byStatus, byId])
+
+  // Vorschläge für Auswahlfelder im Bearbeiten-Modus: feste Werte plus alles, was schon eingetragen ist
+  const fieldOptions = useMemo(() => {
+    const out: Record<string, string[]> = {}
+    for (const f of MAIN_FIELDS.filter((f) => f.type === 'choice')) {
+      const seen = new Set(f.options ?? [])
+      for (const e of list) if (e[f.key]) seen.add(String(e[f.key]))
+      out[f.key] = [...seen]
+    }
+    return out
+  }, [list])
+
+  const activeProfiles = useMemo(
+    () => profiles.filter((p) => p.active).sort((a, b) => displayName(a).localeCompare(displayName(b), 'de')),
+    [profiles],
+  )
+
+  // Name im Bearbeiten-Modus: Nachname und Vorname getrennt, Link zur Akte bleibt dahinter
+  const editName = (e: Employee) => (
+    <div className="cell-name-edit">
+      <EditCell e={e} field={FIELD.last_name} onSaved={(v) => saved(e.id, 'last_name', v)} />
+      <EditCell e={e} field={FIELD.first_name} onSaved={(v) => saved(e.id, 'first_name', v)} />
+      <Link to={`/personal/${e.id}`} title="Personalakte öffnen">↗</Link>
+    </div>
+  )
+
+  function editProfile(e: Employee, c: Column) {
+    const p = e.user_id ? byId[e.user_id] : undefined
+    if (!p) return <span className="muted small">kein App-Benutzer</span>
+    if (c.key === 'role') {
+      const opts = (Object.keys(ROLE_LABEL) as (keyof typeof ROLE_LABEL)[]).map((r) => ({ value: r, label: ROLE_LABEL[r] }))
+      return <ProfileCell p={p} field="role" label={c.label} value={p.role} options={opts} onSaved={reloadProfiles} />
+    }
+    if (c.key === 'supervisor') {
+      const opts = [{ value: '', label: '–' }, ...activeProfiles.filter((o) => o.id !== p.id).map((o) => ({ value: o.id, label: displayName(o) }))]
+      return <ProfileCell p={p} field="supervisor_id" label={c.label} value={p.supervisor_id ?? ''} options={opts} onSaved={reloadProfiles} />
+    }
+    // Kapazitätsplanung gilt nur für Monteure
+    if (p.role !== 'monteur') return <span className="muted small">nur Monteure</span>
+    return (
+      <ProfileCell p={p} field="montage_capacity" label={c.label} value={(p.montage_capacity ?? true) ? 'ja' : 'nein'}
+        options={[{ value: 'ja', label: 'Ja' }, { value: 'nein', label: 'Nein' }]} onSaved={reloadProfiles} />
+    )
+  }
+
+  const saved = (id: number, key: string, value: unknown) =>
+    setList((l) => l.map((x) => (x.id === id ? ({ ...x, [key]: value } as Employee) : x)))
 
   const activeFilters = useMemo(() => tableCols.filter((c) => colFilter[c.key]), [tableCols, colFilter])
 
@@ -455,6 +612,7 @@ function EmployeeList() {
           <option value="">Alle</option>
         </select>
         <button type="button" onClick={() => setPickCols(!pickCols)}>Spalten ({cols.length + 1})</button>
+        <button type="button" className={editing ? 'primary' : ''} onClick={() => setEditing(!editing)}>{editing ? 'Bearbeiten beenden' : 'Bearbeiten'}</button>
       </div>
       {pickCols && (
         <section className="card">
@@ -489,6 +647,13 @@ function EmployeeList() {
         </section>
       )}
       <section className="card">
+        {editing && (
+          <p className="muted small">
+            Änderungen werden beim Verlassen des Feldes (oder mit Enter) direkt in der Personalakte gespeichert, Esc verwirft die Eingabe.
+            Bei Alter und Betriebszugehörigkeit änderst du Geburtsdatum bzw. Firmeneintritt. Rolle, Vorgesetzte(r) und
+            Kapazitätsplanung werden im App-Benutzer gespeichert; den App-Benutzer selbst verknüpfst du in der Personalakte.
+          </p>
+        )}
         <div className="cal-scroll">
           <table className="import-table">
             <thead>
@@ -519,8 +684,14 @@ function EmployeeList() {
                 <tr key={e.id} className={e.status === 'Aktiv' ? '' : 'muted'}>
                   {tableCols.map((c) =>
                     c.key === 'name'
-                      ? <td key={c.key}><Link to={`/personal/${e.id}`}>{nameOf(e)}</Link></td>
-                      : <td key={c.key} className={c.num ? 'num' : ''}>{c.value(e, byId)}</td>,
+                      ? <td key={c.key}>{editing ? editName(e) : <Link to={`/personal/${e.id}`}>{nameOf(e)}</Link>}</td>
+                      : editing && EDIT_VIA[c.key]
+                        ? <td key={c.key}><EditCell e={e} field={FIELD[EDIT_VIA[c.key]]} onSaved={(v) => saved(e.id, EDIT_VIA[c.key], v)} /></td>
+                      : editing && PROFILE_EDIT.includes(c.key)
+                        ? <td key={c.key}>{editProfile(e, c)}</td>
+                      : editing && c.field
+                        ? <td key={c.key}><EditCell e={e} field={c.field} options={fieldOptions[c.key]} onSaved={(v) => saved(e.id, c.key, v)} /></td>
+                        : <td key={c.key} className={c.num ? 'num' : ''}>{c.value(e, byId)}</td>,
                   )}
                 </tr>
               ))}
