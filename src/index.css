@@ -759,3 +759,6 @@ button.link.danger-link { color: var(--danger); }
   .position-price input, .position-price label:last-of-type input { width: 100%; }
   .position-price .position-amount { flex-basis: 100%; text-align: right; padding-bottom: 0; }
 }
+.column-group h3 { margin: 0.8rem 0 0.3rem; font-size: 0.9rem; }
+.import-table .column-filters th { padding-top: 0; font-weight: 400; }
+.import-table .column-filters input, .import-table .column-filters select { min-width: 6rem; width: 100%; padding: 0.25rem 0.4rem; font-size: 0.85rem; min-height: 0; }
