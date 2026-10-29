@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { formatManDays, formatTime, manDays, projectPlace, ticketNo, weekLabel, type Ticket } from '../lib/types'
+import { formatHours, formatManDays, formatTime, manDays, projectPlace, ticketNo, weekLabel, type Ticket } from '../lib/types'
 import { jobAddress } from './AddressFields'
 import { AreaBadge, TypeBadge } from './StatusBadge'
 
@@ -9,10 +9,12 @@ interface Props {
   showAddress?: boolean
   // Grobplanung (Vorplanung) anzeigen
   showWeek?: boolean
+  // Vorplanung: kalkulierte Montagezeit in Stunden statt Manntagen
+  hoursPerManDay?: number
 }
 
 // Ein Einsatz im Kalender. Planer können ihn per Ziehen auf einen anderen Tag/Monteur verschieben.
-export function JobCard({ ticket: t, draggable, showAddress, showWeek }: Props) {
+export function JobCard({ ticket: t, draggable, showAddress, showWeek, hoursPerManDay }: Props) {
   const done = t.status === 'abgeschlossen'
   return (
     <Link
@@ -45,7 +47,10 @@ export function JobCard({ ticket: t, draggable, showAddress, showWeek }: Props) 
       {t.customer_name && <div className="job-sub">{t.customer_name}</div>}
       {!!manDays(t.calc_men, t.calc_days) && (
         <div className="job-sub">
-          {t.calc_men} Mann × {Number(t.calc_days).toLocaleString('de-DE')} Tage = {formatManDays(manDays(t.calc_men, Number(t.calc_days))!)}
+          {t.calc_men} Mann × {Number(t.calc_days).toLocaleString('de-DE')} Tage ={' '}
+          {hoursPerManDay
+            ? formatHours(manDays(t.calc_men, Number(t.calc_days))! * hoursPerManDay)
+            : formatManDays(manDays(t.calc_men, Number(t.calc_days))!)}
         </div>
       )}
       {!!t.ticket_positions?.[0]?.count && <div className="job-sub">{t.ticket_positions[0].count} Pos.</div>}
