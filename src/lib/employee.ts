@@ -1,7 +1,7 @@
 // Personal nach dem Vorbild der Ninox-Mitarbeiterdatenbank (Fabian, 2026-10-26):
 // gleiche Reiter, Abschnitte, Felder und Untertabellen. Der einmalige Ninox-Import ist abgeschlossen.
 
-export type FieldType = 'text' | 'number' | 'money' | 'date' | 'datetime' | 'choice' | 'yesno' | 'status' | 'textarea' | 'file'
+export type FieldType = 'text' | 'number' | 'money' | 'date' | 'datetime' | 'choice' | 'yesno' | 'check' | 'status' | 'textarea' | 'file'
 
 export interface Field {
   key: string
@@ -62,6 +62,10 @@ export const MAIN_FIELDS: Field[] = [
   { key: 'vl_payment', label: 'VL Zahlung?', type: 'yesno' },
   { key: 'residence_title', label: 'Aufenthaltstitel', type: 'choice', options: [] },
   { key: 'residence_valid_until', label: 'Aufenthaltstitel gültig bis:', type: 'date' },
+  // Arbeitserlaubnis im Ausland zum Anhaken (Fabian, 2026-10-29)
+  { key: 'work_permit_lu', label: 'Arbeitserlaubnis in Luxemburg', type: 'check' },
+  { key: 'work_permit_be', label: 'Arbeitserlaubnis in Belgien', type: 'check' },
+  { key: 'work_permit_nl', label: 'Arbeitserlaubnis in Holland', type: 'check' },
   // Abrechnungsrelevante Angaben (Fabian, 2026-10-27)
   { key: 'birth_name', label: 'Geburtsname', type: 'text' },
   { key: 'birth_place', label: 'Geburtsort', type: 'text' },
@@ -258,7 +262,7 @@ export const TABS: Tab[] = [
       { title: 'Lohnabrechnung', fields: pick('tax_id', 'church_tax', 'child_allowance', 'social_security_no', 'health_insurance', 'insurance_type', 'disability') },
       { title: 'Bankverbindung', fields: pick('iban', 'bic', 'account_holder') },
       { title: 'Vermögenswirksame Leistungen (VL)', fields: pick('vl_payment') },
-      { title: 'Arbeits- und Aufenthaltsgenehmigungen', fields: pick('residence_title', 'residence_valid_until'), tables: ['a1'] },
+      { title: 'Arbeits- und Aufenthaltsgenehmigungen', fields: pick('residence_title', 'residence_valid_until', 'work_permit_lu', 'work_permit_be', 'work_permit_nl'), tables: ['a1'] },
     ],
   },
   {
@@ -417,7 +421,7 @@ export function show(f: Field, v: unknown): string {
   }
   if (f.type === 'money') return Number.isFinite(Number(v)) ? euro(Number(v)) : String(v)
   if (f.type === 'number') return Number.isFinite(Number(v)) ? Number(v).toLocaleString('de-DE') + (f.unit ? ' ' + f.unit : '') : String(v)
-  if (f.type === 'yesno') return v ? 'Ja' : 'Nein'
+  if (f.type === 'yesno' || f.type === 'check') return v ? 'Ja' : 'Nein'
   return String(v)
 }
 
