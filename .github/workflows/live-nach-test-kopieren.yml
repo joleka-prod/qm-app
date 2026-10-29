@@ -1,0 +1,87 @@
+# Kopiert die Daten des Livesystems ins Testsystem (nur von Hand gestartet).
+#   erstmalig: Rollen, Struktur, Migrationsliste und alle Daten in das LEERE Testprojekt
+#   daten:     Testdaten löschen und Daten (Tabellen + Benutzer) neu aus Live holen; die Struktur
+#              im Test bleibt, wie sie ist (sie wird über den Branch "test" gepflegt)
+# Fotos und Dateien (Storage) werden nicht kopiert.
+# Benötigte GitHub-Secrets: LIVE_DB_URL, TEST_DB_URL
+name: Live nach Test kopieren
+
+on:
+  workflow_dispatch:
+    inputs:
+      modus:
+        description: 'erstmalig oder daten'
+        required: true
+        default: daten
+        type: choice
+        options: [daten, erstmalig]
+      bestaetigung:
+        description: 'Alle Daten im TESTsystem werden ersetzt. Zum Bestätigen JA eingeben.'
+        required: true
+
+jobs:
+  kopieren:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.bestaetigung == 'JA'
+    env:
+      LIVE_DB_URL: ${{ secrets.LIVE_DB_URL }}
+      TEST_DB_URL: ${{ secrets.TEST_DB_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Sicherheitsprüfung
+        run: |
+          case "$TEST_DB_URL" in
+            *zcsinntrwaqmidyenuee*) echo "::error::TEST_DB_URL zeigt auf das Livesystem!"; exit 1 ;;
+          esac
+          case "$TEST_DB_URL" in
+            *lxpvlybhkmmaeqfnimps*) ;;
+            *) echo "::error::TEST_DB_URL zeigt nicht auf das Testprojekt lxpvlybhkmmaeqfnimps."; exit 1 ;;
+          esac
+
+      - name: Erstmalig - Struktur und Daten kopieren
+        if: github.event.inputs.modus == 'erstmalig'
+        run: |
+          supabase db dump --db-url "$LIVE_DB_URL" -f roles.sql --role-only
+          supabase db dump --db-url "$LIVE_DB_URL" -f schema.sql
+          supabase db dump --db-url "$LIVE_DB_URL" -f data.sql --use-copy --data-only
+          supabase db dump --db-url "$LIVE_DB_URL" -f history_schema.sql --schema supabase_migrations
+          supabase db dump --db-url "$LIVE_DB_URL" -f history_data.sql --use-copy --data-only --schema supabase_migrations
+          psql --single-transaction --variable ON_ERROR_STOP=1 \
+            --file roles.sql --file schema.sql \
+            --command 'SET session_replication_role = replica' \
+            --file data.sql \
+            --dbname "$TEST_DB_URL"
+          psql --single-transaction --variable ON_ERROR_STOP=1 \
+            --file history_schema.sql --file history_data.sql \
+            --dbname "$TEST_DB_URL"
+
+      - name: Daten auffrischen
+        if: github.event.inputs.modus == 'daten'
+        run: |
+          supabase db dump --db-url "$LIVE_DB_URL" -f data.sql --use-copy --data-only --schema public,auth
+          cat > leeren.sql <<'SQL'
+          do $$
+          declare t text;
+          begin
+            select string_agg(format('%I.%I', schemaname, tablename), ', ') into t
+              from pg_tables
+             where schemaname = 'public'
+                or (schemaname = 'auth' and tablename <> 'schema_migrations');
+            if t is not null then
+              execute 'truncate ' || t || ' cascade';
+            end if;
+          end $$;
+          SQL
+          psql --single-transaction --variable ON_ERROR_STOP=1 \
+            --file leeren.sql \
+            --command 'SET session_replication_role = replica' \
+            --file data.sql \
+            --dbname "$TEST_DB_URL"
+
+      - name: Aufräumen
+        if: always()
+        run: rm -f *.sql

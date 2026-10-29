@@ -94,6 +94,19 @@ Adresse und verweigert den Versand ganz, wenn es fehlt.
 Der frühere Cloudflare Worker unter `qm-app.fabian-rieder.workers.dev` leitet nur noch auf die neue Adresse weiter
 (`wrangler.jsonc`, `worker/umleitung.js`) und meldet den alten Service Worker auf den Geräten ab.
 
+### 5. Datenbank-Änderungen und Testsystem (GitHub Actions)
+
+- **Supabase einspielen** (`.github/workflows/supabase-deploy.yml`): Bei jedem Push auf `test` bzw. `main`, der
+  `supabase/` ändert, werden neue Migrationen per `supabase db push` und alle Edge Functions ins Test- bzw.
+  Livesystem eingespielt. Bricht ab, solange die Datenbank keine Migrationsliste hat.
+- **Live: Migrationen als gelaufen markieren**: einmalig von Hand, trägt die bisher per Hand ausgeführten
+  Migrationen im Livesystem ein.
+- **Live nach Test kopieren**: von Hand; `erstmalig` in das leere Testprojekt, danach `daten` zum Auffrischen.
+  Fotos werden nicht kopiert.
+
+GitHub-Secrets: `SUPABASE_ACCESS_TOKEN`, `LIVE_DB_URL`, `TEST_DB_URL` (jeweils die „Session pooler“-Adresse aus
+Supabase → Connect, Passwort eingesetzt).
+
 ## Lokale Entwicklung
 
 ```bash
