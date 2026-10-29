@@ -48,13 +48,17 @@ jobs:
           # Ohne roles.sql: Die App legt keine eigenen Rollen an, und die Einstellungen der
           # Standardrollen (z. B. log_min_messages) darf im neuen Projekt nur Supabase setzen.
           supabase db dump --db-url "$LIVE_DB_URL" -f schema.sql
-          supabase db dump --db-url "$LIVE_DB_URL" -f data.sql --use-copy --data-only
+          # Daten nur aus public und auth; aus Storage nur die Bucket-Einträge (ohne Dateien).
+          # Weitere Supabase-Schemas (z. B. storage.buckets_vectors) darf postgres nicht beschreiben.
+          supabase db dump --db-url "$LIVE_DB_URL" -f data.sql --use-copy --data-only --schema public,auth
+          psql "$LIVE_DB_URL" --variable ON_ERROR_STOP=1 --command "\copy (select id, name, public, file_size_limit, allowed_mime_types from storage.buckets) to 'buckets.csv' csv"
           supabase db dump --db-url "$LIVE_DB_URL" -f history_schema.sql --schema supabase_migrations
           supabase db dump --db-url "$LIVE_DB_URL" -f history_data.sql --use-copy --data-only --schema supabase_migrations
           psql --single-transaction --variable ON_ERROR_STOP=1 \
             --file schema.sql \
             --command 'SET session_replication_role = replica' \
             --file data.sql \
+            --command "\copy storage.buckets (id, name, public, file_size_limit, allowed_mime_types) from 'buckets.csv' csv" \
             --dbname "$TEST_DB_URL"
           psql --single-transaction --variable ON_ERROR_STOP=1 \
             --file history_schema.sql --file history_data.sql \
@@ -85,4 +89,4 @@ jobs:
 
       - name: Aufräumen
         if: always()
-        run: rm -f *.sql
+        run: rm -f *.sql *.csv
