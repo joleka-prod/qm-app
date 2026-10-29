@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { formatManDays, formatTime, manDays, projectPlace, ticketNo, weekLabel, type Ticket } from '../lib/types'
+import { HOURS_PER_MAN_DAY, formatHours, formatTime, manDays, projectPlace, ticketNo, weekLabel, type Ticket } from '../lib/types'
 import { jobAddress } from './AddressFields'
 import { AreaBadge, TypeBadge } from './StatusBadge'
 
@@ -45,7 +45,7 @@ export function JobCard({ ticket: t, draggable, showAddress, showWeek }: Props) 
       {t.customer_name && <div className="job-sub">{t.customer_name}</div>}
       {!!manDays(t.calc_men, t.calc_days) && (
         <div className="job-sub">
-          {t.calc_men} Mann × {Number(t.calc_days).toLocaleString('de-DE')} Tage = {formatManDays(manDays(t.calc_men, Number(t.calc_days))!)}
+          {t.calc_men} Mann × {Number(t.calc_days).toLocaleString('de-DE')} Tage = {formatHours(manDays(t.calc_men, Number(t.calc_days))! * HOURS_PER_MAN_DAY)}
         </div>
       )}
       {!!t.ticket_positions?.[0]?.count && <div className="job-sub">{t.ticket_positions[0].count} Pos.</div>}

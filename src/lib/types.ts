@@ -313,6 +313,15 @@ export function formatManDays(n: number) {
   return `${n.toLocaleString('de-DE', { maximumFractionDigits: 1 })} ${n === 1 ? 'Manntag' : 'Manntage'}`
 }
 
+// Vorplanung rechnet in Stunden: ein Manntag = 9 Stunden (Fabian, 2026-10-29)
+export const HOURS_PER_MAN_DAY = 9
+// Referenzwert der Montage-Kapazität je Kalenderwoche (Fabian, 2026-10-29)
+export const REFERENCE_HOURS_PER_WEEK = 720
+
+export function formatHours(n: number) {
+  return `${n.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Std.`
+}
+
 export function weekLabel(iso: string) {
   return `KW ${weekNumber(new Date(iso + 'T00:00'))}`
 }
