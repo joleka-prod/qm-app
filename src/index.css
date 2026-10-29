@@ -707,6 +707,8 @@ button.link.danger-link { color: var(--danger); }
 .import-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .import-table th, .import-table td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
 .import-table th.num, .import-table td.num { text-align: right; }
+.column-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 0.4rem 1rem; }
+.column-picker .checkbox { min-height: 32px; }
 .import-table tr.import-error td { color: var(--danger); }
 .import-table tr.clickable { cursor: pointer; }
 .import-table tr.clickable:hover td { background: var(--info-bg); }
@@ -757,3 +759,6 @@ button.link.danger-link { color: var(--danger); }
   .position-price input, .position-price label:last-of-type input { width: 100%; }
   .position-price .position-amount { flex-basis: 100%; text-align: right; padding-bottom: 0; }
 }
+.column-group h3 { margin: 0.8rem 0 0.3rem; font-size: 0.9rem; }
+.import-table .column-filters th { padding-top: 0; font-weight: 400; }
+.import-table .column-filters input, .import-table .column-filters select { min-width: 6rem; width: 100%; padding: 0.25rem 0.4rem; font-size: 0.85rem; min-height: 0; }
