@@ -175,7 +175,7 @@ function savedColumns(userId?: string): string[] {
 // Zelle im Bearbeiten-Modus (Fabian, 2026-10-29): speichert beim Verlassen des Feldes bzw. bei Auswahl
 // direkt in der Personalakte. Esc verwirft die Eingabe.
 function EditCell({ e, field, options, onSaved }: { e: Employee; field: Field; options?: string[]; onSaved: (value: unknown) => void }) {
-  const initial = field.type === 'yesno' ? (e[field.key] ? 'ja' : 'nein') : toInput(field, e[field.key])
+  const initial = field.type === 'yesno' || field.type === 'check' ? (e[field.key] ? 'ja' : 'nein') : toInput(field, e[field.key])
   const [v, setV] = useState(initial)
   const [state, setState] = useState<'' | 'busy' | 'ok' | 'error'>('')
   const [msg, setMsg] = useState('')
@@ -183,7 +183,7 @@ function EditCell({ e, field, options, onSaved }: { e: Employee; field: Field; o
   async function save(next: string) {
     if (next === initial) return
     let value: unknown
-    if (field.type === 'yesno') value = next === 'ja'
+    if (field.type === 'yesno' || field.type === 'check') value = next === 'ja'
     else {
       value = parse(field, next)
       if ((field.type === 'number' || field.type === 'money') && typeof value === 'string') {
@@ -210,12 +210,12 @@ function EditCell({ e, field, options, onSaved }: { e: Employee; field: Field; o
     'aria-label': field.label,
     disabled: state === 'busy',
   }
-  if (field.type === 'status' || field.type === 'yesno' || (field.type === 'choice' && options)) {
-    const opts = field.type === 'status' ? [...STATUS] : field.type === 'yesno' ? ['ja', 'nein'] : options!
+  if (field.type === 'status' || field.type === 'yesno' || field.type === 'check' || (field.type === 'choice' && options)) {
+    const opts = field.type === 'status' ? [...STATUS] : field.type === 'yesno' || field.type === 'check' ? ['ja', 'nein'] : options!
     const all = v && !opts.includes(v) ? [v, ...opts] : opts
     return (
       <select {...common} value={v} onChange={(ev) => { setV(ev.target.value); void save(ev.target.value) }}>
-        {field.type !== 'status' && field.type !== 'yesno' && <option value="">–</option>}
+        {field.type !== 'status' && field.type !== 'yesno' && field.type !== 'check' && <option value="">–</option>}
         {all.map((o) => <option key={o} value={o}>{o}</option>)}
       </select>
     )
