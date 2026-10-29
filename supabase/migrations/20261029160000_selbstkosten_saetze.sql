@@ -1,5 +1,5 @@
 -- Neue Selbstkostensätze (Fabian, 2026-10-29): 0,39 € je Kilometer, 42,00 € je Stunde.
--- Gilt für jede neue Berechnung (auch "Neu berechnen"); bereits gespeicherte Ergebnisse bleiben unverändert.
+-- Gilt für jede neue Berechnung; bereits gespeicherte Ergebnisse werden einmalig umgerechnet (Fabian, 2026-10-29).
 
 create or replace function public.calc_self_cost(p_ticket_id bigint)
 returns public.ticket_costs
@@ -59,3 +59,12 @@ $$;
 
 revoke execute on function public.calc_self_cost(bigint) from public, anon;
 grant execute on function public.calc_self_cost(bigint) to authenticated;
+
+-- Gespeicherte Ergebnisse mit den neuen Sätzen umrechnen (km, Arbeitszeit und Positionen bleiben wie berechnet)
+update public.ticket_costs set
+  km_rate = 0.39,
+  km_cost = round(km * 0.39, 2),
+  hour_rate = 42.00,
+  work_cost = round(work_minutes / 60.0 * 42.00, 2),
+  total = round(km * 0.39, 2) + round(work_minutes / 60.0 * 42.00, 2) + positions_cost
+where km_rate <> 0.39 or hour_rate <> 42.00;
