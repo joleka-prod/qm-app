@@ -1,5 +1,6 @@
 # Kopiert die Daten des Livesystems ins Testsystem (nur von Hand gestartet).
 #   erstmalig: Rollen, Struktur, Migrationsliste und alle Daten in das LEERE Testprojekt
+#              (nur Schema public: Regeln auf storage.objects legt Migration 20261029190000 an)
 #   daten:     Testdaten löschen und Daten (Tabellen + Benutzer) neu aus Live holen; die Struktur
 #              im Test bleibt, wie sie ist (sie wird über den Branch "test" gepflegt)
 # Fotos und Dateien (Storage) werden nicht kopiert.
