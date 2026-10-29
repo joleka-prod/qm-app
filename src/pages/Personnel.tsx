@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
-import { MAIN_FIELDS, STATUS, employeeName, isExternal, isManagingDirector, missingPayroll, norm, show, type Employee } from '../lib/employee'
+import { MAIN_FIELDS, STATUS, TABS, employeeName, isExternal, isManagingDirector, missingPayroll, norm, show, type Employee } from '../lib/employee'
 import { supabase } from '../lib/supabase'
 import { ROLE_LABEL, displayName, type Profile } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
@@ -96,8 +96,19 @@ function ignored(): string[] {
 }
 
 // Spalten der Personaltabelle frei wählbar (Fabian, 2026-10-29); Auswahl je Benutzer im Browser gespeichert.
-// Name ist immer sichtbar; Auswahl und Tabelle alphabetisch (Fabian, 2026-10-29), nur Nr. steht vorn.
-type Column = { key: string; label: string; num?: boolean; value: (e: Employee, byId: Record<string, Profile>) => string }
+// Name ist immer sichtbar. Auswahl gegliedert wie die Personalakte (Reiter Stammdaten mit seinen Abschnitten,
+// Reiter App-Benutzer), innerhalb alphabetisch, nur Nr. steht vorn (Fabian, 2026-10-29).
+type Column = { key: string; label: string; group?: string; num?: boolean; value: (e: Employee, byId: Record<string, Profile>) => string }
+
+const APP_USER = 'App-Benutzer'
+// Abschnitt der Personalakte je Feld; Abschnitte ohne Überschrift heißen "Allgemein"
+const SECTION_OF = new Map<string, string>()
+for (const sec of TABS[0].sections) {
+  const title = sec.title ?? 'Allgemein'
+  for (const f of sec.fields ?? []) SECTION_OF.set(f.key, title)
+  for (const c of sec.computed ?? []) SECTION_OF.set(c === 'age' ? 'age' : 'seniority', title)
+}
+const GROUPS = [...new Set([...TABS[0].sections.map((sec) => sec.title ?? 'Allgemein'), APP_USER])]
 
 const yearsSince = (d: unknown) =>
   d ? Math.floor((Date.now() - new Date(String(d).slice(0, 10) + 'T00:00').getTime()) / (365.2425 * 864e5)) : null
@@ -115,6 +126,7 @@ const FIELD_COLUMNS: Column[] = MAIN_FIELDS
 const userColumn = (key: string, label: string, value: (p: Profile, byId: Record<string, Profile>) => string): Column => ({
   key,
   label,
+  group: APP_USER,
   value: (e, byId) => (e.user_id && byId[e.user_id] ? value(byId[e.user_id], byId) : '–'),
 })
 
@@ -123,6 +135,7 @@ const COLUMNS = ([
   {
     key: 'app_user',
     label: 'App-Benutzer',
+    group: APP_USER,
     value: (e, byId) => (e.user_id ? (byId[e.user_id] ? `${displayName(byId[e.user_id])} (${byId[e.user_id].email})` : 'ja') : '–'),
   },
   userColumn('role', 'Rolle', (p) => ROLE_LABEL[p.role] ?? p.role),
@@ -131,8 +144,15 @@ const COLUMNS = ([
   { key: 'age', label: 'Alter', num: true, value: (e) => { const y = yearsSince(e.birth_date); return y === null ? '–' : `${y} Jahre` } },
   { key: 'seniority', label: 'Betriebszugehörigkeit', num: true, value: (e) => { const y = yearsSince(e.entry_date); return y === null ? '–' : `${y} Jahre` } },
 ] as Column[])
-  .map((c) => (c.key === 'personnel_number' ? { ...c, label: 'Nr.' } : c))
-  .sort((a, b) => (a.key === 'personnel_number' ? -1 : b.key === 'personnel_number' ? 1 : a.label.localeCompare(b.label, 'de')))
+  .map((c) => ({ ...c, group: c.group ?? SECTION_OF.get(c.key) ?? 'Allgemein', ...(c.key === 'personnel_number' ? { label: 'Nr.' } : {}) }))
+  .sort((a, b) =>
+    GROUPS.indexOf(a.group!) - GROUPS.indexOf(b.group!) ||
+    (a.key === 'personnel_number' ? -1 : b.key === 'personnel_number' ? 1 : a.label.localeCompare(b.label, 'de')))
+const nameOf = (e: Employee) => (e.last_name || e.first_name ? `${e.last_name}, ${e.first_name}` : employeeName(e))
+const NAME_COLUMN: Column = { key: 'name', label: 'Name', value: nameOf }
+// Spalten mit wenigen verschiedenen Werten bekommen im Kopf eine Auswahl, alle anderen ein Suchfeld
+const MAX_CHOICES = 15
+
 const DEFAULT_COLUMNS = ['personnel_number', 'status', 'department', 'entry_date', 'app_user']
 
 const columnsKey = (userId?: string) => `personal-spalten:${userId ?? ''}`
@@ -256,7 +276,13 @@ function EmployeeList() {
 
   const [colKeys, setColKeys] = useState<string[]>(() => savedColumns(profile?.id))
   const [pickCols, setPickCols] = useState(false)
-  const cols = COLUMNS.filter((c) => colKeys.includes(c.key))
+  const cols = useMemo(() => COLUMNS.filter((c) => colKeys.includes(c.key)), [colKeys])
+  const tableCols = useMemo(
+    () => [...cols.filter((c) => c.key === 'personnel_number'), NAME_COLUMN, ...cols.filter((c) => c.key !== 'personnel_number')],
+    [cols],
+  )
+  // Filter im Spaltenkopf (Fabian, 2026-10-29); gelten nur für sichtbare Spalten
+  const [colFilter, setColFilter] = useState<Record<string, string>>({})
 
   function chooseColumns(next: string[]) {
     setColKeys(next)
@@ -324,13 +350,31 @@ function EmployeeList() {
     }
   }
 
+  const byStatus = useMemo(() => list.filter((e) => !status || e.status === status), [list, status])
+
+  const choices = useMemo(() => {
+    const m = new Map<string, string[]>()
+    for (const c of tableCols) {
+      const vals = [...new Set(byStatus.map((e) => c.value(e, byId)))]
+      if (c.key !== 'name' && vals.length <= MAX_CHOICES) m.set(c.key, vals.sort((a, b) => a.localeCompare(b, 'de', { numeric: true })))
+    }
+    return m
+  }, [tableCols, byStatus, byId])
+
+  const activeFilters = useMemo(() => tableCols.filter((c) => colFilter[c.key]), [tableCols, colFilter])
+
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    return list
-      .filter((e) => !status || e.status === status)
+    return byStatus
       .filter((e) => !needle || [employeeName(e), e.personnel_number, e.department].some((s) => String(s ?? '').toLowerCase().includes(needle)))
+      .filter((e) =>
+        activeFilters.every((c) => {
+          const v = c.value(e, byId)
+          return choices.has(c.key) ? v === colFilter[c.key] : v.toLowerCase().includes(colFilter[c.key].trim().toLowerCase())
+        }),
+      )
       .sort((a, b) => String(a.last_name).localeCompare(String(b.last_name), 'de') || String(a.first_name).localeCompare(String(b.first_name), 'de'))
-  }, [list, q, status])
+  }, [byStatus, q, activeFilters, choices, colFilter, byId])
 
   async function create() {
     const { data, error } = await supabase.from('employees').insert({ status: 'Aktiv' }).select('id').single()
@@ -424,19 +468,24 @@ function EmployeeList() {
             </div>
           </div>
           <p className="muted small">Der Name wird immer angezeigt. Deine Auswahl bleibt in diesem Browser gespeichert.</p>
-          <div className="column-picker">
-            <label className="checkbox"><input type="checkbox" checked disabled /> Name</label>
-            {COLUMNS.map((c) => (
-              <label key={c.key} className="checkbox">
-                <input
-                  type="checkbox"
-                  checked={colKeys.includes(c.key)}
-                  onChange={(ev) => chooseColumns(ev.target.checked ? [...colKeys, c.key] : colKeys.filter((k) => k !== c.key))}
-                />
-                {c.label}
-              </label>
-            ))}
-          </div>
+          {GROUPS.map((g) => (
+            <div key={g} className="column-group">
+              <h3>{g}</h3>
+              <div className="column-picker">
+                {g === 'Allgemein' && <label className="checkbox"><input type="checkbox" checked disabled /> Name</label>}
+                {COLUMNS.filter((c) => c.group === g).map((c) => (
+                  <label key={c.key} className="checkbox">
+                    <input
+                      type="checkbox"
+                      checked={colKeys.includes(c.key)}
+                      onChange={(ev) => chooseColumns(ev.target.checked ? [...colKeys, c.key] : colKeys.filter((k) => k !== c.key))}
+                    />
+                    {c.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
         </section>
       )}
       <section className="card">
@@ -444,23 +493,47 @@ function EmployeeList() {
           <table className="import-table">
             <thead>
               <tr>
-                {cols[0]?.key === 'personnel_number' && <th>{cols[0].label}</th>}
-                <th>Name</th>
-                {cols.filter((c) => c.key !== 'personnel_number').map((c) => <th key={c.key} className={c.num ? 'num' : ''}>{c.label}</th>)}
+                {tableCols.map((c) => <th key={c.key} className={c.num ? 'num' : ''}>{c.label}</th>)}
+              </tr>
+              <tr className="column-filters">
+                {tableCols.map((c) => {
+                  const set = (v: string) => setColFilter({ ...colFilter, [c.key]: v })
+                  const opts = choices.get(c.key)
+                  return (
+                    <th key={c.key}>
+                      {opts ? (
+                        <select value={colFilter[c.key] ?? ''} onChange={(ev) => set(ev.target.value)} aria-label={`Filter ${c.label}`}>
+                          <option value="">Alle</option>
+                          {opts.map((o) => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                      ) : (
+                        <input type="search" value={colFilter[c.key] ?? ''} onChange={(ev) => set(ev.target.value)} placeholder="Filter…" aria-label={`Filter ${c.label}`} />
+                      )}
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
               {shown.map((e) => (
                 <tr key={e.id} className={e.status === 'Aktiv' ? '' : 'muted'}>
-                  {cols[0]?.key === 'personnel_number' && <td>{cols[0].value(e, byId)}</td>}
-                  <td><Link to={`/personal/${e.id}`}>{e.last_name || e.first_name ? `${e.last_name}, ${e.first_name}` : employeeName(e)}</Link></td>
-                  {cols.filter((c) => c.key !== 'personnel_number').map((c) => <td key={c.key} className={c.num ? 'num' : ''}>{c.value(e, byId)}</td>)}
+                  {tableCols.map((c) =>
+                    c.key === 'name'
+                      ? <td key={c.key}><Link to={`/personal/${e.id}`}>{nameOf(e)}</Link></td>
+                      : <td key={c.key} className={c.num ? 'num' : ''}>{c.value(e, byId)}</td>,
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         {shown.length === 0 && <p className="muted">Keine Einträge.</p>}
+        {activeFilters.length > 0 && (
+          <p className="muted small">
+            {shown.length} von {byStatus.length} Einträgen, gefiltert nach {activeFilters.map((c) => c.label).join(', ')}.{' '}
+            <button type="button" className="link" onClick={() => setColFilter({})}>Filter zurücksetzen</button>
+          </p>
+        )}
       </section>
     </div>
   )
