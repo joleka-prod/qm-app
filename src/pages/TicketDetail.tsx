@@ -103,6 +103,8 @@ export function TicketDetail() {
   const [events, setEvents] = useState<TicketEvent[]>([])
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState('')
+  // Fehler beim Speichern der Planung stehen direkt über dem Block Einsatzplanung (Fabian 2026-10-29)
+  const [planError, setPlanError] = useState('')
   const [busy, setBusy] = useState(false)
 
   const [cause, setCause] = useState('')
@@ -241,11 +243,12 @@ export function TicketDetail() {
   const canReport = einsatz && !closed && (isInstaller || isAdmin)
   const dirty = cause !== ticket.cause || action !== ticket.corrective_action
 
-  async function update(patch: Partial<Ticket>) {
+  async function update(patch: Partial<Ticket>, showError = setError) {
     setBusy(true)
     setError('')
+    setPlanError('')
     const { error } = await supabase.from('tickets').update(patch).eq('id', ticketId)
-    if (error) setError(error.message)
+    if (error) showError(error.message)
     await load()
     setBusy(false)
     return !error
@@ -782,6 +785,8 @@ export function TicketDetail() {
         )}
       </section>
 
+      {einsatz && profile.role !== 'monteur' && planError && <p className="error">{planError}</p>}
+
       {einsatz && profile.role !== 'monteur' && (
         <section className="card">
           <h2>Einsatzplanung</h2>
@@ -839,7 +844,7 @@ export function TicketDetail() {
                       // erst senden, wenn geändert (Spalte gibt es erst nach dem SQL-Update)
                       ...(plannedWeek !== (ticket.planned_week ?? '') ? { planned_week: plannedWeek || null } : {}),
                       ...(calcChanged ? calc : {}),
-                    })
+                    }, setPlanError)
                   }}
                 >
                   Planung speichern
