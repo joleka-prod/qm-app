@@ -34,7 +34,7 @@ type Form = Record<string, string | boolean>
 
 function formOf(e: Employee): Form {
   const f: Form = {}
-  for (const field of MAIN_FIELDS) f[field.key] = field.type === 'yesno' ? !!e[field.key] : toInput(field, e[field.key])
+  for (const field of MAIN_FIELDS) f[field.key] = field.type === 'yesno' || field.type === 'check' ? !!e[field.key] : toInput(field, e[field.key])
   return f
 }
 
@@ -311,7 +311,7 @@ export function PersonnelDetail() {
     const row: Record<string, unknown> = {}
     for (const f of MAIN_FIELDS) {
       const v = form[f.key]
-      if (f.type === 'yesno') row[f.key] = !!v
+      if (f.type === 'yesno' || f.type === 'check') row[f.key] = !!v
       else {
         const p = parse(f, String(v ?? ''))
         if ((f.type === 'number' || f.type === 'money') && typeof p === 'string') {
@@ -468,7 +468,12 @@ export function PersonnelDetail() {
             {s.title && <h3 className="emp-heading">{s.title}</h3>}
             {(s.fields?.length || s.computed?.length) ? (
               <div className="emp-grid">
-                {s.fields?.map((f) => (
+                {s.fields?.map((f) => f.type === 'check' ? (
+                  <label key={f.key} className="checkbox-row wide">
+                    <input type="checkbox" checked={!!form[f.key]} onChange={(e) => set(f.key, e.target.checked)} />
+                    {f.label}
+                  </label>
+                ) : (
                   <label key={f.key} className={f.wide ? 'wide' : f.type === 'status' ? 'wide' : ''}>
                     {f.label}
                     <Input field={f} value={form[f.key] ?? ''} options={f.type === 'choice' ? options[f.key] ?? f.options ?? [] : undefined} onChange={(v) => set(f.key, v)} />
