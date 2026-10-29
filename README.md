@@ -83,6 +83,14 @@ auf `qm-app-cq4.pages.dev`):
 
 Links wie `/ticket/12` funktionieren bei Pages automatisch (Single-Page-Weiterleitung).
 
+Die Verbindungsdaten stehen nur in den Pages-Einstellungen, nicht im Repository. Fehlen sie, zeigt die App einen
+Hinweis statt sich mit einem falschen Projekt zu verbinden.
+
+**Testsystem:** zweites Pages-Projekt `qm-app-test` (Branch `test`, Adresse 360-test.joleka.de) mit den Daten des
+Test-Supabase-Projekts und zusätzlich `VITE_APP_ENV=test`. Dann zeigt die App oben einen gelben Balken „TESTSYSTEM“.
+Im Test-Supabase-Projekt muss das Secret `TEST_MAIL_TO` gesetzt sein: `send-report` schickt Berichte dann nur an diese
+Adresse und verweigert den Versand ganz, wenn es fehlt.
+
 Der frühere Cloudflare Worker unter `qm-app.fabian-rieder.workers.dev` leitet nur noch auf die neue Adresse weiter
 (`wrangler.jsonc`, `worker/umleitung.js`) und meldet den alten Service Worker auf den Geräten ab.
 

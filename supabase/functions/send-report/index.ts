@@ -1,9 +1,13 @@
 // Schickt dem Kunden nach Abschluss eines Einsatzes den Servicebericht als PDF per E-Mail (über Resend).
 // Wird von der App nach "Erledigt melden" aufgerufen. Benötigte Secrets: RESEND_API_KEY, MAIL_FROM.
 // Optional: MAIL_REPLY_TO, COMPANY_NAME, LOGO_URL (Logo oben rechts, Standard: logo.jpg der App), RESEND_API_URL (nur für Tests).
+// Testsystem: TEST_MAIL_TO (Pflicht außerhalb des Live-Projekts) – alle Berichte gehen dann nur an diese Adresse.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'npm:pdf-lib@1.17.1'
 import { encodeBase64 } from 'jsr:@std/encoding@1/base64'
+
+// Supabase-Projekt des Livesystems (zcsinntrwaqmidyenuee.supabase.co)
+const LIVE_PROJECT_REF = 'zcsinntrwaqmidyenuee'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -312,14 +316,21 @@ Deno.serve(async (req) => {
 <p>Bei Fragen antworten Sie einfach auf diese E-Mail.</p>
 <p>Freundliche Grüße<br>${esc(company)}</p>`
 
+  // Außerhalb des Live-Projekts nie an Kunden schicken, sondern nur an die Testadresse
+  const testTo = Deno.env.get('TEST_MAIL_TO')
+  const isLive = (Deno.env.get('SUPABASE_URL') ?? '').includes(LIVE_PROJECT_REF)
+  if (!isLive && !testTo) return fail('Testsystem: Secret TEST_MAIL_TO fehlt, Bericht wurde nicht verschickt.')
+  const to = testTo ?? t.customer_email
+  const subject = `${testTo ? `[TEST, an ${t.customer_email}] ` : ''}Servicebericht ${no} – ${t.title}`
+
   const res = await fetch(Deno.env.get('RESEND_API_URL') ?? 'https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       from,
-      to: [t.customer_email],
+      to: [to],
       ...(Deno.env.get('MAIL_REPLY_TO') ? { reply_to: Deno.env.get('MAIL_REPLY_TO') } : {}),
-      subject: `Servicebericht ${no} – ${t.title}`,
+      subject,
       html,
       attachments: [{ filename: `Servicebericht-${no}.pdf`, content: encodeBase64(pdf) }],
     }),
