@@ -172,6 +172,19 @@ export function Terminal() {
     }
   }, [])
 
+  // Vollbild (ohne Adress- und Navigationsleiste): Browser erlauben das nur nach einer Berührung,
+  // daher bei jedem Antippen erneut anfordern, solange es nicht aktiv ist (Fabian, 2026-10-30)
+  const [fullscreen, setFullscreen] = useState(() => !!document.fullscreenElement)
+  useEffect(() => {
+    const change = () => setFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', change)
+    return () => document.removeEventListener('fullscreenchange', change)
+  }, [])
+  const enterFullscreen = useCallback(() => {
+    if (document.fullscreenElement || !document.documentElement.requestFullscreen) return
+    document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => undefined)
+  }, [])
+
   // Chip über NFC des Geräts
   const stopNfc = useRef<(() => void) | null>(null)
   const beginNfc = useCallback(async () => {
@@ -282,7 +295,7 @@ export function Terminal() {
   }
 
   return (
-    <div className="terminal" onClick={needsTap ? beginNfc : undefined}>
+    <div className="terminal" onPointerDown={enterFullscreen} onClick={needsTap ? beginNfc : undefined}>
       <header className="terminal-head">
         <span>{name || 'Stempel-Terminal'}</span>
         <span className={online ? '' : 'terminal-offline'}>{online ? '' : 'Offline'}</span>
@@ -344,6 +357,7 @@ export function Terminal() {
       )}
 
       <footer className="terminal-foot">
+        {!fullscreen && <span>Für Vollbild einmal auf den Bildschirm tippen</span>}
         {pending > 0 && <span>{pending} Stempelung{pending === 1 ? '' : 'en'} warten auf Übertragung</span>}
         {syncErrors.map((e, i) => (
           <span key={i} className="terminal-sync-error">Nicht übernommen: {e}</span>
