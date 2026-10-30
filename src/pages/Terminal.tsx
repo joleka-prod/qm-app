@@ -71,6 +71,9 @@ export function Terminal() {
       const unknown = r.message?.match(/^Unbekannter Chip \((.+)\)$/)
       if (unknown) show({ kind: 'fehler', title: 'Unbekannter Chip', sub: `Nummer ${formatBadge(unknown[1])} · bitte vom Admin zuordnen lassen` })
       else if (!r.ok) show({ kind: 'fehler', title: r.message ?? 'Fehler', sub: '' })
+      // gerade eben schon gestempelt: nichts gebucht, nicht als neues Kommen/Gehen anzeigen
+      else if (r.message === 'Bereits gestempelt')
+        show({ kind: 'gespeichert', title: r.name ?? '', sub: `Gerade schon gestempelt (${r.action === 'kommen' ? 'Kommen' : 'Gehen'} ${fmtTime(r.at)} Uhr)` })
       else
         show({
           kind: r.action === 'kommen' ? 'kommen' : 'gehen',
