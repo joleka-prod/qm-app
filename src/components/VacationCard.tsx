@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { loadMembers, useTeams, type TeamMember } from '../lib/teams'
 import { displayName, formatDate, formatDay, type Profile } from '../lib/types'
 
 export type VacationState = 'beantragt' | 'genehmigt' | 'abgelehnt' | 'storniert'
@@ -9,7 +10,7 @@ export const KIND_LABEL: Record<VacationKind, string> = { urlaub: 'Urlaubstage',
 
 // Arten, die Vorgesetzte und Admin direkt für Mitarbeiter eintragen (sofort genehmigt)
 const ENTER_KINDS: VacationKind[] = ['urlaub', 'ueberstunden', 'krank', 'sonderurlaub']
-const ENTER_LABEL: Record<VacationKind, string> = { urlaub: 'Urlaub', ueberstunden: 'Zeitausgleich', krank: 'Krank', sonderurlaub: 'Sonderurlaub' }
+export const ABSENCE_LABEL: Record<VacationKind, string> = { urlaub: 'Urlaub', ueberstunden: 'Zeitausgleich', krank: 'Krank', sonderurlaub: 'Sonderurlaub' }
 
 // Zusatz hinter dem Zeitraum (Urlaub ohne Zusatz)
 const KIND_NOTE: Record<VacationKind, string> = { urlaub: '', ueberstunden: 'über Überstunden', krank: 'Krankheit', sonderurlaub: 'Sonderurlaub' }
@@ -42,6 +43,14 @@ function period(r: VacationRequest) {
   return r.start_date === r.end_date ? formatDay(r.start_date) : `${formatDay(r.start_date)} – ${formatDay(r.end_date)}`
 }
 
+// Tage, an denen der Mitarbeiter schon in einem Team eingeplant ist, z. B. "Mo 03.11. (Montage 1)"
+function plannedText(list: TeamMember[], teamName: (id: number) => string) {
+  return [...list]
+    .sort((a, b) => a.day.localeCompare(b.day))
+    .map((m) => `${formatDay(m.day)} (${teamName(m.team_id)})`)
+    .join(', ')
+}
+
 const dayWord = (n: number) => `${n.toLocaleString('de-DE')} ${n === 1 ? 'Tag' : 'Tage'}`
 
 interface Props {
@@ -60,6 +69,12 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
   const [pending, setPending] = useState<VacationRequest[]>([])
   const [form, setForm] = useState<{ start: string; end: string; note: string; kind: VacationKind; half?: boolean } | null>(null)
   const [preview, setPreview] = useState<number | null>(null)
+  // Schon eingeplante Tage im gewählten Zeitraum (Hinweis, keine Sperre)
+  const [plannedInForm, setPlannedInForm] = useState<TeamMember[]>([])
+  // Schon eingeplante Tage der Anträge, die zu genehmigen sind
+  const [plannedPending, setPlannedPending] = useState<TeamMember[]>([])
+  const { teamById } = useTeams()
+  const teamName = (id: number) => teamById[id]?.name ?? 'Team'
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const isAdmin = me.role === 'admin'
@@ -77,8 +92,14 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
       // Offene Anträge anderer, die ich sehen darf (Mitarbeiter bzw. Admin)
       supabase.from('vacation_requests').select('*').eq('state', 'beantragt').neq('user_id', me.id).order('start_date'),
     ])
+    const openList = (open.data ?? []) as VacationRequest[]
     setList((mine.data ?? []) as VacationRequest[])
-    setPending((open.data ?? []) as VacationRequest[])
+    setPending(openList)
+    if (openList.length) {
+      const from = openList.reduce((a, r) => (r.start_date < a ? r.start_date : a), openList[0].start_date)
+      const to = openList.reduce((a, r) => (r.end_date > a ? r.end_date : a), openList[0].end_date)
+      setPlannedPending(await loadMembers(from, to))
+    } else setPlannedPending([])
   }, [userId, year, me.id])
 
   useEffect(() => {
@@ -91,6 +112,15 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
     if (!form?.start || !form.end || form.end < form.start) return
     supabase.rpc('vacation_workdays', { p_start: form.start, p_end: form.end }).then(({ data }) => setPreview(data as number))
   }, [form?.start, form?.end])
+
+  useEffect(() => {
+    setPlannedInForm([])
+    if (!form?.start || !form.end || form.end < form.start) return
+    loadMembers(form.start, form.end, userId).then(setPlannedInForm)
+  }, [form?.start, form?.end, userId])
+
+  const plannedFor = (r: VacationRequest) =>
+    plannedPending.filter((m) => m.installer_id === r.user_id && m.day >= r.start_date && m.day <= r.end_date)
 
   // Entscheiden darf der Admin oder ein Vorgesetzter (auch über mehrere Ebenen), nie über eigene Anträge
   const canDecide = (r: VacationRequest) => {
@@ -125,6 +155,11 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
   async function submit() {
     if (!form) return
     const days = form.half && preview === 1 ? 0.5 : preview
+    if (plannedInForm.length) {
+      const who = own ? 'Du bist' : `${displayName(byId[userId])} ist`
+      const msg = `${who} in diesem Zeitraum schon eingeplant: ${plannedText(plannedInForm, teamName)}.\n\nBitte mit der Einsatzplanung abstimmen. Trotzdem ${entering ? 'eintragen' : 'beantragen'}?`
+      if (!confirm(msg)) return
+    }
     if (form.kind === 'urlaub' && days != null && days > rest && !confirm(`${entering ? 'Der Eintrag' : 'Der Antrag'} (${dayWord(days)}) ist mehr als der Resturlaub (${dayWord(rest)}). Trotzdem ${entering ? 'eintragen' : 'beantragen'}?`)) return
     if (entering) {
       const ok = await run(() =>
@@ -163,6 +198,9 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
                     {KIND_NOTE[r.kind] && <> · {KIND_NOTE[r.kind]}</>}
                   </div>
                   {r.note && <div className="small muted">{r.note}</div>}
+                  {plannedFor(r).length > 0 && (
+                    <div className="small appointment-warn">⚠ Schon eingeplant: {plannedText(plannedFor(r), teamName)}</div>
+                  )}
                 </div>
                 <div className="vacation-actions">
                   <button className="primary" disabled={busy} onClick={() => decide(r, true)}>Genehmigen</button>
@@ -207,7 +245,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
                   className={form.kind === k ? 'active' : ''}
                   onClick={() => setForm({ ...form, kind: k, half: k === 'ueberstunden' ? false : form.half })}
                 >
-                  {entering ? ENTER_LABEL[k] : KIND_LABEL[k]}
+                  {entering ? ABSENCE_LABEL[k] : KIND_LABEL[k]}
                 </button>
               ))}
             </div>
@@ -235,11 +273,17 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
                 {entering
                   ? form.kind === 'ueberstunden'
                     ? `${dayWord(preview)} Zeitausgleich (${(preview * Number(byId[userId]?.weekly_hours ?? 40) / 5).toLocaleString('de-DE')} Std. vom Überstundenkonto)`
-                    : `${dayWord(form.half && preview === 1 ? 0.5 : preview)} ${ENTER_LABEL[form.kind]}`
+                    : `${dayWord(form.half && preview === 1 ? 0.5 : preview)} ${ABSENCE_LABEL[form.kind]}`
                   : form.kind === 'urlaub'
                   ? `${dayWord(preview)} Urlaub`
                   : `${dayWord(preview)} frei über Überstunden (${(preview * Number(byId[userId]?.weekly_hours ?? 40) / 5).toLocaleString('de-DE')} Std.)`}{' '}
                 (ohne Wochenenden und Feiertage in Rheinland-Pfalz)
+              </p>
+            )}
+            {plannedInForm.length > 0 && (
+              <p className="small appointment-warn">
+                ⚠ {own ? 'Du bist' : `${displayName(byId[userId])} ist`} in diesem Zeitraum schon eingeplant:{' '}
+                {plannedText(plannedInForm, teamName)}. Bitte mit der Einsatzplanung abstimmen.
               </p>
             )}
             {entering && (
