@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { formatBadge, nfcSupported, normalizeBadge, startNfc } from '../lib/nfc'
+import { formatBadge, nfcMode, normalizeBadge, startNfc } from '../lib/nfc'
 import {
   NetworkError,
   enqueue,
@@ -48,6 +48,7 @@ export function Terminal() {
   const [pending, setPending] = useState(queuedCount())
   const [syncErrors, setSyncErrors] = useState<string[]>([])
   const [needsTap, setNeedsTap] = useState(false)
+  const [nfcError, setNfcError] = useState('')
   const [shown, setShown] = useState<Shown | null>(null)
   const [mode, setMode] = useState<Mode>('start')
   const [people, setPeople] = useState<{ id: string; name: string }[]>([])
@@ -188,11 +189,13 @@ export function Terminal() {
   // Chip über NFC des Geräts
   const stopNfc = useRef<(() => void) | null>(null)
   const beginNfc = useCallback(async () => {
-    if (!nfcSupported || stopNfc.current) return
+    if (!nfcMode() || stopNfc.current) return
     try {
       stopNfc.current = await startNfc(clockBadge, () => show({ kind: 'fehler', title: 'Chip nicht lesbar', sub: 'Bitte noch einmal ruhig vorhalten.' }))
       setNeedsTap(false)
-    } catch {
+      setNfcError('')
+    } catch (err) {
+      setNfcError((err as Error).message || 'Start fehlgeschlagen')
       setNeedsTap(true)
     }
   }, [clockBadge, show])
@@ -358,6 +361,9 @@ export function Terminal() {
 
       <footer className="terminal-foot">
         {!fullscreen && <span>Für Vollbild einmal auf den Bildschirm tippen</span>}
+        <span className="terminal-version">
+          Version {__BUILD__} · NFC: {nfcMode() || 'nicht verfügbar'}{nfcError ? ` (${nfcError})` : ''}
+        </span>
         {pending > 0 && <span>{pending} Stempelung{pending === 1 ? '' : 'en'} warten auf Übertragung</span>}
         {syncErrors.map((e, i) => (
           <span key={i} className="terminal-sync-error">Nicht übernommen: {e}</span>
