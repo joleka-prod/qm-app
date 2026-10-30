@@ -16,6 +16,12 @@ import {
 
 type Shown = { kind: 'kommen' | 'gehen' | 'gespeichert' | 'fehler'; title: string; sub: string }
 
+const LOGOS = [
+  { name: 'JOLEKA', src: '/logo.jpg' },
+  { name: 'Ursprung', src: '/logo-ursprung.png' },
+  { name: 'Kalverkamp', src: '/logo-kalverkamp.png' },
+]
+
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
 
 function beep(ok: boolean) {
@@ -273,8 +279,16 @@ export function Terminal() {
           <div className="terminal-clock">{now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</div>
           <div className="terminal-date">{now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
           <p className="terminal-prompt">{needsTap ? 'Einmal auf den Bildschirm tippen, um das Lesen zu starten' : 'Chip vorhalten'}</p>
+          <p className="terminal-tag">#wirsindjoleka</p>
         </div>
       )}
+
+      {/* Unsere drei Unternehmen (Fabian, 2026-10-30) */}
+      <div className="terminal-logos">
+        {LOGOS.map((l) => (
+          <img key={l.src} src={l.src} alt={l.name} />
+        ))}
+      </div>
 
       <footer className="terminal-foot">
         {!fullscreen && <span>Für Vollbild einmal auf den Bildschirm tippen</span>}
