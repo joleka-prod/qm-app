@@ -20,6 +20,7 @@ import { Timesheet } from './pages/Timesheet'
 import { Windows } from './pages/Windows'
 import { NfcTest } from './pages/NfcTest'
 import { Terminal } from './pages/Terminal'
+import { terminalToken } from './lib/terminal'
 import { TimetacImport } from './pages/TimetacImport'
 import { Personnel } from './pages/Personnel'
 import { PersonnelDetail } from './pages/PersonnelDetail'
@@ -29,6 +30,11 @@ function Routed() {
 
   // Stempel-Terminal: eigenes Vollbild ohne Anmeldung (weist sich mit dem Geräteschlüssel aus)
   if (window.location.pathname === '/terminal') return <Terminal />
+  // als Terminal eingerichtetes Gerät startet die App (z. B. vom Startbildschirm, Start-URL /) immer im Terminal
+  if (window.location.pathname === '/' && terminalToken() && !loading && !session) {
+    window.history.replaceState(null, '', '/terminal')
+    return <Terminal />
+  }
   // NFC-Test ist ohne Anmeldung erreichbar (liest nur den Chip, keine Daten)
   if (window.location.pathname === '/nfc-test')
     return (
