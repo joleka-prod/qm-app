@@ -32,18 +32,21 @@ function duplicateGroups(list: Employee[]) {
 const num = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
 // Kennzahlen oben in der Übersicht (Fabian, 2026-10-27), nur aktive Mitarbeiter (ohne Externe):
-// Durchschnittsalter mit Geschäftsführung; Krankheitstage ohne Geschäftsführung als Mittel der
-// Jahresdurchschnitte je Mitarbeiter (wie im Reiter Fehlzeiten), damit kurze Zugehörigkeit nicht verzerrt.
+// Durchschnittsalter mit Geschäftsführung; Fehlzeitenquote nach Tagen ohne Geschäftsführung (Fabian, 2026-10-30):
+// Summe der Krankheitstage / Summe der möglichen Arbeitstage (vereinbarte Arbeitstage ohne Feiertage) × 100.
 function KeyFigures({ list }: { list: Employee[] }) {
-  type Sick = { avg_days: number; cur_days: number | null }
-  const [sick, setSick] = useState<Map<number, Sick> | null>(null)
-  const [sickError, setSickError] = useState('')
+  type Rate = { sick: number; possible: number; curSick: number | null; curPossible: number | null }
+  const [rates, setRates] = useState<Map<number, Rate> | null>(null)
+  const [rateError, setRateError] = useState('')
 
   useEffect(() => {
-    supabase.rpc('employees_sick_days_avg').then(({ data, error }) => {
-      if (error) setSickError(error.message.includes('employees_sick_days_avg') ? 'SQL-Update fehlt' : error.message)
-      const rows = (data ?? []) as ({ employee_id: number } & Sick)[]
-      setSick(new Map(rows.map((r) => [r.employee_id, { avg_days: Number(r.avg_days), cur_days: r.cur_days == null ? null : Number(r.cur_days) }])))
+    supabase.rpc('employees_absence_rate').then(({ data, error }) => {
+      if (error) setRateError(error.message.includes('employees_absence_rate') ? 'SQL-Update fehlt' : error.message)
+      const rows = (data ?? []) as { employee_id: number; sick_days: number; possible_days: number; cur_sick_days: number | null; cur_possible_days: number | null }[]
+      const n = (v: number | null) => (v == null ? null : Number(v))
+      setRates(new Map(rows.map((r) => [r.employee_id, {
+        sick: Number(r.sick_days), possible: Number(r.possible_days), curSick: n(r.cur_sick_days), curPossible: n(r.cur_possible_days),
+      }])))
     })
   }, [])
 
@@ -51,12 +54,17 @@ function KeyFigures({ list }: { list: Employee[] }) {
   const now = Date.now()
   const year = new Date().getFullYear()
   const ages = active.filter((e) => e.birth_date).map((e) => (now - new Date(String(e.birth_date) + 'T00:00').getTime()) / (365.2425 * 864e5))
-  const sickRows = active.filter((e) => !isManagingDirector(e) && sick?.has(e.id)).map((e) => sick!.get(e.id)!)
-  const sickAvgs = sickRows.map((r) => r.avg_days)
-  // laufendes Geschäftsjahr (= Kalenderjahr), Stand heute
-  const sickCur = sickRows.filter((r) => r.cur_days !== null).map((r) => r.cur_days!)
   const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length
-  const sickValue = (a: number[]) => (sickError ? '–' : sick === null ? '…' : a.length ? `${num(avg(a))} Tage` : '–')
+  const rateRows = active.filter((e) => !isManagingDirector(e) && rates?.has(e.id)).map((e) => rates!.get(e.id)!)
+  const all = rateRows.filter((r) => r.possible > 0).map((r) => ({ sick: r.sick, possible: r.possible }))
+  // laufendes Geschäftsjahr (= Kalenderjahr), Stand heute
+  const cur = rateRows.filter((r) => r.curPossible).map((r) => ({ sick: r.curSick ?? 0, possible: r.curPossible! }))
+  const sum = (a: { sick: number; possible: number }[], k: 'sick' | 'possible') => a.reduce((x, r) => x + r[k], 0)
+  const rateValue = (a: { sick: number; possible: number }[]) =>
+    rateError ? '–' : rates === null ? '…' : a.length ? `${num((sum(a, 'sick') / sum(a, 'possible')) * 100)} %` : '–'
+  const rateNote = (a: { sick: number; possible: number }[], what: string) =>
+    rateError ||
+    `${num(sum(a, 'sick'))} Krankheitstage von ${sum(a, 'possible').toLocaleString('de-DE')} möglichen Arbeitstagen ${what}, ${a.length} aktive Mitarbeiter mit Zeiterfassung, ohne Geschäftsführung`
 
   return (
     <div className="key-figures">
@@ -68,18 +76,14 @@ function KeyFigures({ list }: { list: Employee[] }) {
         </div>
       </section>
       <section className="card key-figure">
-        <div className="muted small">Ø Krankheitstage pro Jahr (historisch)</div>
-        <div className="key-figure-value">{sickValue(sickAvgs)}</div>
-        <div className="muted small">
-          {sickError || `je Mitarbeiter über alle Jahre, ${sickAvgs.length} aktive Mitarbeiter mit Zeiterfassung, ohne Geschäftsführung`}
-        </div>
+        <div className="muted small">Fehlzeitenquote (historisch)</div>
+        <div className="key-figure-value">{rateValue(all)}</div>
+        <div className="muted small">{rateNote(all, 'über alle Jahre')}</div>
       </section>
       <section className="card key-figure">
-        <div className="muted small">Ø Krankheitstage {year} (bis heute)</div>
-        <div className="key-figure-value">{sickValue(sickCur)}</div>
-        <div className="muted small">
-          {sickError || `je Mitarbeiter im laufenden Geschäftsjahr, ${sickCur.length} aktive Mitarbeiter mit Zeiterfassung, ohne Geschäftsführung`}
-        </div>
+        <div className="muted small">Fehlzeitenquote {year} (bis heute)</div>
+        <div className="key-figure-value">{rateValue(cur)}</div>
+        <div className="muted small">{rateNote(cur, 'im laufenden Geschäftsjahr')}</div>
       </section>
     </div>
   )
