@@ -56,14 +56,11 @@ export interface ClockResult {
 }
 
 export const terminalPing = (token: string) => rpc<string>('terminal_ping', { p_token: token })
-export const terminalPeople = (token: string) => rpc<{ id: string; name: string }[]>('terminal_people', { p_token: token })
 
-export async function terminalClock(token: string, args: { badge?: string; user?: string; pin?: string; at?: string }) {
+export async function terminalClock(token: string, args: { badge: string; at?: string }) {
   const rows = await rpc<ClockResult[]>('terminal_clock', {
     p_token: token,
-    p_badge: args.badge ?? null,
-    p_user: args.user ?? null,
-    p_pin: args.pin ?? null,
+    p_badge: args.badge,
     p_at: args.at ?? null,
   })
   return rows[0]

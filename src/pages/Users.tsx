@@ -21,10 +21,10 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
 
   const [busy, setBusy] = useState(false)
 
-  const [edit, setEdit] = useState<{ id: string; full_name: string; email: string; role: Role; active: boolean; supervisor_id: string; vacation_days: string; weekly_hours: string; overtime_start: string; overtime_opening: string; montage_capacity: boolean; hr_access: boolean; badge: string; pin: string; removePin: boolean } | null>(null)
+  const [edit, setEdit] = useState<{ id: string; full_name: string; email: string; role: Role; active: boolean; supervisor_id: string; vacation_days: string; weekly_hours: string; overtime_start: string; overtime_opening: string; montage_capacity: boolean; hr_access: boolean; badge: string } | null>(null)
 
-  // Stempel-Terminal: Chip und PIN je Benutzer (nur Admin, ohne SQL-Update leer)
-  const [creds, setCreds] = useState<Record<string, { badge_uid: string | null; has_pin: boolean; locked_until: string | null }>>({})
+  // Stempel-Terminal: Chip je Benutzer (nur Admin, ohne SQL-Update leer)
+  const [creds, setCreds] = useState<Record<string, { badge_uid: string | null }>>({})
   const [reading, setReading] = useState(false)
   const stopReading = useRef<(() => void) | null>(null)
   const loadCreds = useCallback(async () => {
@@ -70,7 +70,7 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
   function startEdit(p: Profile) {
     setError('')
     setNotice('')
-    setEdit({ id: p.id, full_name: p.full_name, email: p.email, role: p.role, active: p.active, supervisor_id: p.supervisor_id ?? '', vacation_days: String(p.vacation_days ?? 0), weekly_hours: String(p.weekly_hours ?? 40).replace('.', ','), overtime_start: p.overtime_start ?? '', overtime_opening: String(p.overtime_opening ?? 0).replace('.', ','), montage_capacity: p.montage_capacity ?? true, hr_access: p.hr_access ?? false, badge: formatBadge(creds[p.id]?.badge_uid), pin: '', removePin: false })
+    setEdit({ id: p.id, full_name: p.full_name, email: p.email, role: p.role, active: p.active, supervisor_id: p.supervisor_id ?? '', vacation_days: String(p.vacation_days ?? 0), weekly_hours: String(p.weekly_hours ?? 40).replace('.', ','), overtime_start: p.overtime_start ?? '', overtime_opening: String(p.overtime_opening ?? 0).replace('.', ','), montage_capacity: p.montage_capacity ?? true, hr_access: p.hr_access ?? false, badge: formatBadge(creds[p.id]?.badge_uid) })
   }
 
   async function saveEdit(e: FormEvent, p: Profile) {
@@ -109,11 +109,6 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
       const badge = normalizeBadge(edit.badge)
       if (badge !== (creds[p.id]?.badge_uid ?? '')) {
         const { error } = await supabase.rpc('set_terminal_badge', { p_user: p.id, p_badge: badge || null })
-        if (error) throw error
-      }
-      if (edit.pin || edit.removePin) {
-        if (edit.pin && !/^[0-9]{4,8}$/.test(edit.pin)) throw new Error('Die PIN muss aus 4 bis 8 Ziffern bestehen.')
-        const { error } = await supabase.rpc('set_terminal_pin', { p_user: p.id, p_pin: edit.removePin ? null : edit.pin })
         if (error) throw error
       }
       const email = edit.email.trim().toLowerCase()
@@ -309,26 +304,6 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
                       )}
                     </div>
                   </label>
-                  <label>
-                    {creds[p.id]?.has_pin ? 'Neue PIN (leer lassen = bleibt)' : 'PIN für Stempeln ohne Chip (4–8 Ziffern, optional)'}
-                    <input
-                      inputMode="numeric"
-                      autoComplete="off"
-                      maxLength={8}
-                      value={edit.pin}
-                      disabled={edit.removePin}
-                      onChange={(e) => setEdit({ ...edit, pin: e.target.value.replace(/\D/g, '') })}
-                    />
-                  </label>
-                  {creds[p.id]?.has_pin && (
-                    <label className="checkbox-row">
-                      <input type="checkbox" checked={edit.removePin} onChange={(e) => setEdit({ ...edit, removePin: e.target.checked, pin: '' })} />
-                      PIN entfernen
-                    </label>
-                  )}
-                  {creds[p.id]?.locked_until && new Date(creds[p.id].locked_until!) > new Date() && (
-                    <p className="small appointment-warn">PIN wegen Fehlversuchen gesperrt bis {new Date(creds[p.id].locked_until!).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr. Eine neue PIN hebt die Sperre auf.</p>
-                  )}
                 </fieldset>}
                 {!files[p.id] && (
                   <label className="checkbox-row">
@@ -371,7 +346,6 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
                   {!p.active && <span className="muted"> · deaktiviert</span>}
                   {p.role === 'monteur' && p.montage_capacity === false && <span className="muted"> · nicht in der Montage-Kapazität</span>}
                   {creds[p.id]?.badge_uid && <span className="muted"> · Chip {formatBadge(creds[p.id].badge_uid)}</span>}
-                  {creds[p.id]?.has_pin && <span className="muted"> · PIN</span>}
                   {p.hr_access && p.role !== 'admin' && p.role !== 'personal' && <span className="muted"> · Personalakten</span>}
                 </div>
                 <div className="small muted">

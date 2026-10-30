@@ -64,8 +64,8 @@ export function TerminalAdmin() {
     <section className="card">
       <h2>Stempel-Terminals</h2>
       <p className="muted small">
-        Ein Terminal ist ein Android-Gerät am Eingang, an dem Mitarbeiter mit ihrem Chip oder mit Name + PIN stempeln. Zum
-        Einrichten am Gerät selbst als Admin anmelden und hier „Dieses Gerät als Terminal einrichten“ wählen. Chip und PIN
+        Ein Terminal ist ein Android-Gerät am Eingang, an dem Mitarbeiter mit ihrem Chip stempeln. Zum
+        Einrichten am Gerät selbst als Admin anmelden und hier „Dieses Gerät als Terminal einrichten“ wählen. Den Chip
         vergibst du beim jeweiligen Benutzer unter „Bearbeiten“.
       </p>
       {error && <p className="error">{error}</p>}

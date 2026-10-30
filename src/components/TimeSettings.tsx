@@ -13,9 +13,9 @@ const WEEKDAYS = [
   { day: 5, label: 'Freitag' },
 ]
 
-type Creds = { badge_uid: string | null; has_pin: boolean; locked_until: string | null }
+type Creds = { badge_uid: string | null }
 
-type Form = { weekly_hours: string; work_days: number[]; overtime_start: string; overtime_opening: string; badge: string; pin: string; removePin: boolean }
+type Form = { weekly_hours: string; work_days: number[]; overtime_start: string; overtime_opening: string; badge: string }
 
 const num = (s: string) => Number(s.trim().replace(',', '.'))
 
@@ -45,8 +45,6 @@ export function TimeSettings({ emp, user, onSaved }: { emp: Employee; user: Prof
       overtime_start: user?.overtime_start ?? '',
       overtime_opening: String(user?.overtime_opening ?? 0).replace('.', ','),
       badge: formatBadge(c?.badge_uid),
-      pin: '',
-      removePin: false,
     })
   }, [emp, user])
 
@@ -105,11 +103,6 @@ export function TimeSettings({ emp, user, onSaved }: { emp: Employee; user: Prof
         const badge = normalizeBadge(form.badge)
         if (badge !== (creds?.badge_uid ?? '')) {
           const { error } = await supabase.rpc('set_terminal_badge', { p_user: user.id, p_badge: badge || null })
-          if (error) throw error
-        }
-        if (form.pin || form.removePin) {
-          if (form.pin && !/^[0-9]{4,8}$/.test(form.pin)) throw new Error('Die PIN muss aus 4 bis 8 Ziffern bestehen.')
-          const { error } = await supabase.rpc('set_terminal_pin', { p_user: user.id, p_pin: form.removePin ? null : form.pin })
           if (error) throw error
         }
       }
@@ -179,29 +172,7 @@ export function TimeSettings({ emp, user, onSaved }: { emp: Employee; user: Prof
                 )}
               </div>
             </label>
-            <label className="wide">
-              {creds?.has_pin ? 'Neue PIN (leer lassen = bleibt)' : 'PIN für Stempeln ohne Chip (4–8 Ziffern, optional)'}
-              <input
-                inputMode="numeric"
-                autoComplete="off"
-                maxLength={8}
-                value={form.pin}
-                disabled={form.removePin}
-                onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, '') })}
-              />
-            </label>
           </div>
-          {creds?.has_pin && (
-            <label className="checkbox-row">
-              <input type="checkbox" checked={form.removePin} onChange={(e) => setForm({ ...form, removePin: e.target.checked, pin: '' })} />
-              PIN entfernen
-            </label>
-          )}
-          {creds?.locked_until && new Date(creds.locked_until) > new Date() && (
-            <p className="small appointment-warn">
-              PIN wegen Fehlversuchen gesperrt bis {new Date(creds.locked_until).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr. Eine neue PIN hebt die Sperre auf.
-            </p>
-          )}
         </>
       )}
 
