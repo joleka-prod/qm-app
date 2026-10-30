@@ -684,6 +684,9 @@ button.link.danger-link { color: var(--danger); }
 .terminal-fehler { background: #b91c1c; }
 .terminal-icon { font-size: 4.5rem; line-height: 1; font-weight: 700; }
 @keyframes terminal-in { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+.terminal-tag { margin-top: 1.5rem !important; font-size: clamp(1.4rem, 5vw, 2.2rem) !important; font-weight: 700; color: #fbbf24; letter-spacing: 0.02em; }
+.terminal-logos { display: flex; justify-content: center; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 0.5rem 1rem; }
+.terminal-logos img { height: clamp(48px, 9vh, 90px); max-width: 30%; object-fit: contain; background: #fff; border-radius: 10px; padding: 0.4rem 0.8rem; }
 .terminal-foot { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; padding: 0.5rem 1rem 1rem; font-size: 0.9rem; }
 .terminal-foot .link { color: #93c5fd; }
 .terminal-sync-error { color: #fecaca; }
