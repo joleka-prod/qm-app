@@ -16,6 +16,12 @@ import {
 
 type Shown = { kind: 'kommen' | 'gehen' | 'gespeichert' | 'fehler'; title: string; sub: string }
 
+// Im Fully Kiosk Browser oder als Vollbild-App ist die Seite bereits randlos, dann keinen Hinweis zeigen
+const isFullscreen = () =>
+  !!document.fullscreenElement ||
+  nfcMode() === 'Fully Kiosk' ||
+  window.matchMedia('(display-mode: fullscreen)').matches
+
 const LOGOS = [
   { name: 'JOLEKA', src: '/logo.jpg' },
   { name: 'Ursprung', src: '/logo-ursprung.png' },
@@ -173,14 +179,14 @@ export function Terminal() {
 
   // Vollbild (ohne Adress- und Navigationsleiste): Browser erlauben das nur nach einer Berührung,
   // daher bei jedem Antippen erneut anfordern, solange es nicht aktiv ist (Fabian, 2026-10-30)
-  const [fullscreen, setFullscreen] = useState(() => !!document.fullscreenElement)
+  const [fullscreen, setFullscreen] = useState(isFullscreen)
   useEffect(() => {
-    const change = () => setFullscreen(!!document.fullscreenElement)
+    const change = () => setFullscreen(isFullscreen())
     document.addEventListener('fullscreenchange', change)
     return () => document.removeEventListener('fullscreenchange', change)
   }, [])
   const enterFullscreen = useCallback(() => {
-    if (document.fullscreenElement || !document.documentElement.requestFullscreen) return
+    if (isFullscreen() || !document.documentElement.requestFullscreen) return
     document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => undefined)
   }, [])
 
