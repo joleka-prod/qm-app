@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { employeeName, isExternal, norm, type Employee } from '../lib/employee'
+import { formatBadge, normalizeBadge } from '../lib/nfc'
 import { supabase } from '../lib/supabase'
 import { displayName } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
@@ -33,6 +34,17 @@ function ttNumber(u: Row) {
     if (/personal_?n|personnel_?n|staff_?n|employee_?n|pers_?nr/i.test(k) && str(v)) return str(v)
   }
   return ''
+}
+
+// Chipnummer: TimeTac speichert die Seriennummer als Dezimalzahl mit umgekehrter Byte-Reihenfolge
+// (1046943492 = 0x3E671704 -> 04:17:67:3E, wie Web NFC sie liest; Fabian, 2026-10-30)
+function ttBadge(u: Row) {
+  const raw = str(u.terminal_transponder_nr)
+  if (!/^[0-9]+$/.test(raw)) return normalizeBadge(raw)
+  let hex = BigInt(raw).toString(16)
+  // auf volle UID-Länge auffüllen (4 oder 7 Byte), sonst fehlen führende Null-Bytes
+  hex = hex.padStart(hex.length <= 8 ? 8 : hex.length <= 14 ? 14 : hex.length + (hex.length % 2), '0')
+  return hex.match(/../g)!.reverse().join('')
 }
 
 const ttName = (u: Row) => [str(u.firstname), str(u.lastname)].filter(Boolean).join(' ') || str(u.username) || `#${str(u.id)}`
@@ -163,6 +175,7 @@ export function TimetacImport() {
   const [grants, setGrants] = useState<Map<string, Grant>>(new Map())
   const [grantsError, setGrantsError] = useState('')
   const [absResult, setAbsResult] = useState<{ name: string; replaced: number; inserted: number; skipped: number; error?: string }[]>([])
+  const [badgeResult, setBadgeResult] = useState<{ name: string; text: string; error?: boolean }[]>([])
   const [result, setResult] = useState<{ name: string; replaced: number; inserted: number; skipped: number; error?: string }[]>([])
 
   async function loadEmployees() {
@@ -231,6 +244,31 @@ export function TimetacImport() {
       }
     }
     await loadEmployees()
+    setBusy('')
+  }
+
+  // Chipnummern aus TimeTac ans Stempel-Terminal übernehmen (nur zugeordnete Mitarbeiter mit App-Benutzer)
+  async function importBadges() {
+    setBusy('Übernehme Chipnummern …')
+    setError('')
+    const { data: creds } = await supabase.rpc('terminal_credentials_list')
+    const current = new Map(((creds ?? []) as { user_id: string; badge_uid: string | null }[]).map((c) => [c.user_id, c.badge_uid ?? '']))
+    const out: { name: string; text: string; error?: boolean }[] = []
+    for (const u of shownUsers) {
+      const e = empById[map[str(u.id)]]
+      const badge = ttBadge(u)
+      if (!e?.user_id || !badge) continue
+      const before = current.get(e.user_id) ?? ''
+      if (before === badge) continue
+      const { error } = await supabase.rpc('set_terminal_badge', { p_user: e.user_id, p_badge: badge })
+      out.push(
+        error
+          ? { name: employeeName(e), text: error.message, error: true }
+          : { name: employeeName(e), text: before ? `${formatBadge(before)} → ${formatBadge(badge)}` : formatBadge(badge) },
+      )
+    }
+    if (out.length === 0) out.push({ name: 'Alle Chipnummern', text: 'sind schon aktuell oder in TimeTac nicht hinterlegt' })
+    setBadgeResult(out)
     setBusy('')
   }
 
@@ -423,7 +461,7 @@ export function TimetacImport() {
         <h2>1. Mitarbeiter abgleichen</h2>
         <p className="muted small">
           Jeder TimeTac-Benutzer wird einer Personalakte zugeordnet (gleiche Personalnummer, sonst gleicher Name). Zeiten
-          können nur Mitarbeiter mit App-Benutzer bekommen.
+          und Chipnummern fürs Stempel-Terminal können nur Mitarbeiter mit App-Benutzer bekommen.
         </p>
         <div className="filters">
           <button type="button" className="primary" disabled={!!busy} onClick={loadUsers}>Benutzer aus TimeTac laden</button>
@@ -431,6 +469,7 @@ export function TimetacImport() {
             <>
               <label className="small"><input type="checkbox" checked={onlyActive} onChange={(e) => setOnlyActive(e.target.checked)} /> nur aktive</label>
               <button type="button" disabled={!!busy} onClick={fillNumbers}>Fehlende Personalnummern ergänzen</button>
+              <button type="button" disabled={!!busy} onClick={importBadges}>Chipnummern übernehmen</button>
             </>
           )}
         </div>
@@ -438,7 +477,7 @@ export function TimetacImport() {
           <div className="cal-scroll">
             <table className="import-table">
               <thead>
-                <tr><th>TimeTac</th><th>Nr.</th><th>Personalakte</th><th>App-Benutzer</th></tr>
+                <tr><th>TimeTac</th><th>Nr.</th><th>Chip</th><th>Personalakte</th><th>App-Benutzer</th></tr>
               </thead>
               <tbody>
                 {shownUsers.map((u) => {
@@ -448,6 +487,7 @@ export function TimetacImport() {
                     <tr key={id}>
                       <td>{ttName(u)}</td>
                       <td>{ttNumber(u) || '–'}</td>
+                      <td>{formatBadge(ttBadge(u)) || '–'}</td>
                       <td>
                         <select value={map[id] ?? 0} onChange={(ev) => remember({ ...map, [id]: Number(ev.target.value) })}>
                           <option value={0}>– nicht zugeordnet –</option>
@@ -468,6 +508,21 @@ export function TimetacImport() {
               </tbody>
             </table>
           </div>
+        )}
+        {badgeResult.length > 0 && (
+          <table className="import-table">
+            <thead>
+              <tr><th>Mitarbeiter</th><th>Chip</th></tr>
+            </thead>
+            <tbody>
+              {badgeResult.map((r) => (
+                <tr key={r.name}>
+                  <td>{r.name}</td>
+                  <td className={r.error ? 'error' : ''}>{r.text}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </section>
 
