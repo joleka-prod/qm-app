@@ -5,16 +5,25 @@ import { loadMembers, useTeams, type TeamMember } from '../lib/teams'
 import { canSeePersonnel, displayName, formatDate, formatDay, type Profile } from '../lib/types'
 
 export type VacationState = 'beantragt' | 'genehmigt' | 'abgelehnt' | 'storniert'
-export type VacationKind = 'urlaub' | 'ueberstunden' | 'krank' | 'sonderurlaub'
+export type VacationKind = 'urlaub' | 'ueberstunden' | 'krank' | 'sonderurlaub' | 'schulung' | 'schule' | 'unbezahlt' | 'kindkrank'
 
-export const KIND_LABEL: Record<VacationKind, string> = { urlaub: 'Urlaubstage', ueberstunden: 'Überstunden', krank: 'Krank', sonderurlaub: 'Sonderurlaub' }
+export const KIND_LABEL: Record<VacationKind, string> = {
+  urlaub: 'Urlaubstage', ueberstunden: 'Überstunden', krank: 'Krank', sonderurlaub: 'Sonderurlaub',
+  schulung: 'Schulung', schule: 'Schule', unbezahlt: 'Unbezahlter Urlaub', kindkrank: 'Kindkrank',
+}
 
 // Arten, die Vorgesetzte und Admin direkt für Mitarbeiter eintragen (sofort genehmigt)
-const ENTER_KINDS: VacationKind[] = ['urlaub', 'ueberstunden', 'krank', 'sonderurlaub']
-export const ABSENCE_LABEL: Record<VacationKind, string> = { urlaub: 'Urlaub', ueberstunden: 'Zeitausgleich', krank: 'Krank', sonderurlaub: 'Sonderurlaub' }
+const ENTER_KINDS: VacationKind[] = ['urlaub', 'ueberstunden', 'krank', 'sonderurlaub', 'schulung', 'schule', 'unbezahlt', 'kindkrank']
+export const ABSENCE_LABEL: Record<VacationKind, string> = {
+  urlaub: 'Urlaub', ueberstunden: 'Zeitausgleich', krank: 'Krank', sonderurlaub: 'Sonderurlaub',
+  schulung: 'Schulung', schule: 'Schule', unbezahlt: 'Unbezahlter Urlaub', kindkrank: 'Kindkrank',
+}
 
 // Zusatz hinter dem Zeitraum (Urlaub ohne Zusatz)
-const KIND_NOTE: Record<VacationKind, string> = { urlaub: '', ueberstunden: 'über Überstunden', krank: 'Krankheit', sonderurlaub: 'Sonderurlaub' }
+const KIND_NOTE: Record<VacationKind, string> = {
+  urlaub: '', ueberstunden: 'über Überstunden', krank: 'Krankheit', sonderurlaub: 'Sonderurlaub',
+  schulung: 'Schulung', schule: 'Schule', unbezahlt: 'Unbezahlter Urlaub', kindkrank: 'Kindkrank',
+}
 
 export interface VacationRequest {
   id: number
