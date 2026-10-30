@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FunctionsHttpError } from '@supabase/supabase-js'
-import { employeeName, isExternal, norm, type Employee } from '../lib/employee'
+import { employeeName, norm, type Employee } from '../lib/employee'
 import { formatBadge, normalizeBadge } from '../lib/nfc'
 import { supabase } from '../lib/supabase'
 import { displayName } from '../lib/types'
@@ -179,9 +179,8 @@ export function TimetacImport() {
   const [result, setResult] = useState<{ name: string; replaced: number; inserted: number; skipped: number; error?: string }[]>([])
 
   async function loadEmployees() {
-    // Externe Dienstleister werden nicht mit TimeTac abgeglichen
     const { data } = await supabase.from('employees').select('*')
-    setEmployees(((data ?? []) as unknown as Employee[]).filter((e) => !isExternal(e)))
+    setEmployees((data ?? []) as unknown as Employee[])
   }
   useEffect(() => {
     loadEmployees()

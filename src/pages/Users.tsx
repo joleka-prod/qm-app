@@ -6,7 +6,7 @@ import { deleteUser, generatePassword, setPassword, updateEmail } from '../lib/a
 import { formatBadge, nfcSupported, normalizeBadge, startNfc } from '../lib/nfc'
 import { supabase } from '../lib/supabase'
 import { ROLE_LABEL, displayName, type Profile, type Role } from '../lib/types'
-import { isExternal, isManagingDirector } from '../lib/employee'
+import { isManagingDirector } from '../lib/employee'
 import { useProfiles } from '../lib/useProfiles'
 
 const ROLES = Object.keys(ROLE_LABEL) as Role[]
@@ -128,7 +128,7 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
 
   // App-Benutzer gibt es nur zu einem Mitarbeiter (Fabian, 2026-10-26): Benutzer ohne Akte bekommen eine
   const [files, setFiles] = useState<Record<string, number>>({})
-  // Geschäftsführer und Externe (ohne Pflicht für Vorgesetzte) je App-Benutzer
+  // Geschäftsführer (ohne Pflicht für Vorgesetzte) je App-Benutzer
   const [directors, setDirectors] = useState<Set<string>>(new Set())
   const [filesLoaded, setFilesLoaded] = useState(false)
   const orphans = filesLoaded ? profiles.filter((p) => !files[p.id]) : []
@@ -136,8 +136,7 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
     const { data } = await supabase.from('employees').select('*').not('user_id', 'is', null)
     const rows = (data ?? []) as Record<string, unknown>[]
     setFiles(Object.fromEntries(rows.map((r) => [r.user_id as string, r.id as number])))
-    // externe Dienstleister brauchen ebenfalls keine(n) Vorgesetzte(n)
-    setDirectors(new Set(rows.filter((r) => isManagingDirector(r) || isExternal(r)).map((r) => r.user_id as string)))
+    setDirectors(new Set(rows.filter((r) => isManagingDirector(r)).map((r) => r.user_id as string)))
     setFilesLoaded(true)
   }, [])
   useEffect(() => {

@@ -115,7 +115,7 @@ const yearsSince = (d: unknown) =>
   d ? Math.floor((Date.now() - new Date(String(d).slice(0, 10) + 'T00:00').getTime()) / (365.2425 * 864e5)) : null
 
 const FIELD_COLUMNS: Column[] = MAIN_FIELDS
-  .filter((f) => !['first_name', 'last_name', 'company', 'trade', 'phone', 'mobile', 'email', 'vat_id', 'tax_number', 'note'].includes(f.key))
+  .filter((f) => !['first_name', 'last_name', 'company'].includes(f.key))
   .map((f) => ({
     key: f.key,
     label: f.label.replace(/:$/, ''),
@@ -157,6 +157,9 @@ const PROFILE_EDIT = ['role', 'supervisor', 'montage_capacity']
 
 const nameOf = (e: Employee) => (e.last_name || e.first_name ? `${e.last_name}, ${e.first_name}` : employeeName(e))
 const NAME_COLUMN: Column = { key: 'name', label: 'Name', value: nameOf }
+// nur bei den externen Mitarbeitern, immer sichtbar
+const COMPANY_FIELD = MAIN_FIELDS.find((f) => f.key === 'company')!
+const COMPANY_COLUMN: Column = { key: 'company', label: 'Firma', field: COMPANY_FIELD, value: (e) => String(e.company || '') || '–' }
 // Spalten mit wenigen verschiedenen Werten bekommen im Kopf eine Auswahl, alle anderen ein Suchfeld
 const MAX_CHOICES = 15
 
@@ -274,7 +277,7 @@ function ProfileCell({ p, field, label, value, options, onSaved }: {
   )
 }
 
-// Menüpunkt Personal: Mitarbeiter, externe Dienstleister (Fabian, 2026-10-27) und (nur Admin) App-Benutzer mit Stempel-Terminals
+// Menüpunkt Personal: Mitarbeiter, externe Mitarbeiter (Fabian, 2026-10-30) und (nur Admin) App-Benutzer mit Stempel-Terminals
 export function Personnel() {
   const { profile } = useAuth()
   const [params, setParams] = useSearchParams()
@@ -284,91 +287,19 @@ export function Personnel() {
     <div>
       <nav className="emp-tabs">
         <button type="button" className={users || external ? '' : 'active'} onClick={() => setParams({})}>Mitarbeiter</button>
-        <button type="button" className={external ? 'active' : ''} onClick={() => setParams({ art: 'extern' })}>Externe Dienstleister</button>
+        <button type="button" className={external ? 'active' : ''} onClick={() => setParams({ art: 'extern' })}>Externe Mitarbeiter</button>
         {profile?.role === 'admin' && (
           <button type="button" className={users ? 'active' : ''} onClick={() => setParams({ ansicht: 'benutzer' })}>Stempel-Terminals</button>
         )}
       </nav>
-      {users ? <Users /> : external ? <ExternalList /> : <EmployeeList />}
+      {users ? <Users /> : <EmployeeList key={external ? 'extern' : 'intern'} external={external} />}
     </div>
   )
 }
 
-// Übersicht externe Dienstleister: nur Stammdaten und App-Benutzer, keine Pflichtangaben für die Lohnabrechnung
-function ExternalList() {
-  const { byId } = useProfiles()
-  const navigate = useNavigate()
-  const [list, setList] = useState<Employee[]>([])
-  const [error, setError] = useState('')
-  const [q, setQ] = useState('')
-  const [status, setStatus] = useState<string>('Aktiv')
-
-  useEffect(() => {
-    supabase.from('employees').select('*').eq('employee_type', 'extern').then(({ data, error }) => {
-      if (error) setError(error.message.includes('employee_type') ? 'Bitte zuerst das SQL-Update für externe Dienstleister ausführen.' : error.message)
-      setList((data ?? []) as unknown as Employee[])
-    })
-  }, [])
-
-  const shown = useMemo(() => {
-    const needle = q.trim().toLowerCase()
-    return list
-      .filter((e) => !status || e.status === status)
-      .filter((e) => !needle || [e.company, e.first_name, e.last_name, e.trade, e.city].some((s) => String(s ?? '').toLowerCase().includes(needle)))
-      .sort((a, b) => employeeName(a).localeCompare(employeeName(b), 'de'))
-  }, [list, q, status])
-
-  async function create() {
-    const { data, error } = await supabase.from('employees').insert({ status: 'Aktiv', employee_type: 'extern' }).select('id').single()
-    if (error) setError(error.message)
-    else navigate(`/personal/${data.id}`)
-  }
-
-  return (
-    <div>
-      <div className="page-head">
-        <h1>Externe Dienstleister</h1>
-        <div className="card-head-actions">
-          <button className="primary" onClick={create}>+ Externer Dienstleister</button>
-        </div>
-      </div>
-      {error && <p className="error">{error}</p>}
-      <div className="filters">
-        <input type="search" placeholder="Firma, Ansprechpartner, Gewerk, Ort…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="Aktiv">Aktiv</option>
-          <option value="nicht aktiv">nicht aktiv</option>
-          <option value="">Alle</option>
-        </select>
-      </div>
-      <section className="card">
-        <div className="cal-scroll">
-          <table className="import-table">
-            <thead>
-              <tr><th>Firma</th><th>Ansprechpartner</th><th>Gewerk / Tätigkeit</th><th>Telefon</th><th>Ort</th><th>App-Benutzer</th></tr>
-            </thead>
-            <tbody>
-              {shown.map((e) => (
-                <tr key={e.id} className={e.status === 'Aktiv' ? '' : 'muted'}>
-                  <td><Link to={`/personal/${e.id}`}>{String(e.company || '') || 'Ohne Firma'}</Link></td>
-                  <td>{[e.first_name, e.last_name].filter(Boolean).join(' ') || '–'}</td>
-                  <td>{String(e.trade || '–')}</td>
-                  <td>{String(e.mobile || e.phone || '–')}</td>
-                  <td>{String(e.city || '–')}</td>
-                  <td>{e.user_id ? (byId[e.user_id] ? `${displayName(byId[e.user_id])} (${byId[e.user_id].email})` : 'ja') : '–'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {shown.length === 0 && <p className="muted">Keine Einträge.</p>}
-      </section>
-    </div>
-  )
-}
-
-// Übersicht Personalakten (nur Admin und Benutzer mit Zugriff auf Personalakten)
-function EmployeeList() {
+// Übersicht Personalakten (nur Admin und Benutzer mit Zugriff auf Personalakten);
+// external: Liste der externen Mitarbeiter, gleich aufgebaut, zusätzlich mit Spalte Firma
+function EmployeeList({ external }: { external: boolean }) {
   const { profile } = useAuth()
   const { profiles, byId, reload: reloadProfiles } = useProfiles()
   const navigate = useNavigate()
@@ -388,8 +319,13 @@ function EmployeeList() {
   const [editing, setEditing] = useState(false)
   const cols = useMemo(() => COLUMNS.filter((c) => colKeys.includes(c.key)), [colKeys])
   const tableCols = useMemo(
-    () => [...cols.filter((c) => c.key === 'personnel_number'), NAME_COLUMN, ...cols.filter((c) => c.key !== 'personnel_number')],
-    [cols],
+    () => [
+      ...cols.filter((c) => c.key === 'personnel_number'),
+      NAME_COLUMN,
+      ...(external ? [COMPANY_COLUMN] : []),
+      ...cols.filter((c) => c.key !== 'personnel_number'),
+    ],
+    [cols, external],
   )
   // Filter im Spaltenkopf (Fabian, 2026-10-29); gelten nur für sichtbare Spalten
   const [colFilter, setColFilter] = useState<Record<string, string>>({})
@@ -409,10 +345,10 @@ function EmployeeList() {
       supabase.from('employee_entries').select('employee_id').eq('kind', 'lohn'),
     ])
     if (error) setError(error.message.includes('employees') ? 'Bitte zuerst das SQL-Update für das Personal ausführen.' : error.message)
-    // externe Dienstleister stehen in einer eigenen Liste
-    setList(((data ?? []) as unknown as Employee[]).filter((e) => !isExternal(e)))
+    // Mitarbeiter und externe Mitarbeiter stehen in getrennten Listen
+    setList(((data ?? []) as unknown as Employee[]).filter((e) => isExternal(e) === external))
     setWithWage(new Set((wages.data ?? []).map((w) => w.employee_id as number)))
-  }, [])
+  }, [external])
 
   const incomplete = useMemo(
     () =>
@@ -523,7 +459,7 @@ function EmployeeList() {
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase()
     return byStatus
-      .filter((e) => !needle || [employeeName(e), e.personnel_number, e.department].some((s) => String(s ?? '').toLowerCase().includes(needle)))
+      .filter((e) => !needle || [employeeName(e), e.personnel_number, e.department, e.company].some((s) => String(s ?? '').toLowerCase().includes(needle)))
       .filter((e) =>
         activeFilters.every((c) => {
           const v = c.value(e, byId)
@@ -534,7 +470,7 @@ function EmployeeList() {
   }, [byStatus, q, activeFilters, choices, colFilter, byId])
 
   async function create() {
-    const { data, error } = await supabase.from('employees').insert({ status: 'Aktiv' }).select('id').single()
+    const { data, error } = await supabase.from('employees').insert({ status: 'Aktiv', employee_type: external ? 'extern' : 'mitarbeiter' }).select('id').single()
     if (error) setError(error.message)
     else navigate(`/personal/${data.id}`)
   }
@@ -542,10 +478,10 @@ function EmployeeList() {
   return (
     <div>
       <div className="page-head">
-        <h1>Personal</h1>
+        <h1>{external ? 'Externe Mitarbeiter' : 'Personal'}</h1>
         <div className="card-head-actions">
-          {profile?.role === 'admin' && <Link to="/personal/timetac" className="button">Import aus TimeTac</Link>}
-          <button className="primary" onClick={create}>+ Mitarbeiter</button>
+          {profile?.role === 'admin' && !external && <Link to="/personal/timetac" className="button">Import aus TimeTac</Link>}
+          <button className="primary" onClick={create}>{external ? '+ Externer Mitarbeiter' : '+ Mitarbeiter'}</button>
         </div>
       </div>
       {error && <p className="error">{error}</p>}
@@ -606,7 +542,7 @@ function EmployeeList() {
         </section>
       )}
       <div className="filters">
-        <input type="search" placeholder="Name, Personalnummer, Abteilung…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input type="search" placeholder={external ? 'Name, Firma, Personalnummer, Abteilung…' : 'Name, Personalnummer, Abteilung…'} value={q} onChange={(e) => setQ(e.target.value)} />
         <select value={status} onChange={(e) => setStatus(e.target.value)}>
           {STATUS.map((s) => <option key={s} value={s}>{s}</option>)}
           <option value="">Alle</option>

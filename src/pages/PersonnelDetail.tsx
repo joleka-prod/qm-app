@@ -20,7 +20,7 @@ import {
   type SubTable,
   companyEmail,
   missingPayroll,
-  EXTERNAL_TAB,
+  EXTERNAL_TABS,
   isExternal,
 } from '../lib/employee'
 import { supabase } from '../lib/supabase'
@@ -347,12 +347,9 @@ export function PersonnelDetail() {
     if (!emp) return
     const first = String(form.first_name ?? '').trim()
     const last = String(form.last_name ?? '').trim()
-    const external = isExternal(emp)
-    if (!first || !last) return setError(external ? 'Bitte zuerst Vor- und Nachname des Ansprechpartners eintragen und speichern.' : 'Bitte zuerst Vor- und Nachname eintragen und speichern.')
-    // Externe melden sich mit ihrer eigenen E-Mail-Adresse an
-    const email = external ? String(emp.email ?? '').trim().toLowerCase() : companyEmail(first, last)
-    if (external && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setError('Bitte zuerst die E-Mail-Adresse eintragen und speichern, sie wird der Login.')
-    const role = external || /montage/i.test(String(form.department ?? '')) ? 'monteur' : 'mitarbeiter'
+    if (!first || !last) return setError('Bitte zuerst Vor- und Nachname eintragen und speichern.')
+    const email = companyEmail(first, last)
+    const role = /montage/i.test(String(form.department ?? '')) ? 'monteur' : 'mitarbeiter'
     if (!confirm(`App-Benutzer ${email} (${ROLE_LABEL[role]}) anlegen?`)) return
     setBusy(true)
     setError('')
@@ -370,23 +367,16 @@ export function PersonnelDetail() {
     setBusy(false)
   }
 
-  // Mitarbeiter <-> externer Dienstleister (Fabian, 2026-10-27). Alle Daten bleiben gespeichert, nur die
-  // Ansicht wechselt; private Kontaktdaten werden beim Umwandeln in leere Kontaktfelder übernommen.
+  // Mitarbeiter <-> externer Mitarbeiter (Fabian, 2026-10-30). Alle Daten bleiben gespeichert, nur die
+  // Reiter Lohnkonzept und Kleidung/KFZ werden bei Externen ausgeblendet.
   async function convert() {
     if (!emp) return
     if (dirty) return setError('Bitte zuerst speichern oder die Änderungen verwerfen.')
     const toExternal = !isExternal(emp)
     if (!confirm(toExternal
-      ? `${employeeName(emp)} in einen externen Dienstleister umwandeln?\n\nName, Anschrift, Bankverbindung und App-Benutzer bleiben erhalten. Die übrigen Angaben (Lohn, Logbuch …) werden ausgeblendet, aber nicht gelöscht.`
-      : `${employeeName(emp)} wieder zum Mitarbeiter machen?\n\nAlle früheren Angaben der Personalakte sind wieder sichtbar.`)) return
+      ? `${employeeName(emp)} in einen externen Mitarbeiter umwandeln?\n\nAlle Angaben bleiben erhalten, Lohnkonzept und Kleidung/KFZ werden ausgeblendet, aber nicht gelöscht.`
+      : `${employeeName(emp)} wieder zum Mitarbeiter machen?\n\nLohnkonzept und Kleidung/KFZ sind wieder sichtbar.`)) return
     const row: Record<string, unknown> = { employee_type: toExternal ? 'extern' : 'mitarbeiter' }
-    if (toExternal) {
-      const empty = (k: string) => !String(emp[k] ?? '').trim()
-      if (empty('phone') && !empty('phone_private')) row.phone = emp.phone_private
-      if (empty('mobile') && !empty('mobile_private')) row.mobile = emp.mobile_private
-      if (empty('email') && !empty('email_private')) row.email = emp.email_private
-      if (emp.status === 'Langzeitkrank') row.status = 'Aktiv'
-    }
     setBusy(true)
     setError('')
     const { error } = await supabase.from('employees').update(row).eq('id', emp.id)
@@ -413,7 +403,7 @@ export function PersonnelDetail() {
   const wc = wageConcept(wage, String(form.entry_date || '') || null)
   const user = emp.user_id ? byId[emp.user_id] : null
   const external = isExternal(emp)
-  const own = external ? [EXTERNAL_TAB] : TABS
+  const own = external ? EXTERNAL_TABS : TABS
   const tabs = me?.role === 'admin' ? [...own, { key: 'benutzer', title: 'App-Benutzer', sections: [] }] : own
   const current = tabs.find((t) => t.key === tab) ?? own[0]
 
@@ -434,7 +424,7 @@ export function PersonnelDetail() {
     <div className="emp-page">
       <div className="page-head">
         <h1>{employeeName(emp)}</h1>
-        <Link to={external ? '/personal?art=extern' : '/personal'}>← {external ? 'Externe Dienstleister' : 'Personal'}</Link>
+        <Link to={external ? '/personal?art=extern' : '/personal'}>← {external ? 'Externe Mitarbeiter' : 'Personal'}</Link>
       </div>
       <p className="muted small">
         App-Benutzer: {user ? `${displayName(user)} · ${user.email}` : 'keiner'}
@@ -453,9 +443,7 @@ export function PersonnelDetail() {
           <section className="card">
             <p>{employeeName(emp)} hat noch keinen App-Benutzer.</p>
             <p className="muted small">
-              {external
-                ? `Login ist die E-Mail-Adresse aus den Stammdaten${emp.email ? ` (${emp.email})` : ''}, das Startpasswort wird einmal angezeigt.`
-                : 'Login nach dem Schema vorname.nachname@joleka.de, das Startpasswort wird einmal angezeigt.'}
+              Login nach dem Schema vorname.nachname@joleka.de, das Startpasswort wird einmal angezeigt.
             </p>
             <button type="button" className="primary" disabled={busy} onClick={createAccount}>App-Benutzer anlegen</button>
           </section>
@@ -561,11 +549,11 @@ export function PersonnelDetail() {
       <EmployeeHistory employeeId={emp.id} version={logVersion} />
 
       <p>
-        <button type="button" disabled={busy} onClick={convert}>{external ? 'Wieder zum Mitarbeiter machen' : 'In externen Dienstleister umwandeln'}</button>
+        <button type="button" disabled={busy} onClick={convert}>{external ? 'Wieder zum Mitarbeiter machen' : 'In externen Mitarbeiter umwandeln'}</button>
       </p>
 
       {me?.role === 'admin' && (
-        <p><button type="button" className="danger" onClick={removeEmployee}>{external ? 'Externen Dienstleister löschen' : 'Mitarbeiter löschen'}</button></p>
+        <p><button type="button" className="danger" onClick={removeEmployee}>{external ? 'Externen Mitarbeiter löschen' : 'Mitarbeiter löschen'}</button></p>
       )}
     </div>
   )
