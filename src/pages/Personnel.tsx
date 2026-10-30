@@ -33,7 +33,7 @@ const num = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 1,
 
 // Kennzahlen oben in der Übersicht (Fabian, 2026-10-27), nur aktive Mitarbeiter (ohne Externe):
 // Durchschnittsalter mit Geschäftsführung. Quoten nach Tagen ohne Geschäftsführung (Fabian, 2026-10-30):
-// Fehlzeitenquote = alle Fehltage (Krank, Urlaub, Sonderurlaub) / Soll-Arbeitstage × 100,
+// Fehlzeitenquote = Fehltage (Krank, Sonderurlaub; ohne Urlaub) / Soll-Arbeitstage × 100,
 // Krankenquote = Krankheitstage / Soll-Arbeitstage × 100; jeweils Summen über alle Mitarbeiter.
 // Die Quoten zählen alle Mitarbeiter, auch ausgetretene (bis zum Austritt) und langzeitkranke.
 function KeyFigures({ list }: { list: Employee[] }) {
@@ -69,7 +69,7 @@ function KeyFigures({ list }: { list: Employee[] }) {
     rateError ? '–' : rates === null ? '…' : a.length ? `${num((sum(a, k) / sum(a, 'possible')) * 100)} %` : '–'
   const rateNote = (a: Days[], k: 'sick' | 'absent', what: string) =>
     rateError ||
-    `${num(sum(a, k))} ${k === 'sick' ? 'Krankheitstage' : 'Fehltage (Krank, Urlaub, Sonderurlaub)'} von ${sum(a, 'possible').toLocaleString('de-DE')} Soll-Arbeitstagen ${what}, ${a.length} Mitarbeiter mit Zeiterfassung (auch ausgetretene), ohne Geschäftsführung`
+    `${num(sum(a, k))} ${k === 'sick' ? 'Krankheitstage' : 'Fehltage (Krank, Sonderurlaub)'} von ${sum(a, 'possible').toLocaleString('de-DE')} Soll-Arbeitstagen ${what}, ${a.length} Mitarbeiter mit Zeiterfassung (auch ausgetretene), ohne Geschäftsführung`
   const figures: [string, Days[], 'sick' | 'absent', string][] = [
     ['Fehlzeitenquote (historisch)', all, 'absent', 'über alle Jahre'],
     [`Fehlzeitenquote ${year} (bis heute)`, cur, 'absent', 'im laufenden Geschäftsjahr'],
