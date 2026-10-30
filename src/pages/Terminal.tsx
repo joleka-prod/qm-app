@@ -203,7 +203,13 @@ export function Terminal() {
   useEffect(() => {
     if (!token) return
     beginNfc()
+    // Fully Kiosk stellt seine Schnittstelle manchmal erst nach dem Laden bereit: Leser so lange
+    // automatisch neu starten, bis er läuft (sonst müsste erst jemand auf den Bildschirm tippen)
+    const retry = setInterval(() => {
+      if (!stopNfc.current) beginNfc()
+    }, 2000)
     return () => {
+      clearInterval(retry)
       stopNfc.current?.()
       stopNfc.current = null
     }
