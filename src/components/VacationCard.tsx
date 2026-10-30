@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { loadMembers, useTeams, type TeamMember } from '../lib/teams'
-import { displayName, formatDate, formatDay, type Profile } from '../lib/types'
+import { canSeePersonnel, displayName, formatDate, formatDay, type Profile } from '../lib/types'
 
 export type VacationState = 'beantragt' | 'genehmigt' | 'abgelehnt' | 'storniert'
 export type VacationKind = 'urlaub' | 'ueberstunden' | 'krank' | 'sonderurlaub'
@@ -142,8 +142,8 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
     return !error
   }
 
-  // Krankheit, Sonderurlaub und Feiertag trägt der Vorgesetzte bzw. Admin für Mitarbeiter ein
-  const canEnter = canDecide({ user_id: userId } as VacationRequest)
+  // Abwesenheiten tragen Vorgesetzte, Admin und Personalabteilung für Mitarbeiter ein (sofort genehmigt)
+  const canEnter = !own && (canDecide({ user_id: userId } as VacationRequest) || canSeePersonnel(me))
   const entering = !!form && !own
 
   const allowance = Number(byId[userId]?.vacation_days ?? 0)
@@ -288,7 +288,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
             )}
             {entering && (
               <p className="small muted">
-                Wird sofort als genehmigt eingetragen.
+                Wird sofort als genehmigt eingetragen, {displayName(byId[userId])} bekommt dazu eine Info.
                 {form.kind === 'urlaub' && ' Zählt gegen den Urlaubsanspruch.'}
               </p>
             )}
@@ -334,7 +334,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
                   {r.state === 'beantragt' && r.user_id === me.id && (
                     <button className="link" disabled={busy} onClick={() => cancel(r)}>Zurückziehen</button>
                   )}
-                  {r.state === 'genehmigt' && canDecide(r) && (
+                  {r.state === 'genehmigt' && (canDecide(r) || (canSeePersonnel(me) && r.user_id !== me.id)) && (
                     <button className="link danger" disabled={busy} onClick={() => cancel(r)}>Stornieren</button>
                   )}
                 </div>

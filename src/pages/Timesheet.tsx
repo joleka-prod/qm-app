@@ -5,6 +5,7 @@ import { AttendanceApprovals, requestText, type AttendanceRequest } from '../com
 import { ClockBar } from '../components/ClockBar'
 import { OvertimeCard } from '../components/OvertimeCard'
 import { TeamOverview } from '../components/TeamOverview'
+import { TimeChangeNotices } from '../components/TimeChangeNotices'
 import { VacationCard, type VacationRequest } from '../components/VacationCard'
 import { minutesOf, toLocalInput, type TimeEntry } from '../components/TimeCard'
 import { clockTime, fixedBreakMinutes, formatMinutes, minutesBetween, useClockChanged, workMinutes, type Attendance } from '../lib/clock'
@@ -43,7 +44,7 @@ export function Timesheet() {
   const staff = profiles.filter((p) => p.active)
   const isPlanner = isPlannerRole(profile?.role)
   const isAdmin = profile?.role === 'admin'
-  // Personalabteilung sieht die Zeiten aller Mitarbeiter (nur lesen)
+  // Personalabteilung sieht und ändert die Zeiten aller Mitarbeiter
   const isHr = canSeePersonnel(profile)
   const today = isoDate(new Date())
   // Vorgesetzte sehen die Zeiten ihrer Mitarbeiter (auch über mehrere Ebenen)
@@ -85,8 +86,9 @@ export function Timesheet() {
   const [error, setError] = useState('')
   const now = Date.now()
   // Nachtragen/Korrigieren darf man für sich selbst (mit Genehmigung), Planer, Personalabteilung und Vorgesetzte auch für andere.
-  // Genehmigen bleibt beim Vorgesetzten oder Admin.
+  // Vorgesetzte, Admin und Personalabteilung ändern fremde Zeiten sofort; Genehmigen bleibt beim Vorgesetzten oder Admin.
   const canCorrect = installerId === profile?.id || isPlanner || isHr || isAbove(installerId)
+  const changesDirectly = installerId !== profile?.id && (isAdmin || isHr || isAbove(installerId))
   const [requests, setRequests] = useState<AttendanceRequest[]>([])
   const [info, setInfo] = useState('')
 
@@ -223,9 +225,11 @@ export function Timesheet() {
           placeholder="z. B. Ausstempeln vergessen"
         />
       </label>
-      {installerId === profile?.id || !(isAdmin || isAbove(installerId)) ? (
+      {changesDirectly ? (
+        <p className="small muted">Die Änderung gilt sofort. {displayName(byId[installerId])} bekommt dazu eine Info in der Zeiterfassung.</p>
+      ) : (
         <p className="small muted">Die Änderung gilt erst, wenn der Vorgesetzte sie genehmigt hat.</p>
-      ) : null}
+      )}
       {error && <p className="error">{error}</p>}
       <div className="actions">
         {edit.id && isAdmin && (
@@ -233,7 +237,7 @@ export function Timesheet() {
         )}
         <button disabled={busy} onClick={() => setEdit(null)}>Abbrechen</button>
         <button className="primary" disabled={busy || !edit.start || !edit.end || edit.reason.trim().length < 3} onClick={saveEdit}>
-          {installerId !== profile?.id && (isAdmin || isAbove(installerId)) ? 'Speichern' : 'Zur Genehmigung senden'}
+          {changesDirectly ? 'Speichern' : 'Zur Genehmigung senden'}
         </button>
       </div>
     </div>
@@ -255,13 +259,17 @@ export function Timesheet() {
         <p className="small">Vorgesetzte(r): {displayName(byId[byId[installerId].supervisor_id!])}</p>
       )}
       {installerId && <OvertimeCard userId={installerId} reloadKey={sessions} />}
+      {installerId && installerId === profile?.id && <TimeChangeNotices userId={installerId} byId={byId} reloadKey={sessions} />}
       {profile && installerId && (
         <VacationCard userId={installerId} me={profile} byId={byId} year={Number(month.slice(0, 4))} onChanged={load} part="own" />
       )}
 
       <p className="muted small">
         Die Arbeitszeit kommt aus Start und Stopp der Zeiterfassung oben, abzüglich der festen Pausen 09:00–09:15 und 12:00–12:30. „Aufträge“ zeigt die Zeit, die auf
-        Aufträge gebucht wurde.{canCorrect && ' Fehlende oder falsche Zeiten kannst du hier mit Grund nachtragen oder korrigieren; sie gelten nach Genehmigung durch den Vorgesetzten.'}
+        Aufträge gebucht wurde.{canCorrect &&
+          (changesDirectly
+            ? ' Fehlende oder falsche Zeiten kannst du hier mit Grund nachtragen oder korrigieren; sie gelten sofort.'
+            : ' Fehlende oder falsche Zeiten kannst du hier mit Grund nachtragen oder korrigieren; sie gelten nach Genehmigung durch den Vorgesetzten.')}
       </p>
 
       <div className="timesheet-days">
