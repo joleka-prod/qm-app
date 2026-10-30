@@ -188,8 +188,10 @@ export function Terminal() {
 
   // Chip über NFC des Geräts
   const stopNfc = useRef<(() => void) | null>(null)
+  const nfcStarting = useRef(false)
   const beginNfc = useCallback(async () => {
-    if (!nfcMode() || stopNfc.current) return
+    if (!nfcMode() || stopNfc.current || nfcStarting.current) return
+    nfcStarting.current = true
     try {
       stopNfc.current = await startNfc(clockBadge, () => show({ kind: 'fehler', title: 'Chip nicht lesbar', sub: 'Bitte noch einmal ruhig vorhalten.' }))
       setNeedsTap(false)
@@ -198,6 +200,7 @@ export function Terminal() {
       setNfcError((err as Error).message || 'Start fehlgeschlagen')
       setNeedsTap(true)
     }
+    nfcStarting.current = false
   }, [clockBadge, show])
 
   useEffect(() => {
