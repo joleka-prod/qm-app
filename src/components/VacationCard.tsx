@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { rejectReason } from '../lib/rejectReason'
 import { supabase } from '../lib/supabase'
 import { loadMembers, useTeams, type TeamMember } from '../lib/teams'
 import { canSeePersonnel, displayName, formatDate, formatDay, type Profile } from '../lib/types'
@@ -173,7 +174,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
   }
 
   const decide = (r: VacationRequest, approve: boolean) => {
-    const note = approve ? '' : prompt('Grund für die Ablehnung (optional):') ?? null
+    const note = approve ? '' : rejectReason()
     if (note === null) return
     run(() => supabase.rpc('decide_vacation', { p_id: r.id, p_approve: approve, p_note: note }))
   }
