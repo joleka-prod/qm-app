@@ -172,6 +172,8 @@ export function TimetacImport() {
   const [tasks, setTasks] = useState<Record<string, string>>({})
   const [skipTasks, setSkipTasks] = useState<string[]>([])
   const [absences, setAbsences] = useState<Map<string, Absence[]> | null>(null)
+  // TimeTac-Arten ohne Gegenstück in der App (werden nicht übernommen), mit Anzahl Tage
+  const [otherTypes, setOtherTypes] = useState<[string, number][]>([])
   const [grants, setGrants] = useState<Map<string, Grant>>(new Map())
   const [grantsError, setGrantsError] = useState('')
   const [absResult, setAbsResult] = useState<{ name: string; replaced: number; inserted: number; skipped: number; error?: string }[]>([])
@@ -402,6 +404,12 @@ export function TimetacImport() {
       }
       setGrants(next)
       setGrantsError(gErr)
+      const other = new Map<string, number>()
+      for (const r of list) {
+        if (Number(r.status) !== 1 || Number(r.value) <= 0 || ABSENCE_KIND[str(r.type)]) continue
+        other.set(str(r.type) || '?', (other.get(str(r.type) || '?') ?? 0) + (str(r.value_unit) === 'hs' ? Number(r.value) / 8 : Number(r.value)))
+      }
+      setOtherTypes([...other.entries()])
       setAbsences(groupAbsences(list))
       setAbsRange([from, to])
     } catch (e) {
@@ -649,6 +657,13 @@ export function TimetacImport() {
                 <p className="error small">Genehmiger konnten nicht aus TimeTac geladen werden ({grantsError}). Die Abwesenheiten werden ohne Genehmiger übernommen.</p>
               ) : (
                 <p className="muted small">Genehmiger aus TimeTac: {grants.size.toLocaleString('de-DE')} Anträge. Wer keinen App-Benutzer hat, erscheint nur mit Namen.</p>
+              )}
+              {otherTypes.length > 0 && (
+                <p className="small appointment-warn">
+                  Nicht übernommen (andere TimeTac-Arten):{' '}
+                  {otherTypes.map(([t, d]) => `${t} (${d.toLocaleString('de-DE')} Tage)`).join(', ')}.
+                  Schulung, Schule, Unbezahlter Urlaub und Kindkrank bitte in der App eintragen; sie bleiben beim Import stehen.
+                </p>
               )}
               {absences.size === 0 && <p className="muted">Keine genehmigten Abwesenheiten in diesem Zeitraum.</p>}
               {absences.size > 0 && <button type="button" className="primary" disabled={!!busy} onClick={importAbsences}>Abwesenheiten übernehmen</button>}
