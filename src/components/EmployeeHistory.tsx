@@ -74,6 +74,7 @@ export function EmployeeHistory({ employeeId, version }: { employeeId: number; v
     if (r.action === 'benutzer_geändert') return USER_LABEL[key] ?? key
     if (key === 'user_id') return 'App-Benutzer'
     if (key === 'wage_concept') return 'Lohnkonzept'
+    if (key === 'work_days') return 'Arbeitstage'
     if (key === 'akte') return 'Hineingeführt'
     return MAIN[key]?.label ?? key
   }
@@ -91,6 +92,7 @@ export function EmployeeHistory({ employeeId, version }: { employeeId: number; v
       return String(v)
     }
     if (key === 'user_id') return byId[String(v)] ? `${displayName(byId[String(v)])} (${byId[String(v)].email})` : 'verknüpft'
+    if (key === 'work_days' && Array.isArray(v)) return v.map((d) => ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr'][Number(d)] ?? d).join(', ')
     if (MAIN[key]) return show(MAIN[key], v) || '–'
     return typeof v === 'object' ? JSON.stringify(v) : String(v)
   }
