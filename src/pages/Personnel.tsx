@@ -32,20 +32,25 @@ function duplicateGroups(list: Employee[]) {
 const num = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
 // Kennzahlen oben in der Übersicht (Fabian, 2026-10-27), nur aktive Mitarbeiter (ohne Externe):
-// Durchschnittsalter mit Geschäftsführung; Fehlzeitenquote nach Tagen ohne Geschäftsführung (Fabian, 2026-10-30):
-// Summe der Krankheitstage / Summe der möglichen Arbeitstage (vereinbarte Arbeitstage ohne Feiertage) × 100.
+// Durchschnittsalter mit Geschäftsführung. Quoten nach Tagen ohne Geschäftsführung (Fabian, 2026-10-30):
+// Fehlzeitenquote = alle Fehltage (Krank, Urlaub, Sonderurlaub) / Soll-Arbeitstage × 100,
+// Krankenquote = Krankheitstage / Soll-Arbeitstage × 100; jeweils Summen über alle Mitarbeiter.
+// Die Quoten zählen alle Mitarbeiter, auch ausgetretene (bis zum Austritt) und langzeitkranke.
 function KeyFigures({ list }: { list: Employee[] }) {
-  type Rate = { sick: number; possible: number; curSick: number | null; curPossible: number | null }
+  type Days = { sick: number; absent: number; possible: number }
+  type Rate = { all: Days; cur: Days | null }
   const [rates, setRates] = useState<Map<number, Rate> | null>(null)
   const [rateError, setRateError] = useState('')
 
   useEffect(() => {
     supabase.rpc('employees_absence_rate').then(({ data, error }) => {
       if (error) setRateError(error.message.includes('employees_absence_rate') ? 'SQL-Update fehlt' : error.message)
-      const rows = (data ?? []) as { employee_id: number; sick_days: number; possible_days: number; cur_sick_days: number | null; cur_possible_days: number | null }[]
-      const n = (v: number | null) => (v == null ? null : Number(v))
-      setRates(new Map(rows.map((r) => [r.employee_id, {
-        sick: Number(r.sick_days), possible: Number(r.possible_days), curSick: n(r.cur_sick_days), curPossible: n(r.cur_possible_days),
+      type Row = { employee_id: number; sick_days: number; absent_days: number; possible_days: number
+        cur_sick_days: number | null; cur_absent_days: number | null; cur_possible_days: number | null }
+      setRates(new Map(((data ?? []) as Row[]).map((r) => [r.employee_id, {
+        all: { sick: Number(r.sick_days), absent: Number(r.absent_days), possible: Number(r.possible_days) },
+        cur: r.cur_possible_days == null ? null
+          : { sick: Number(r.cur_sick_days ?? 0), absent: Number(r.cur_absent_days ?? 0), possible: Number(r.cur_possible_days) },
       }])))
     })
   }, [])
@@ -55,16 +60,22 @@ function KeyFigures({ list }: { list: Employee[] }) {
   const year = new Date().getFullYear()
   const ages = active.filter((e) => e.birth_date).map((e) => (now - new Date(String(e.birth_date) + 'T00:00').getTime()) / (365.2425 * 864e5))
   const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length
-  const rateRows = active.filter((e) => !isManagingDirector(e) && rates?.has(e.id)).map((e) => rates!.get(e.id)!)
-  const all = rateRows.filter((r) => r.possible > 0).map((r) => ({ sick: r.sick, possible: r.possible }))
+  const rateRows = list.filter((e) => !isManagingDirector(e) && rates?.has(e.id)).map((e) => rates!.get(e.id)!)
+  const all = rateRows.map((r) => r.all).filter((d) => d.possible > 0)
   // laufendes Geschäftsjahr (= Kalenderjahr), Stand heute
-  const cur = rateRows.filter((r) => r.curPossible).map((r) => ({ sick: r.curSick ?? 0, possible: r.curPossible! }))
-  const sum = (a: { sick: number; possible: number }[], k: 'sick' | 'possible') => a.reduce((x, r) => x + r[k], 0)
-  const rateValue = (a: { sick: number; possible: number }[]) =>
-    rateError ? '–' : rates === null ? '…' : a.length ? `${num((sum(a, 'sick') / sum(a, 'possible')) * 100)} %` : '–'
-  const rateNote = (a: { sick: number; possible: number }[], what: string) =>
+  const cur = rateRows.map((r) => r.cur).filter((d): d is Days => !!d && d.possible > 0)
+  const sum = (a: Days[], k: keyof Days) => a.reduce((x, r) => x + r[k], 0)
+  const rateValue = (a: Days[], k: 'sick' | 'absent') =>
+    rateError ? '–' : rates === null ? '…' : a.length ? `${num((sum(a, k) / sum(a, 'possible')) * 100)} %` : '–'
+  const rateNote = (a: Days[], k: 'sick' | 'absent', what: string) =>
     rateError ||
-    `${num(sum(a, 'sick'))} Krankheitstage von ${sum(a, 'possible').toLocaleString('de-DE')} möglichen Arbeitstagen ${what}, ${a.length} aktive Mitarbeiter mit Zeiterfassung, ohne Geschäftsführung`
+    `${num(sum(a, k))} ${k === 'sick' ? 'Krankheitstage' : 'Fehltage (Krank, Urlaub, Sonderurlaub)'} von ${sum(a, 'possible').toLocaleString('de-DE')} Soll-Arbeitstagen ${what}, ${a.length} Mitarbeiter mit Zeiterfassung (auch ausgetretene), ohne Geschäftsführung`
+  const figures: [string, Days[], 'sick' | 'absent', string][] = [
+    ['Fehlzeitenquote (historisch)', all, 'absent', 'über alle Jahre'],
+    [`Fehlzeitenquote ${year} (bis heute)`, cur, 'absent', 'im laufenden Geschäftsjahr'],
+    ['Krankenquote (historisch)', all, 'sick', 'über alle Jahre'],
+    [`Krankenquote ${year} (bis heute)`, cur, 'sick', 'im laufenden Geschäftsjahr'],
+  ]
 
   return (
     <div className="key-figures">
@@ -75,16 +86,13 @@ function KeyFigures({ list }: { list: Employee[] }) {
           {ages.length} aktive Mitarbeiter{ages.length < active.length ? `, ${active.length - ages.length} ohne Geburtsdatum` : ''}
         </div>
       </section>
-      <section className="card key-figure">
-        <div className="muted small">Fehlzeitenquote (historisch)</div>
-        <div className="key-figure-value">{rateValue(all)}</div>
-        <div className="muted small">{rateNote(all, 'über alle Jahre')}</div>
-      </section>
-      <section className="card key-figure">
-        <div className="muted small">Fehlzeitenquote {year} (bis heute)</div>
-        <div className="key-figure-value">{rateValue(cur)}</div>
-        <div className="muted small">{rateNote(cur, 'im laufenden Geschäftsjahr')}</div>
-      </section>
+      {figures.map(([label, days, k, what]) => (
+        <section key={label} className="card key-figure">
+          <div className="muted small">{label}</div>
+          <div className="key-figure-value">{rateValue(days, k)}</div>
+          <div className="muted small">{rateNote(days, k, what)}</div>
+        </section>
+      ))}
     </div>
   )
 }
