@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { clockTime } from '../lib/clock'
+import { rejectReason } from '../lib/rejectReason'
 import { supabase } from '../lib/supabase'
 import { displayName, formatDay, isoDate, type Profile } from '../lib/types'
 
@@ -53,7 +54,7 @@ export function AttendanceApprovals({ me, byId, onChanged }: { me: Profile; byId
   }
 
   async function decide(r: AttendanceRequest, approve: boolean) {
-    const note = approve ? '' : prompt('Grund für die Ablehnung (optional):') ?? null
+    const note = approve ? '' : rejectReason()
     if (note === null) return
     setBusy(true)
     setError('')

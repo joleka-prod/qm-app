@@ -29,6 +29,7 @@ import { createUser, generatePassword } from '../lib/adminUsers'
 import { useProfiles } from '../lib/useProfiles'
 import { Users } from './Users'
 import { EmployeeHistory } from '../components/EmployeeHistory'
+import { TimeSettings } from '../components/TimeSettings'
 
 type Form = Record<string, string | boolean>
 
@@ -283,6 +284,18 @@ export function PersonnelDetail() {
     load()
   }, [load])
 
+  // Nach dem Speichern im Reiter Zeiterfassung: Akte neu laden, ungespeicherte Änderungen der anderen Reiter behalten
+  const reloadTimeSettings = useCallback(async () => {
+    const { data } = await supabase.from('employees').select('*').eq('id', id).maybeSingle()
+    if (data) {
+      const e = data as Employee
+      setEmp(e)
+      setForm((f) => ({ ...f, weekly_hours: formOf(e).weekly_hours }))
+    }
+    setLogVersion((v) => v + 1)
+    await reloadProfiles()
+  }, [id, reloadProfiles])
+
   // Auswahl-Vorschläge: feste Werte plus alles, was bei anderen Mitarbeitern schon eingetragen ist
   useEffect(() => {
     const keys = MAIN_FIELDS.filter((f) => f.type === 'choice').map((f) => f.key)
@@ -458,6 +471,7 @@ export function PersonnelDetail() {
       })()}
 
       {current.key !== 'benutzer' && <section className="card emp-card">
+        {current.key === 'zeiterfassung' && <TimeSettings emp={emp} user={user ?? null} onSaved={reloadTimeSettings} />}
         {current.key === 'fehlzeiten' && (
           <div className="emp-section">
             <SickDaysByYear employeeId={emp.id} hasUser={!!emp.user_id} />
