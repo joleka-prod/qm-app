@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, type DragEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { JobCard } from '../components/JobCard'
+import { ABSENCE_LABEL, type VacationKind } from '../components/VacationCard'
 import { WeekPlanning } from '../components/WeekPlanning'
 import { scrollToToday, useRemembered, useScrollMemory } from '../lib/calendarMemory'
 import { holidayName } from '../lib/holidays'
@@ -22,6 +23,13 @@ import {
 import { useProfiles } from '../lib/useProfiles'
 
 const DAYS = 6 // Montag bis Samstag
+
+interface Absence {
+  user_id: string
+  start_date: string
+  end_date: string
+  kind: VacationKind
+}
 const MAX_MEMBERS = 3
 
 function byTime(a: Ticket, b: Ticket) {
@@ -41,6 +49,8 @@ export function PlanningCalendar() {
   const [planned, setPlanned] = useState<Ticket[]>([])
   const [unplanned, setUnplanned] = useState<Ticket[]>([])
   const [members, setMembers] = useState<TeamMember[]>([])
+  // Genehmigter Urlaub und andere Abwesenheiten der Woche (Einteilen ist dann gesperrt)
+  const [absences, setAbsences] = useState<Absence[]>([])
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [dropTarget, setDropTarget] = useState('')
@@ -86,7 +96,7 @@ export function PlanningCalendar() {
   const load = useCallback(async () => {
     const from = isoDate(weekStart)
     const to = isoDate(addDays(weekStart, DAYS - 1))
-    const [p, u, m] = await Promise.all([
+    const [p, u, m, a] = await Promise.all([
       supabase
         .from('tickets')
         .select(CALENDAR_SELECT)
@@ -95,11 +105,18 @@ export function PlanningCalendar() {
         .lte('montage_date', to),
       supabase.from('tickets').select(CALENDAR_SELECT).neq('ticket_type', 'qm').eq('status', 'neu').order('created_at'),
       loadMembers(from, to),
+      supabase
+        .from('vacation_requests')
+        .select('user_id, start_date, end_date, kind')
+        .eq('state', 'genehmigt')
+        .lte('start_date', to)
+        .gte('end_date', from),
     ])
     setPlanned(((p.data ?? []) as Ticket[]).filter((t) => t.team_id))
     // vorgemerkte Wochen zuerst, danach nach Eingang
     setUnplanned(((u.data ?? []) as Ticket[]).sort((a, b) => (a.planned_week ?? '9').localeCompare(b.planned_week ?? '9')))
     setMembers(m)
+    setAbsences((a.data ?? []) as Absence[])
     setLoaded(true)
   }, [weekStart])
   useScrollMemory('cal-scroll', loaded)
@@ -148,7 +165,7 @@ export function PlanningCalendar() {
         const { error } = await supabase.from('team_members').insert({ team_id: team.id, day: d, installer_id: installerId })
         if (error) skipped.push(formatDay(d))
       }
-      if (skipped.length) setInfo(`${name} konnte nicht eingeplant werden am ${skipped.join(', ')} (schon in einem anderen Team, Team voll oder keine Arbeitserlaubnis für das Land).`)
+      if (skipped.length) setInfo(`${name} konnte nicht eingeplant werden am ${skipped.join(', ')} (schon in einem anderen Team, Team voll, Urlaub/Abwesenheit oder keine Arbeitserlaubnis für das Land).`)
     }
     load()
   }
@@ -189,6 +206,8 @@ export function PlanningCalendar() {
   const membersIn = (teamId: number, date: string) =>
     members.filter((m) => m.team_id === teamId && m.day === date).sort((a, b) => Number(b.lead) - Number(a.lead))
   const leadOf = (teamId: number, date: string) => members.find((m) => m.team_id === teamId && m.day === date && m.lead)
+  const absenceOf = (installerId: string, date: string) =>
+    absences.find((a) => a.user_id === installerId && a.start_date <= date && a.end_date >= date)
   const freeInstallers = (date: string) => {
     const busy = new Set(members.filter((m) => m.day === date).map((m) => m.installer_id))
     return installers.filter((i) => !busy.has(i.id))
@@ -221,6 +240,9 @@ export function PlanningCalendar() {
                 </button>
               )}
               <Link to={`/monteur/${m.installer_id}`}>{displayName(byId[m.installer_id])}</Link>
+              {absenceOf(m.installer_id, d) && (
+                <span className="appointment-warn" title="Wurde vor dem Urlaub eingeplant">({ABSENCE_LABEL[absenceOf(m.installer_id, d)!.kind]})</span>
+              )}
               <button
                 aria-label={`${displayName(byId[m.installer_id])} aus ${team.name} entfernen`}
                 onClick={() => removeMember(m)}
@@ -238,7 +260,10 @@ export function PlanningCalendar() {
             >
               <option value="">+ Monteur</option>
               {free.map((p) => (
-                <option key={p.id} value={p.id}>{displayName(p)}</option>
+                <option key={p.id} value={p.id}>
+                  {displayName(p)}
+                  {absenceOf(p.id, d) ? ` – ${ABSENCE_LABEL[absenceOf(p.id, d)!.kind]}` : ''}
+                </option>
               ))}
             </select>
           )}
