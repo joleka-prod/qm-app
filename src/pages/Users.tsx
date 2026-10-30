@@ -260,15 +260,22 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
                       <input inputMode="decimal" value={edit.weekly_hours} onChange={(e) => setEdit({ ...edit, weekly_hours: e.target.value })} />
                     </label>
                   )}
-                  <label>
-                    Stundenkonto ab
-                    <input type="date" value={edit.overtime_start} onChange={(e) => setEdit({ ...edit, overtime_start: e.target.value })} />
-                  </label>
-                  <label>
-                    Übertrag Überstunden (Std.)
-                    <input inputMode="decimal" value={edit.overtime_opening} onChange={(e) => setEdit({ ...edit, overtime_opening: e.target.value })} />
-                  </label>
+                  {!files[p.id] && (
+                    <>
+                      <label>
+                        Stundenkonto ab
+                        <input type="date" value={edit.overtime_start} onChange={(e) => setEdit({ ...edit, overtime_start: e.target.value })} />
+                      </label>
+                      <label>
+                        Übertrag Überstunden (Std.)
+                        <input inputMode="decimal" value={edit.overtime_opening} onChange={(e) => setEdit({ ...edit, overtime_opening: e.target.value })} />
+                      </label>
+                    </>
+                  )}
                 </div>
+                {files[p.id] && (
+                  <p className="small muted">Wochenstunden, Arbeitstage, Stundenkonto und Stempel-Terminal stehen im Reiter Zeiterfassung.</p>
+                )}
                 {edit.role === 'monteur' && (
                   <label className="checkbox-row">
                     <input
@@ -285,7 +292,7 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
                     Zugriff auf Personalakten (sieht und pflegt alle Personaldaten)
                   </label>
                 )}
-                <fieldset className="terminal-creds">
+                {!files[p.id] && <fieldset className="terminal-creds">
                   <legend>Stempel-Terminal</legend>
                   <label>
                     Chipnummer (Transponder)
@@ -322,7 +329,7 @@ export function Users({ only, onChanged }: { only?: string; onChanged?: () => vo
                   {creds[p.id]?.locked_until && new Date(creds[p.id].locked_until!) > new Date() && (
                     <p className="small appointment-warn">PIN wegen Fehlversuchen gesperrt bis {new Date(creds[p.id].locked_until!).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr. Eine neue PIN hebt die Sperre auf.</p>
                   )}
-                </fieldset>
+                </fieldset>}
                 {!files[p.id] && (
                   <label className="checkbox-row">
                     <input
