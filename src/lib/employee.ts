@@ -256,7 +256,7 @@ export const TABS: Tab[] = [
       { title: 'Anschrift', fields: pick('street', 'house_no', 'zip', 'city', 'phone_private', 'mobile_private', 'email_private') },
       {
         title: 'Vertragsdaten',
-        fields: pick('vacation_days', 'entry_date', 'exit_date', 'department', 'job_title', 'specific_experience', 'employment_type', 'weekly_hours', 'wage_type', 'probation_end', 'contract_end'),
+        fields: pick('vacation_days', 'entry_date', 'exit_date', 'department', 'job_title', 'specific_experience', 'employment_type', 'wage_type', 'probation_end', 'contract_end'),
         computed: ['seniority'],
       },
       { title: 'Lohnabrechnung', fields: pick('tax_id', 'church_tax', 'child_allowance', 'social_security_no', 'health_insurance', 'insurance_type', 'disability') },
@@ -282,6 +282,8 @@ export const TABS: Tab[] = [
   { key: 'kleidung', title: 'Kleidung/KFZ', sections: [{ tables: ['schuhe', 'kleidung', 'kfz'] }] },
   { key: 'fehlzeiten', title: 'Fehlzeiten', sections: [{ tables: ['unfall', 'reha'] }] },
   { key: 'lohnkonzept', title: 'Lohnkonzept', sections: [] },
+  // Wochenstunden, Arbeitstage, Stundenkonto und Stempel-Terminal (TimeSettings)
+  { key: 'zeiterfassung', title: 'Zeiterfassung', sections: [] },
 ]
 
 // Externe Dienstleister haben nur Stammdaten (eigene Felder) und den Reiter App-Benutzer.
