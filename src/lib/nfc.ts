@@ -17,6 +17,9 @@ interface Fully {
 const fully = () => (typeof window !== 'undefined' ? (window as unknown as { fully?: Fully }).fully : undefined)
 type FullyWindow = { __fullyNfc?: (serial: string) => void }
 
+// zur Anzeige am Terminal: über welchen Weg Chips gelesen werden
+export const nfcMode = () => (fully()?.nfcScanStart ? 'Fully Kiosk' : typeof window !== 'undefined' && 'NDEFReader' in window ? 'Chrome' : '')
+
 export const nfcSupported = typeof window !== 'undefined' && ('NDEFReader' in window || !!fully()?.nfcScanStart)
 
 // Startet das Lesen; liefert eine Funktion zum Beenden. Wirft, wenn NFC aus ist oder die

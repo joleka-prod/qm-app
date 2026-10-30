@@ -768,3 +768,4 @@ button.link.danger-link { color: var(--danger); }
 .import-table .cell-edit.error { border-color: #f04438; background: #fef3f2; }
 .cell-name-edit { display: flex; gap: 0.3rem; align-items: center; }
 .cell-name-edit .cell-edit { min-width: 7rem; }
+.terminal-version { font-size: 0.75rem; opacity: 0.6; }
