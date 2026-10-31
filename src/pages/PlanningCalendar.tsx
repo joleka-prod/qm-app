@@ -1,7 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, type DragEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { JobCard } from '../components/JobCard'
-import { ABSENCE_LABEL, type VacationKind } from '../components/VacationCard'
 import { WeekPlanning } from '../components/WeekPlanning'
 import { scrollToToday, useRemembered, useScrollMemory } from '../lib/calendarMemory'
 import { holidayName } from '../lib/holidays'
@@ -28,7 +27,6 @@ interface Absence {
   user_id: string
   start_date: string
   end_date: string
-  kind: VacationKind
 }
 const MAX_MEMBERS = 3
 
@@ -105,12 +103,8 @@ export function PlanningCalendar() {
         .lte('montage_date', to),
       supabase.from('tickets').select(CALENDAR_SELECT).neq('ticket_type', 'qm').eq('status', 'neu').order('created_at'),
       loadMembers(from, to),
-      supabase
-        .from('vacation_requests')
-        .select('user_id, start_date, end_date, kind')
-        .eq('state', 'genehmigt')
-        .lte('start_date', to)
-        .gte('end_date', from),
+      // nur "abwesend", ohne Art (Krank usw. sehen nur Vorgesetzte, Personalabteilung und Admin)
+      supabase.rpc('planning_absences', { p_from: from, p_to: to }),
     ])
     setPlanned(((p.data ?? []) as Ticket[]).filter((t) => t.team_id))
     // vorgemerkte Wochen zuerst, danach nach Eingang
@@ -241,7 +235,7 @@ export function PlanningCalendar() {
               )}
               <Link to={`/monteur/${m.installer_id}`}>{displayName(byId[m.installer_id])}</Link>
               {absenceOf(m.installer_id, d) && (
-                <span className="appointment-warn" title="Wurde vor dem Urlaub eingeplant">({ABSENCE_LABEL[absenceOf(m.installer_id, d)!.kind]})</span>
+                <span className="appointment-warn" title="Wurde vor der Abwesenheit eingeplant">(abwesend)</span>
               )}
               <button
                 aria-label={`${displayName(byId[m.installer_id])} aus ${team.name} entfernen`}
@@ -262,7 +256,7 @@ export function PlanningCalendar() {
               {free.map((p) => (
                 <option key={p.id} value={p.id}>
                   {displayName(p)}
-                  {absenceOf(p.id, d) ? ` – ${ABSENCE_LABEL[absenceOf(p.id, d)!.kind]}` : ''}
+                  {absenceOf(p.id, d) ? ' – abwesend' : ''}
                 </option>
               ))}
             </select>
