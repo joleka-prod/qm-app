@@ -812,3 +812,12 @@ button.link.danger-link { color: var(--danger); }
 /* Über 10 Stunden: Meldung am Tag und Zähler am Reiter Mitarbeiter */
 .ts-request.long-day-open { background: var(--highlight-bg, rgba(255, 196, 0, 0.18)); }
 .tab-badge { display: inline-block; min-width: 1.3em; margin-left: 0.4em; padding: 0 0.35em; border-radius: 999px; background: var(--primary); color: #fff; font-size: 0.75em; line-height: 1.4; text-align: center; }
+.long-day-edit { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.3rem; }
+.long-day-edit input { width: auto; }
+/* Handy: Meldungen untereinander statt Tabelle */
+@media (max-width: 640px) {
+  .long-day-table thead { display: none; }
+  .long-day-table tr { display: block; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+  .long-day-table td { display: block; border: 0; padding: 0.15rem 0; text-align: left !important; }
+  .long-day-table td:first-child { font-weight: 600; }
+}

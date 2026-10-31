@@ -142,7 +142,7 @@ export function LongDayApprovals({ me, byId, onChanged }: { me: Profile; byId: R
         eine Korrektur als Info in seiner Zeiterfassung.
       </p>
       <div className="cal-scroll">
-        <table className="import-table">
+        <table className="import-table long-day-table">
           <thead>
             <tr>
               <th>Mitarbeiter</th>
@@ -171,13 +171,13 @@ export function LongDayApprovals({ me, byId, onChanged }: { me: Profile; byId: R
                           </div>
                         ))
                       : rowsOf(r).map((a) => (
-                          <div key={a.id} className="ts-edit-row">
+                          <div key={a.id} className="long-day-edit">
                             <input
                               type="datetime-local"
                               value={active.times[a.id]?.start ?? ''}
                               onChange={(e) => setAction({ ...active, times: { ...active.times, [a.id]: { ...active.times[a.id], start: e.target.value } } })}
                             />
-                            {' – '}
+                            <span>–</span>
                             <input
                               type="datetime-local"
                               value={active.times[a.id]?.end ?? ''}
