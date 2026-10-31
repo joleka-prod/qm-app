@@ -245,9 +245,6 @@ export function Timesheet() {
   const timesheet = installerId && (
     <>
       {info && <p className="info">{info}</p>}
-      {byId[installerId]?.supervisor_id && (
-        <p className="small">Vorgesetzte(r): {displayName(byId[byId[installerId].supervisor_id!])}</p>
-      )}
       {profile && installerId && (
         <VacationCard
           userId={installerId}
