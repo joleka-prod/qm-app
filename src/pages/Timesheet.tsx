@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { AttendanceApprovals, requestText, type AttendanceRequest } from '../components/AttendanceApprovals'
@@ -60,19 +60,17 @@ export function Timesheet() {
   const staffView = hasStaffView && params.get('ansicht') === 'mitarbeiter'
   const staffId = params.get('person') ?? ''
   const installerId = staffView ? staffId : profile?.id ?? ''
-  const staffTimes = useRef<HTMLDivElement>(null)
   function switchView(staff: boolean) {
     setEdit(null)
     setInfo('')
-    setParams(staff ? { ansicht: 'mitarbeiter', ...(staffId ? { person: staffId } : {}) } : {}, { replace: true })
+    setParams(staff ? { ansicht: 'mitarbeiter' } : {}, { replace: true })
   }
   // Person in der Mitarbeiteransicht wählen und zu deren Zeiten springen
   function pick(id: string) {
     setEdit(null)
     setInfo('')
-    setParams(id ? { ansicht: 'mitarbeiter', person: id } : { ansicht: 'mitarbeiter' }, { replace: true })
-    if (id) setTimeout(() => staffTimes.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
-    else window.scrollTo({ top: 0, behavior: 'smooth' })
+    setParams(id ? { ansicht: 'mitarbeiter', person: id } : { ansicht: 'mitarbeiter' })
+    window.scrollTo({ top: 0 })
   }
   const [month, setMonth] = useState(today.slice(0, 7))
   const [openNotices, setOpenNotices] = useState<number | null>(null)
@@ -401,20 +399,24 @@ export function Timesheet() {
 
       {staffView && profile && (
         <>
-          <AttendanceApprovals me={profile} byId={byId} onChanged={load} />
-          <VacationCard userId={profile.id} me={profile} byId={byId} year={Number(today.slice(0, 4))} onChanged={load} part="approvals" />
-          <TeamOverview
-            members={others}
-            selected={installerId}
-            onPick={pick}
-            reloadKey={sessions}
-          />
-
-          {installerId && (
-            <div className="staff-section" ref={staffTimes}>
+          {/* Person gewählt: nur deren Zeiterfassung, zurück zur Übersicht per Button */}
+          {installerId ? (
+            <div className="staff-section">
+              <button type="button" onClick={() => pick('')}>← Zurück zur Mitarbeiterübersicht</button>
               <h2>Zeiterfassung von {displayName(byId[installerId])}</h2>
               {timesheet}
             </div>
+          ) : (
+            <>
+              <AttendanceApprovals me={profile} byId={byId} onChanged={load} />
+              <VacationCard userId={profile.id} me={profile} byId={byId} year={Number(today.slice(0, 4))} onChanged={load} part="approvals" />
+              <TeamOverview
+                members={others}
+                selected={installerId}
+                onPick={pick}
+                reloadKey={sessions}
+              />
+            </>
           )}
         </>
       )}
