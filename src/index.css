@@ -521,17 +521,13 @@ button.link.danger { color: #b42318; }
 .cal td.cal-holiday, .cal th.cal-holiday { background: repeating-linear-gradient(135deg, transparent 0 8px, rgba(247, 144, 9, 0.07) 8px 16px); }
 
 /* Mitarbeiter-Übersicht für Vorgesetzte */
-.team-overview .table-scroll { overflow-x: auto; }
-.team-overview table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-.team-overview th, .team-overview td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
-.team-overview th { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
-.team-overview tbody tr { cursor: pointer; }
-.team-overview tbody tr:hover, .team-overview tr.selected { background: var(--info-bg); }
+.team-overview .import-table td { vertical-align: middle; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.team-overview .import-table tr.selected td { background: var(--info-bg); }
+/* Namen wie in der Personalübersicht als unterstrichener Link */
+.team-overview .name-link { text-decoration: underline; font-size: inherit; text-align: left; }
 
 /* Zeiterfassung: fremde Zeiten ansehen, Mitarbeiterbereich unten */
 .viewing-other { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; padding: 0.6rem 0.9rem; margin-bottom: 0.75rem; border-radius: 10px; background: var(--info-bg); }
-.staff-section { margin-top: 2rem; padding-top: 1rem; border-top: 2px solid var(--border); }
-.staff-section > h2 { margin: 0 0 0.75rem; }
 
 /* Selbstkosten */
 .cost-table { width: 100%; border-collapse: collapse; margin-bottom: 0.5rem; }
@@ -784,3 +780,14 @@ button.link.danger-link { color: var(--danger); }
 .month-picker-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem; }
 .month-picker-grid button { min-width: 0; padding: 0.4rem 0.2rem; }
 .ts-month-nav { display: flex; margin: 0.75rem 0 0.5rem; }
+/* Zeiterfassung im Stil der Personal-Seiten: Kartenabstände wie die Kennzahlen, Karteninnenabstand wie überall */
+.time-summary { gap: 0.75rem; margin-bottom: 0.9rem; }
+.time-summary > .card { margin: 0; }
+.timesheet-week { padding: 0.25rem 1rem; }
+.timesheet-days { gap: 0.9rem; }
+.ts-month-sum { margin-top: 0.9rem; }
+/* auf breiten Bildschirmen „Korrigieren“ direkt neben der Zeit statt am rechten Rand */
+@media (min-width: 700px) { .ts-session { justify-content: flex-start; gap: 1.25rem; } }
+.ts-session, .ts-meta { align-items: baseline; }
+.ts-session button.link, .ts-meta button.link, .ts-request button.link { font-size: inherit; padding: 0; }
+.page-head.wrap { flex-wrap: wrap; }

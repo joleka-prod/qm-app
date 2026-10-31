@@ -384,15 +384,16 @@ export function Timesheet() {
       {profile && !staffView && <ClockBar userId={profile.id} />}
       {noticeGate}
 
+      {/* Reiter wie im Bereich Personal */}
       {hasStaffView && (
-        <div className="segmented two view-switch" role="radiogroup" aria-label="Ansicht">
-          <button role="radio" aria-checked={!staffView} className={staffView ? '' : 'active'} onClick={() => switchView(false)}>
+        <nav className="emp-tabs" aria-label="Ansicht">
+          <button type="button" aria-pressed={!staffView} className={staffView ? '' : 'active'} onClick={() => switchView(false)}>
             Meine Zeiten
           </button>
-          <button role="radio" aria-checked={staffView} className={staffView ? 'active' : ''} onClick={() => switchView(true)}>
+          <button type="button" aria-pressed={staffView} className={staffView ? 'active' : ''} onClick={() => switchView(true)}>
             Mitarbeiter
           </button>
-        </div>
+        </nav>
       )}
 
       {!staffView && timesheet}
@@ -401,9 +402,12 @@ export function Timesheet() {
         <>
           {/* Person gewählt: nur deren Zeiterfassung, zurück zur Übersicht per Button */}
           {installerId ? (
-            <div className="staff-section">
-              <button type="button" onClick={() => pick('')}>← Zurück zur Mitarbeiterübersicht</button>
-              <h2>Zeiterfassung von {displayName(byId[installerId])}</h2>
+            <div>
+              {/* Kopf wie in der Personalakte: Name links, zurück rechts */}
+              <div className="page-head wrap">
+                <h1>{displayName(byId[installerId])}</h1>
+                <button type="button" onClick={() => pick('')}>← Zurück zur Mitarbeiterübersicht</button>
+              </div>
               {timesheet}
             </div>
           ) : (
