@@ -17,7 +17,7 @@ type Form = { id: number | null; kind: BlockKind; start: string; end: string; re
 
 const empty: Form = { id: null, kind: 'sperre', start: '', end: '', reason: '', all: true, departments: [] }
 
-// Zeiterfassung → Reiter "Urlaubssperren": Urlaubssperren und Betriebsferien für alle oder einzelne Abteilungen.
+// Zeiterfassung → Reiter "Einstellungen": Urlaubssperren und Betriebsferien für alle oder einzelne Abteilungen.
 // Pflegen Admin und Personalabteilung.
 export function VacationBlocks({ byId }: { byId: Record<string, Profile> }) {
   const [list, setList] = useState<VacationBlock[]>([])

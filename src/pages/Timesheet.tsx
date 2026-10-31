@@ -59,12 +59,12 @@ export function Timesheet() {
   // Zwei Ansichten: "Meine Zeiten" und "Mitarbeiter" (?ansicht=mitarbeiter, Person über &person=)
   const [params, setParams] = useSearchParams()
   const staffView = hasStaffView && params.get('ansicht') === 'mitarbeiter'
-  // Urlaubssperren und Betriebsferien pflegen Admin und Personalabteilung (?ansicht=sperren)
+  // Urlaubssperren und Betriebsferien pflegen Admin und Personalabteilung (Reiter Einstellungen, ?ansicht=einstellungen)
   const canBlocks = isAdmin || isHr
-  const blocksView = canBlocks && params.get('ansicht') === 'sperren'
+  const blocksView = canBlocks && params.get('ansicht') === 'einstellungen'
   const staffId = params.get('person') ?? ''
   const installerId = staffView ? staffId : profile?.id ?? ''
-  function switchView(view: '' | 'mitarbeiter' | 'sperren') {
+  function switchView(view: '' | 'mitarbeiter' | 'einstellungen') {
     setEdit(null)
     setInfo('')
     setParams(view ? { ansicht: view } : {}, { replace: true })
@@ -415,8 +415,8 @@ export function Timesheet() {
             </button>
           )}
           {canBlocks && (
-            <button type="button" aria-pressed={blocksView} className={blocksView ? 'active' : ''} onClick={() => switchView('sperren')}>
-              Urlaubssperren
+            <button type="button" aria-pressed={blocksView} className={`tab-end ${blocksView ? 'active' : ''}`} onClick={() => switchView('einstellungen')}>
+              Einstellungen
             </button>
           )}
         </nav>

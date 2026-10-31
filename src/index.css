@@ -731,6 +731,7 @@ button.link.danger-link { color: var(--danger); }
 .emp-tabs { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 .emp-tabs button { border-radius: 6px; }
 .emp-tabs button.active { background: var(--text); color: var(--card); border-color: var(--text); font-weight: 600; }
+.emp-tabs button.tab-end { margin-left: auto; }
 .emp-section + .emp-section { margin-top: 1rem; }
 .emp-heading { text-align: center; text-transform: none; letter-spacing: 0; font-size: 1rem; color: var(--text); padding-bottom: 0.3rem; border-bottom: 3px dotted var(--text); margin: 1.2rem 0 0.75rem; }
 .emp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0.6rem 0.9rem; align-items: end; }
