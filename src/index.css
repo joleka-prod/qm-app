@@ -491,9 +491,12 @@ button.link.danger { color: #b42318; }
 .cal-transposed thead th.cal-team-kundendienst { border-top-color: #2e90fa; }
 
 /* Überstunden */
-.overtime-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
-.overtime-head h2 { margin: 0; }
-.overtime-head strong { font-size: 1.4rem; }
+/* Urlaub und Überstunden oben nebeneinander (Handy untereinander) */
+.time-summary { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 0.9rem; }
+@media (min-width: 700px) {
+  .time-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .time-summary .vacation-sum { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 .overtime-plus { color: #067647; }
 .overtime-minus { color: #b42318; }
 .overtime p { margin: 0.35rem 0 0; }

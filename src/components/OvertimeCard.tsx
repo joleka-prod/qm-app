@@ -32,11 +32,17 @@ export function OvertimeCard({ userId, reloadKey }: { userId: string; reloadKey?
   if (!b) return null
   const empty = b.until < b.since
 
+  const rest = b.balance_min - b.planned_min - b.requested_min
+
+  // Aufbau wie die Urlaubsübersicht: Konto, für Freizeit genehmigt bzw. beantragt, danach frei verfügbar
   return (
     <section className="card overtime">
-      <div className="overtime-head">
-        <h2>Überstunden</h2>
-        <strong className={b.balance_min < 0 ? 'overtime-minus' : 'overtime-plus'}>{signed(b.balance_min)}</strong>
+      <h2>Überstunden</h2>
+      <div className="vacation-sum">
+        <div><span className="muted small">Überstunden</span><strong className={b.balance_min < 0 ? 'overtime-minus' : 'overtime-plus'}>{signed(b.balance_min)}</strong></div>
+        <div><span className="muted small">Genehmigt</span><strong>{formatMinutes(b.planned_min)}</strong></div>
+        <div><span className="muted small">Beantragt</span><strong>{formatMinutes(b.requested_min)}</strong></div>
+        <div><span className="muted small">Rest</span><strong className={rest < 0 ? 'overtime-minus' : ''}>{signed(rest)}</strong></div>
       </div>
       <p className="small muted">
         {empty ? (
@@ -48,17 +54,6 @@ export function OvertimeCard({ userId, reloadKey }: { userId: string; reloadKey?
           </>
         )}
       </p>
-      {(b.planned_min > 0 || b.requested_min > 0) && (
-        <p className="small">
-          Für Freizeit verplant: {b.planned_min > 0 && <>{formatMinutes(b.planned_min)} genehmigt</>}
-          {b.planned_min > 0 && b.requested_min > 0 && ' · '}
-          {b.requested_min > 0 && <>{formatMinutes(b.requested_min)} beantragt</>}
-          {' · '}danach frei verfügbar{' '}
-          <strong className={b.balance_min - b.planned_min - b.requested_min < 0 ? 'overtime-minus' : ''}>
-            {signed(b.balance_min - b.planned_min - b.requested_min)}
-          </strong>
-        </p>
-      )}
     </section>
   )
 }

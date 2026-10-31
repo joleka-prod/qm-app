@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { rejectReason } from '../lib/rejectReason'
 import { supabase } from '../lib/supabase'
 import { loadMembers, useTeams, type TeamMember } from '../lib/teams'
@@ -71,10 +71,13 @@ interface Props {
   onChanged?: () => void
   // 'own': nur Urlaub der Person, 'approvals': nur Anträge zum Genehmigen
   part?: 'all' | 'own' | 'approvals'
+  // Neben der Urlaubsübersicht (z. B. Überstunden) und darunter über volle Breite (z. B. Änderungsinfos)
+  aside?: ReactNode
+  below?: ReactNode
 }
 
 // Urlaub in der Zeiterfassung: Anträge stellen, Übersicht des Jahres, Genehmigung durch Vorgesetzte
-export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }: Props) {
+export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', aside, below }: Props) {
   const [list, setList] = useState<VacationRequest[]>([])
   const [pending, setPending] = useState<VacationRequest[]>([])
   const [form, setForm] = useState<{ start: string; end: string; note: string; kind: VacationKind; half?: boolean } | null>(null)
@@ -223,6 +226,8 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
       )}
 
       {part !== 'approvals' && (
+      <>
+      <div className="time-summary">
       <section className="card">
         <h2>Urlaub {year}</h2>
         <div className="vacation-sum">
@@ -232,6 +237,14 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
           <div><span className="muted small">Rest</span><strong className={rest < 0 ? 'appointment-warn' : ''}>{dayWord(rest)}</strong></div>
         </div>
         {allowance === 0 && <p className="small muted">Kein Urlaubsanspruch eingetragen. Der Admin kann ihn in der Benutzerverwaltung ändern.</p>}
+      </section>
+      {aside}
+      </div>
+      {below}
+
+      {(own || canEnter || form || error || list.length > 0) && (
+      <section className="card">
+        <h2>{own ? 'Urlaubsanträge' : 'Abwesenheiten'} {year}</h2>
 
         {own && !form && (
           <button className="primary" onClick={() => { setError(''); setForm({ start: '', end: '', note: '', kind: 'urlaub' }) }}>
@@ -353,6 +366,8 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all' }
           </ul>
         )}
       </section>
+      )}
+      </>
       )}
     </>
   )
