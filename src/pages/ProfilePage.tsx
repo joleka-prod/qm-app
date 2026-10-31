@@ -1,14 +1,21 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../auth'
 import { useOfflineState } from '../lib/offline'
 import { supabase } from '../lib/supabase'
-import { ROLE_LABEL } from '../lib/types'
+import { ROLE_LABEL, displayName, type Profile } from '../lib/types'
 
 export function ProfilePage() {
   const { profile, reloadProfile, setNeedsPassword } = useAuth()
   const [name, setName] = useState(profile?.full_name ?? '')
   const [msg, setMsg] = useState('')
   const offline = useOfflineState()
+  const [supervisor, setSupervisor] = useState<Profile | null>(null)
+  const supervisorId = profile?.supervisor_id
+
+  useEffect(() => {
+    if (!supervisorId) return setSupervisor(null)
+    supabase.from('profiles').select('*').eq('id', supervisorId).maybeSingle().then(({ data }) => setSupervisor(data as Profile | null))
+  }, [supervisorId])
 
   if (!profile) return null
 
@@ -33,6 +40,7 @@ export function ProfilePage() {
     <form className="card form" onSubmit={save}>
       <h1>Mein Profil</h1>
       <p className="muted">{profile.email} · {ROLE_LABEL[profile.role]}</p>
+      {supervisor && <p className="small">Vorgesetzte(r): {displayName(supervisor)}</p>}
       <label>
         Name
         <input required value={name} onChange={(e) => setName(e.target.value)} />
