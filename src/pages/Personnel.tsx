@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
-import { MAIN_FIELDS, STATUS, TABS, employeeName, entryVacation, isExternal, isManagingDirector, missingPayroll, norm, parse, show, toInput, type Employee, type Field } from '../lib/employee'
+import { MAIN_FIELDS, STATUS, TABS, employeeName, entryVacation, euro, wageConcept, isExternal, isManagingDirector, missingPayroll, norm, parse, show, toInput, type Employee, type Field } from '../lib/employee'
 import { supabase } from '../lib/supabase'
 import { ROLE_LABEL, displayName, type Profile } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 import { Users } from './Users'
+import { formatBadge } from '../lib/nfc'
 
 const fmt = (d: unknown) => (d ? new Date(String(d) + 'T00:00').toLocaleDateString('de-DE') : '–')
 
@@ -107,7 +108,27 @@ function ignored(): string[] {
 // Name ist immer sichtbar. Auswahl gegliedert wie die Personalakte (Reiter Stammdaten mit seinen Abschnitten,
 // Reiter App-Benutzer), innerhalb alphabetisch, nur Nr. steht vorn (Fabian, 2026-10-29).
 // field: Feld der Personalakte, im Bearbeiten-Modus direkt in der Tabelle änderbar
-type Column = { key: string; label: string; group?: string; num?: boolean; field?: Field; value: (e: Employee, byId: Record<string, Profile>) => string }
+type Column = { key: string; label: string; group?: string; num?: boolean; field?: Field; value: (e: Employee, byId: Record<string, Profile>, x: Extra) => string }
+
+// Angaben außerhalb der Tabelle employees (Fabian, 2026-10-31: alle Felder der Personalakte als Spalte):
+// Logbuch/Kinder/A1 aus employee_entries, Chip/PIN aus terminal_credentials_list, Resturlaub per RPC (nur wenn gewählt)
+type Extra = {
+  wage: Map<number, { from: string; wage: unknown }>
+  kids: Map<number, number>
+  a1: Map<number, string>
+  creds: Map<string, { badge_uid: string | null; has_pin: boolean }>
+  carry: Map<string, number | null>
+}
+const NO_EXTRA: Extra = { wage: new Map(), kids: new Map(), a1: new Map(), creds: new Map(), carry: new Map() }
+const YEAR = new Date().getFullYear()
+const LOGBOOK = 'Logbuch'
+const WAGE_CONCEPT = 'Lohnkonzept'
+const TIME = 'Zeiterfassung'
+const DAY_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
+const dec = (n: number) => String(Math.round(n * 100) / 100).replace('.', ',')
+const hhmm = (v: unknown) => (typeof v === 'string' && v ? v.slice(0, 5) : '–')
+const dateDe = (v: unknown) => (v ? new Date(String(v).slice(0, 10) + 'T00:00').toLocaleDateString('de-DE') : '–')
+const hasConcept = (e: Employee) => Object.values(e.wage_concept ?? {}).some(Boolean)
 
 const APP_USER = 'App-Benutzer'
 // Abschnitt der Personalakte je Feld; Abschnitte ohne Überschrift heißen "Allgemein"
@@ -116,8 +137,11 @@ for (const sec of TABS[0].sections) {
   const title = sec.title ?? 'Allgemein'
   for (const f of sec.fields ?? []) SECTION_OF.set(f.key, title)
   for (const c of sec.computed ?? []) SECTION_OF.set(c, title)
+  for (const t of sec.tables ?? []) SECTION_OF.set(t, title)
 }
-const GROUPS = [...new Set([...TABS[0].sections.map((sec) => sec.title ?? 'Allgemein'), APP_USER])]
+// Wochenstunden stehen seit 2026-10-30 im Reiter Zeiterfassung
+SECTION_OF.set('weekly_hours', TIME)
+const GROUPS = [...new Set([...TABS[0].sections.map((sec) => sec.title ?? 'Allgemein'), LOGBOOK, WAGE_CONCEPT, TIME, APP_USER])]
 
 const yearsSince = (d: unknown) =>
   d ? Math.floor((Date.now() - new Date(String(d).slice(0, 10) + 'T00:00').getTime()) / (365.2425 * 864e5)) : null
@@ -133,11 +157,18 @@ const FIELD_COLUMNS: Column[] = MAIN_FIELDS
   }))
 
 // Angaben aus dem App-Benutzer (Reiter App-Benutzer der Personalakte)
-const userColumn = (key: string, label: string, value: (p: Profile, byId: Record<string, Profile>) => string): Column => ({
+const userColumn = (key: string, label: string, value: (p: Profile, byId: Record<string, Profile>, x: Extra) => string, group = APP_USER): Column => ({
   key,
   label,
-  group: APP_USER,
-  value: (e, byId) => (e.user_id && byId[e.user_id] ? value(byId[e.user_id], byId) : '–'),
+  group,
+  value: (e, byId, x) => (e.user_id && byId[e.user_id] ? value(byId[e.user_id], byId, x) : '–'),
+})
+const conceptColumn = (key: string, label: string, part: 'base' | 'seniority' | 'total'): Column => ({
+  key,
+  label,
+  group: WAGE_CONCEPT,
+  num: true,
+  value: (e) => (hasConcept(e) ? euro(wageConcept(e.wage_concept ?? {}, e.entry_date as string)[part]) : '–'),
 })
 
 const COLUMNS = ([
@@ -151,6 +182,29 @@ const COLUMNS = ([
   userColumn('role', 'Rolle', (p) => ROLE_LABEL[p.role] ?? p.role),
   userColumn('supervisor', 'Vorgesetzte(r)', (p, byId) => (p.supervisor_id && byId[p.supervisor_id] ? displayName(byId[p.supervisor_id]) : '–')),
   userColumn('montage_capacity', 'Zählt bei Kapazitätsplanung', (p) => (p.role === 'monteur' ? ((p.montage_capacity ?? true) ? 'Ja' : 'Nein') : '–')),
+  userColumn('user_active', 'App-Benutzer aktiv', (p) => (p.active ? 'Ja' : 'Nein')),
+  userColumn('hr_access', 'Zugriff auf Personalakten', (p) => (p.role === 'admin' || p.role === 'personal' || p.hr_access ? 'Ja' : 'Nein')),
+  // Reiter Zeiterfassung
+  {
+    key: 'work_days', label: 'Vereinbarte Arbeitstage', group: TIME,
+    value: (e) => ((e.work_days as number[] | undefined) ?? [1, 2, 3, 4, 5]).map(Number).sort().map((d) => DAY_SHORT[d % 7]).join(', ') || '–',
+  },
+  { key: 'core_start', label: 'Kernarbeitszeit Beginn', group: TIME, value: (e) => hhmm(e.core_start) },
+  { key: 'core_end', label: 'Kernarbeitszeit Ende', group: TIME, value: (e) => hhmm(e.core_end) },
+  userColumn('overtime_start', 'Stundenkonto ab', (p) => dateDe(p.overtime_start), TIME),
+  userColumn('overtime_opening', 'Übertrag Überstunden', (p) => `${dec(Number(p.overtime_opening ?? 0))} Std.`, TIME),
+  userColumn('carryover', `Resturlaub aus ${YEAR - 1}`, (p, _b, x) => { if (!x.carry.has(p.id)) return '…'; const v = x.carry.get(p.id); return v == null ? '–' : `${dec(v)} Tage` }, TIME),
+  userColumn('badge', 'Chipnummer (Transponder)', (p, _b, x) => formatBadge(x.creds.get(p.id)?.badge_uid) || '–', TIME),
+  userColumn('pin', 'PIN vergeben', (p, _b, x) => (x.creds.get(p.id)?.has_pin ? 'Ja' : 'Nein'), TIME),
+  // Lohnkonzept (nur Mitarbeiter, nicht bei Externen)
+  conceptColumn('wage_base', 'Lohn / Gehalt nach neuem LK', 'base'),
+  conceptColumn('wage_seniority', 'Zuschlag Betriebszugehörigkeit / Erfahrung', 'seniority'),
+  conceptColumn('wage_total', 'Stundenlohn Summe (Lohnkonzept)', 'total'),
+  // Untertabellen: jeweils der aktuelle Stand
+  { key: 'lohn', label: 'Aktueller Lohn / Gehalt', group: LOGBOOK, num: true, value: (e, _b, x) => { const w = x.wage.get(e.id); return w && w.wage != null && w.wage !== '' ? (Number.isFinite(Number(w.wage)) ? euro(Number(w.wage)) : String(w.wage)) : '–' } },
+  { key: 'lohn_from', label: 'Lohn / Gehalt gültig ab', group: LOGBOOK, value: (e, _b, x) => dateDe(x.wage.get(e.id)?.from) },
+  { key: 'kinder', label: 'Anzahl Kinder', num: true, value: (e, _b, x) => String(x.kids.get(e.id) ?? 0) },
+  { key: 'a1', label: 'A1 Bescheinigung gültig bis', value: (e, _b, x) => dateDe(x.a1.get(e.id)) },
   { key: 'age', label: 'Alter', num: true, value: (e) => { const y = yearsSince(e.birth_date); return y === null ? '–' : `${y} Jahre` } },
   { key: 'seniority', label: 'Betriebszugehörigkeit', num: true, value: (e) => { const y = yearsSince(e.entry_date); return y === null ? '–' : `${y} Jahre` } },
   { key: 'entry_vacation', label: 'Urlaubsanspruch bei Firmeneintritt', num: true, value: (e) => { const v = entryVacation(e.vacation_days, e.entry_date); return v === null ? '–' : `${String(v).replace('.', ',')} Tage` } },
@@ -326,7 +380,10 @@ function EmployeeList({ external }: { external: boolean }) {
   const [colKeys, setColKeys] = useState<string[]>(() => savedColumns(profile?.id))
   const [pickCols, setPickCols] = useState(false)
   const [editing, setEditing] = useState(false)
-  const cols = useMemo(() => COLUMNS.filter((c) => colKeys.includes(c.key)), [colKeys])
+  const [extra, setExtra] = useState<Extra>(NO_EXTRA)
+  // Externe haben kein Lohnkonzept
+  const available = useMemo(() => COLUMNS.filter((c) => !external || c.group !== WAGE_CONCEPT), [external])
+  const cols = useMemo(() => available.filter((c) => colKeys.includes(c.key)), [available, colKeys])
   const tableCols = useMemo(
     () => [
       ...cols.filter((c) => c.key === 'personnel_number'),
@@ -349,15 +406,50 @@ function EmployeeList({ external }: { external: boolean }) {
   }
 
   const load = useCallback(async () => {
-    const [{ data, error }, wages] = await Promise.all([
+    const [{ data, error }, entries, creds] = await Promise.all([
       supabase.from('employees').select('*'),
-      supabase.from('employee_entries').select('employee_id').eq('kind', 'lohn'),
+      supabase.from('employee_entries').select('employee_id, kind, data').in('kind', ['lohn', 'kinder', 'a1']),
+      supabase.rpc('terminal_credentials_list'),
     ])
     if (error) setError(error.message.includes('employees') ? 'Bitte zuerst das SQL-Update für das Personal ausführen.' : error.message)
     // Mitarbeiter und externe Mitarbeiter stehen in getrennten Listen
     setList(((data ?? []) as unknown as Employee[]).filter((e) => isExternal(e) === external))
-    setWithWage(new Set((wages.data ?? []).map((w) => w.employee_id as number)))
+    const rows = (entries.data ?? []) as { employee_id: number; kind: string; data: Record<string, unknown> | null }[]
+    setWithWage(new Set(rows.filter((r) => r.kind === 'lohn').map((r) => r.employee_id)))
+    // jeweils der neueste Eintrag (Lohn nach "Ab Datum", A1 nach "Gültig bis")
+    const wage = new Map<number, { from: string; wage: unknown }>()
+    const kids = new Map<number, number>()
+    const a1 = new Map<number, string>()
+    for (const r of rows) {
+      const d = r.data ?? {}
+      if (r.kind === 'kinder') kids.set(r.employee_id, (kids.get(r.employee_id) ?? 0) + 1)
+      if (r.kind === 'lohn') {
+        const from = String(d.from ?? '')
+        const cur = wage.get(r.employee_id)
+        if (!cur || from >= cur.from) wage.set(r.employee_id, { from, wage: d.wage })
+      }
+      if (r.kind === 'a1' && d.valid_until && String(d.valid_until) > (a1.get(r.employee_id) ?? '')) a1.set(r.employee_id, String(d.valid_until))
+    }
+    const credMap = new Map(((creds.data ?? []) as { user_id: string; badge_uid: string | null; has_pin: boolean }[]).map((c) => [c.user_id, c]))
+    setExtra((x) => ({ ...x, wage, kids, a1, creds: credMap }))
   }, [external])
+
+  // Resturlaub aus dem Vorjahr rechnet die Datenbank je Person; nur laden, wenn die Spalte gewählt ist
+  const wantCarry = colKeys.includes('carryover')
+  const linkedUsers = useMemo(() => list.map((e) => e.user_id).filter(Boolean).join(','), [list])
+  useEffect(() => {
+    if (!wantCarry || !linkedUsers) return
+    let alive = true
+    const ids = linkedUsers.split(',')
+    void Promise.all(ids.map((id) => supabase.rpc('vacation_carryover_days', { p_user: id, p_year: YEAR }))).then((res) => {
+      if (!alive) return
+      const carry = new Map<string, number | null>(ids.map((id, i) => [id, res[i].data == null ? null : Number(res[i].data)]))
+      setExtra((x) => ({ ...x, carry }))
+    })
+    return () => {
+      alive = false
+    }
+  }, [wantCarry, linkedUsers])
 
   const incomplete = useMemo(
     () =>
@@ -410,11 +502,11 @@ function EmployeeList({ external }: { external: boolean }) {
   const choices = useMemo(() => {
     const m = new Map<string, string[]>()
     for (const c of tableCols) {
-      const vals = [...new Set(byStatus.map((e) => c.value(e, byId)))]
+      const vals = [...new Set(byStatus.map((e) => c.value(e, byId, extra)))]
       if (c.key !== 'name' && vals.length <= MAX_CHOICES) m.set(c.key, vals.sort((a, b) => a.localeCompare(b, 'de', { numeric: true })))
     }
     return m
-  }, [tableCols, byStatus, byId])
+  }, [tableCols, byStatus, byId, extra])
 
   // Vorschläge für Auswahlfelder im Bearbeiten-Modus: feste Werte plus alles, was schon eingetragen ist
   const fieldOptions = useMemo(() => {
@@ -471,12 +563,12 @@ function EmployeeList({ external }: { external: boolean }) {
       .filter((e) => !needle || [employeeName(e), e.personnel_number, e.department, e.company].some((s) => String(s ?? '').toLowerCase().includes(needle)))
       .filter((e) =>
         activeFilters.every((c) => {
-          const v = c.value(e, byId)
+          const v = c.value(e, byId, extra)
           return choices.has(c.key) ? v === colFilter[c.key] : v.toLowerCase().includes(colFilter[c.key].trim().toLowerCase())
         }),
       )
       .sort((a, b) => String(a.last_name).localeCompare(String(b.last_name), 'de') || String(a.first_name).localeCompare(String(b.first_name), 'de'))
-  }, [byStatus, q, activeFilters, choices, colFilter, byId])
+  }, [byStatus, q, activeFilters, choices, colFilter, byId, extra])
 
   async function create() {
     const { data, error } = await supabase.from('employees').insert({ status: 'Aktiv', employee_type: external ? 'extern' : 'mitarbeiter' }).select('id').single()
@@ -564,19 +656,19 @@ function EmployeeList({ external }: { external: boolean }) {
           <div className="card-head">
             <h2>Spalten auswählen</h2>
             <div className="card-head-actions">
-              <button type="button" className="link" onClick={() => chooseColumns(COLUMNS.map((c) => c.key))}>Alle</button>
+              <button type="button" className="link" onClick={() => chooseColumns(available.map((c) => c.key))}>Alle</button>
               <button type="button" className="link" onClick={() => chooseColumns([])}>Keine</button>
               <button type="button" className="link" onClick={() => chooseColumns(DEFAULT_COLUMNS)}>Standard</button>
               <button type="button" onClick={() => setPickCols(false)}>Fertig</button>
             </div>
           </div>
           <p className="muted small">Der Name wird immer angezeigt. Deine Auswahl bleibt in diesem Browser gespeichert.</p>
-          {GROUPS.map((g) => (
+          {GROUPS.filter((g) => available.some((c) => c.group === g)).map((g) => (
             <div key={g} className="column-group">
               <h3>{g}</h3>
               <div className="column-picker">
                 {g === 'Allgemein' && <label className="checkbox"><input type="checkbox" checked disabled /> Name</label>}
-                {COLUMNS.filter((c) => c.group === g).map((c) => (
+                {available.filter((c) => c.group === g).map((c) => (
                   <label key={c.key} className="checkbox">
                     <input
                       type="checkbox"
@@ -636,7 +728,7 @@ function EmployeeList({ external }: { external: boolean }) {
                         ? <td key={c.key}>{editProfile(e, c)}</td>
                       : editing && c.field
                         ? <td key={c.key}><EditCell e={e} field={c.field} options={fieldOptions[c.key]} onSaved={(v) => saved(e.id, c.key, v)} /></td>
-                        : <td key={c.key} className={c.num ? 'num' : ''}>{c.value(e, byId)}</td>,
+                        : <td key={c.key} className={c.num ? 'num' : ''}>{c.value(e, byId, extra)}</td>,
                   )}
                 </tr>
               ))}
