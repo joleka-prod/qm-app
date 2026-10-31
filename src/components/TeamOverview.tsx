@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { clockTime, formatMinutes, workMinutes, type Attendance } from '../lib/clock'
 import { supabase } from '../lib/supabase'
 import { displayName, startOfWeek, type Profile } from '../lib/types'
@@ -13,6 +13,17 @@ interface Row {
 
 const signed = (m: number) => `${m < 0 ? '−' : '+'}${formatMinutes(Math.abs(m))}`
 
+// Profile haben nur den vollen Namen ("Vorname Nachname"): letztes Wort gilt als Nachname
+function nameParts(p: Profile) {
+  const words = p.full_name.trim().split(/\s+/).filter(Boolean)
+  if (words.length < 2) return { last: displayName(p), first: '' }
+  return { last: words.at(-1)!, first: words.slice(0, -1).join(' ') }
+}
+const lastFirst = (p: Profile) => {
+  const n = nameParts(p)
+  return n.first ? `${n.last}, ${n.first}` : n.last
+}
+
 // Übersicht für Vorgesetzte: Wer ist eingestempelt, Stunden heute und diese Woche, Überstunden, offene Anträge.
 // Ein Klick auf eine Zeile zeigt die Zeiterfassung dieser Person.
 export function TeamOverview({ members, selected, onPick, reloadKey }: {
@@ -22,6 +33,20 @@ export function TeamOverview({ members, selected, onPick, reloadKey }: {
   reloadKey?: unknown
 }) {
   const [rows, setRows] = useState<Record<string, Row>>({})
+  const [q, setQ] = useState('')
+  // Nachname, Vorname – aufsteigend nach Nachname, dann Vorname
+  const sorted = useMemo(
+    () => [...members].sort((a, b) => {
+      const x = nameParts(a), y = nameParts(b)
+      return x.last.localeCompare(y.last, 'de') || x.first.localeCompare(y.first, 'de')
+    }),
+    [members],
+  )
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean)
+  const shown = sorted.filter((m) => {
+    const text = `${m.full_name} ${m.email}`.toLowerCase()
+    return words.every((w) => text.includes(w))
+  })
   const ids = members.map((m) => m.id).join(',')
 
   useEffect(() => {
@@ -57,6 +82,9 @@ export function TeamOverview({ members, selected, onPick, reloadKey }: {
   return (
     <section className="card team-overview">
       <h2>Meine Mitarbeiter</h2>
+      <div className="filters">
+        <input type="search" placeholder="Name suchen…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Mitarbeiter suchen" />
+      </div>
       <div className="table-scroll">
         <table>
           <thead>
@@ -70,12 +98,12 @@ export function TeamOverview({ members, selected, onPick, reloadKey }: {
             </tr>
           </thead>
           <tbody>
-            {members.map((m) => {
+            {shown.map((m) => {
               const r = rows[m.id]
               return (
                 <tr key={m.id} className={m.id === selected ? 'selected' : ''} onClick={() => onPick(m.id)}>
                   <td>
-                    <button className="link" onClick={() => onPick(m.id)}>{displayName(m)}</button>
+                    <button className="link" onClick={() => onPick(m.id)}>{lastFirst(m)}</button>
                   </td>
                   <td>
                     {r?.running ? <span className="time-running">● seit {clockTime(r.running.started_at)}</span> : <span className="muted">–</span>}
@@ -89,10 +117,13 @@ export function TeamOverview({ members, selected, onPick, reloadKey }: {
                 </tr>
               )
             })}
+            {shown.length === 0 && (
+              <tr><td colSpan={6} className="muted">Keine Treffer.</td></tr>
+            )}
           </tbody>
         </table>
       </div>
-      <p className="small muted">Auf einen Namen tippen, um die Zeiterfassung dieser Person oben anzuzeigen.</p>
+      <p className="small muted">Auf einen Namen tippen, um die Zeiterfassung dieser Person darunter anzuzeigen.</p>
     </section>
   )
 }
