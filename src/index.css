@@ -453,6 +453,7 @@ button.link.danger { color: #b42318; }
 .ts-work { font-weight: 700; }
 .ts-session { display: flex; justify-content: space-between; gap: 0.5rem; font-variant-numeric: tabular-nums; }
 .ts-task { color: var(--text); font-weight: 600; }
+.ts-break { padding-left: 1rem; border-left: 3px solid #f9bc01; }
 .ts-meta { display: flex; flex-wrap: wrap; gap: 0.25rem 0.9rem; }
 .ts-week-sum { display: flex; justify-content: space-between; font-weight: 700; padding: 0.55rem 0; }
 .ts-month-sum { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; align-items: baseline; justify-content: space-between; margin-top: 0.75rem; font-size: 1.05rem; }

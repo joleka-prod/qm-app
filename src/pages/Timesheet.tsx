@@ -9,7 +9,7 @@ import { TeamOverview } from '../components/TeamOverview'
 import { TimeChangeNotices } from '../components/TimeChangeNotices'
 import { VacationCard, type VacationRequest } from '../components/VacationCard'
 import { minutesOf, toLocalInput, type TimeEntry } from '../components/TimeCard'
-import { clockTime, fixedBreakMinutes, formatMinutes, minutesBetween, useClockChanged, workMinutes, type Attendance } from '../lib/clock'
+import { clockTime, fixedBreakMinutes, fixedBreakSegments, formatMinutes, minutesBetween, useClockChanged, workMinutes, type Attendance } from '../lib/clock'
 import { holidayName } from '../lib/holidays'
 import { supabase } from '../lib/supabase'
 import { canSeePersonnel, displayName, formatDay, isoDate, parseDate, weekNumber } from '../lib/types'
@@ -317,7 +317,22 @@ export function Timesheet() {
                         )}
                       </div>
                     ),
-                  )}
+                  ).flatMap((row, i) => {
+                    // feste Pausen als eigene, automatisch gebuchte Zeile unter der Stempelzeit
+                    const s = list[i]
+                    if (edit?.id === s.id) return [row]
+                    return [
+                      row,
+                      ...fixedBreakSegments(s.started_at, s.ended_at, now).map((b) => (
+                        <div key={`${s.id}-p${b.from}`} className="ts-session ts-break small">
+                          <span>
+                            {clockTime(new Date(b.from).toISOString())} – {clockTime(new Date(b.to).toISOString())}
+                            <span className="muted"> · <span className="ts-task">Pause</span> ({b.label}, automatisch gebucht)</span>
+                          </span>
+                        </div>
+                      )),
+                    ]
+                  })}
                   <div className="ts-meta small muted">
                     {pause > 0 && <span>Pause {formatMinutes(pause)}</span>}
                     {!!jobsByDay[d] && <span>Aufträge {formatMinutes(jobsByDay[d])}</span>}
