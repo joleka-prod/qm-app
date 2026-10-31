@@ -11,7 +11,7 @@ import { minutesOf, toLocalInput, type TimeEntry } from '../components/TimeCard'
 import { clockTime, fixedBreakMinutes, formatMinutes, minutesBetween, useClockChanged, workMinutes, type Attendance } from '../lib/clock'
 import { holidayName } from '../lib/holidays'
 import { supabase } from '../lib/supabase'
-import { canSeePersonnel, displayName, formatDay, isPlannerRole, isoDate, parseDate, weekNumber } from '../lib/types'
+import { canSeePersonnel, displayName, formatDay, isoDate, parseDate, weekNumber } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 
 // Gesetzliche Mindestpause (ArbZG): über 6 Std. 30 Min., über 9 Std. 45 Min.
@@ -35,7 +35,7 @@ function shiftMonth(month: string, n: number) {
 type Edit = { id?: number; start: string; end: string; reason: string }
 
 // Stundenkonto: Tage, Wochen und Monat aus den Stempelzeiten. Mitarbeiter sehen ihr eigenes,
-// QM und Teamleiter alle und können Zeiten korrigieren oder nachtragen.
+// Vorgesetzte ihre Mitarbeiter, Personalabteilung und Admin alle; sie können Zeiten korrigieren oder nachtragen.
 const VACATION_TEXT = {
   urlaub: 'Urlaub ', ueberstunden: 'Frei (Überstunden) ', krank: 'Krank ', sonderurlaub: 'Sonderurlaub ',
   schulung: 'Schulung ', schule: 'Schule ', unbezahlt: 'Unbezahlter Urlaub ', kindkrank: 'Kindkrank ',
@@ -45,7 +45,6 @@ export function Timesheet() {
   const { profile } = useAuth()
   const { profiles, byId } = useProfiles()
   const staff = profiles.filter((p) => p.active)
-  const isPlanner = isPlannerRole(profile?.role)
   const isAdmin = profile?.role === 'admin'
   // Personalabteilung sieht und ändert die Zeiten aller Mitarbeiter
   const isHr = canSeePersonnel(profile)
@@ -56,9 +55,9 @@ export function Timesheet() {
     for (let i = 0; up && i < 10; i++, up = byId[up]?.supervisor_id) if (up === profile?.id) return true
     return false
   }
-  const choices = isPlanner || isHr ? staff : staff.filter((p) => p.id === profile?.id || isAbove(p.id))
+  const choices = isAdmin || isHr ? staff : staff.filter((p) => p.id === profile?.id || isAbove(p.id))
   const others = choices.filter((p) => p.id !== profile?.id)
-  // Mitarbeiteransicht nur für Vorgesetzte, Planer, Personalabteilung und Admin (wer andere Personen sehen darf)
+  // Mitarbeiteransicht nur für Vorgesetzte, Personalabteilung und Admin (wer andere Personen sehen darf)
   const hasStaffView = others.length > 0 || isAdmin
 
   // Zwei Ansichten: "Meine Zeiten" und "Mitarbeiter" (?ansicht=mitarbeiter, Person über &person=)
@@ -88,9 +87,9 @@ export function Timesheet() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const now = Date.now()
-  // Nachtragen/Korrigieren darf man für sich selbst (mit Genehmigung), Planer, Personalabteilung und Vorgesetzte auch für andere.
+  // Nachtragen/Korrigieren darf man für sich selbst (mit Genehmigung), Admin, Personalabteilung und Vorgesetzte auch für andere.
   // Vorgesetzte, Admin und Personalabteilung ändern fremde Zeiten sofort; Genehmigen bleibt beim Vorgesetzten oder Admin.
-  const canCorrect = installerId === profile?.id || isPlanner || isHr || isAbove(installerId)
+  const canCorrect = installerId === profile?.id || isAdmin || isHr || isAbove(installerId)
   const changesDirectly = installerId !== profile?.id && (isAdmin || isHr || isAbove(installerId))
   const [requests, setRequests] = useState<AttendanceRequest[]>([])
   const [info, setInfo] = useState('')
