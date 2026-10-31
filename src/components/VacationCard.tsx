@@ -3,6 +3,7 @@ import { rejectReason } from '../lib/rejectReason'
 import { supabase } from '../lib/supabase'
 import { loadMembers, useTeams, type TeamMember } from '../lib/teams'
 import { canSeePersonnel, displayName, formatDate, formatDay, type Profile } from '../lib/types'
+import { blockText, type VacationBlock } from '../lib/vacationBlocks'
 
 export type VacationState = 'beantragt' | 'genehmigt' | 'abgelehnt' | 'storniert'
 export type VacationKind = 'urlaub' | 'ueberstunden' | 'krank' | 'sonderurlaub' | 'schulung' | 'schule' | 'unbezahlt' | 'kindkrank'
@@ -88,6 +89,9 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
   const [plannedInForm, setPlannedInForm] = useState<TeamMember[]>([])
   // Schon eingeplante Tage der Anträge, die zu genehmigen sind
   const [plannedPending, setPlannedPending] = useState<TeamMember[]>([])
+  // Urlaubssperren/Betriebsferien im gewählten Zeitraum bzw. bei den Anträgen zum Genehmigen
+  const [blocksInForm, setBlocksInForm] = useState<VacationBlock[]>([])
+  const [blocksPending, setBlocksPending] = useState<Record<number, VacationBlock[]>>({})
   const { teamById } = useTeams()
   const teamName = (id: number) => teamById[id]?.name ?? 'Team'
   const [busy, setBusy] = useState(false)
@@ -116,7 +120,14 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
       const from = openList.reduce((a, r) => (r.start_date < a ? r.start_date : a), openList[0].start_date)
       const to = openList.reduce((a, r) => (r.end_date > a ? r.end_date : a), openList[0].end_date)
       setPlannedPending(await loadMembers(from, to))
-    } else setPlannedPending([])
+      const hits = await Promise.all(
+        openList.map((r) => supabase.rpc('vacation_block_hits', { p_user: r.user_id, p_start: r.start_date, p_end: r.end_date })),
+      )
+      setBlocksPending(Object.fromEntries(openList.map((r, i) => [r.id, ((hits[i].data ?? []) as VacationBlock[]).filter((b) => b.kind === 'sperre')])))
+    } else {
+      setPlannedPending([])
+      setBlocksPending({})
+    }
   }, [userId, year, me.id])
 
   useEffect(() => {
@@ -135,6 +146,17 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
     if (!form?.start || !form.end || form.end < form.start) return
     loadMembers(form.start, form.end, userId).then(setPlannedInForm)
   }, [form?.start, form?.end, userId])
+
+  useEffect(() => {
+    setBlocksInForm([])
+    if (!form?.start || !form.end || form.end < form.start) return
+    supabase
+      .rpc('vacation_block_hits', { p_user: userId, p_start: form.start, p_end: form.end })
+      .then(({ data }) => setBlocksInForm((data ?? []) as VacationBlock[]))
+  }, [form?.start, form?.end, userId])
+  // Sperre gilt nur für Urlaub und Zeitausgleich
+  const sperreInForm = form && (form.kind === 'urlaub' || form.kind === 'ueberstunden') ? blocksInForm.filter((b) => b.kind === 'sperre') : []
+  const ferienInForm = blocksInForm.filter((b) => b.kind === 'betriebsferien')
 
   const plannedFor = (r: VacationRequest) =>
     plannedPending.filter((m) => m.installer_id === r.user_id && m.day >= r.start_date && m.day <= r.end_date)
@@ -178,6 +200,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
       const msg = `${who} in diesem Zeitraum schon eingeplant: ${plannedText(plannedInForm, teamName)}.\n\nBitte mit der Einsatzplanung abstimmen. Trotzdem ${entering ? 'eintragen' : 'beantragen'}?`
       if (!confirm(msg)) return
     }
+    if (entering && sperreInForm.length && !confirm(`${sperreInForm.map(blockText).join(', ')}.\n\nTrotzdem als Ausnahme eintragen?`)) return
     if (form.kind === 'urlaub' && days != null && days > rest && !confirm(`${entering ? 'Der Eintrag' : 'Der Antrag'} (${dayWord(days)}) ist mehr als der Resturlaub (${dayWord(rest)}). Trotzdem ${entering ? 'eintragen' : 'beantragen'}?`)) return
     if (entering) {
       const ok = await run(() =>
@@ -194,6 +217,13 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
     const note = approve ? '' : rejectReason()
     if (note === null) return
     run(() => supabase.rpc('decide_vacation', { p_id: r.id, p_approve: approve, p_note: note }))
+  }
+
+  // Genehmigen trotz Urlaubssperre nur nach Rückfrage
+  const approveBlocked = (r: VacationRequest) => {
+    const hits = blocksPending[r.id] ?? []
+    if (hits.length && !confirm(`Der Antrag liegt in der ${hits.map(blockText).join(', ')}.\n\nTrotzdem als Ausnahme genehmigen?`)) return
+    decide(r, true)
   }
 
   const cancel = (r: VacationRequest) => {
@@ -216,12 +246,15 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
                     {KIND_NOTE[r.kind] && <> · {KIND_NOTE[r.kind]}</>}
                   </div>
                   {r.note && <div className="small muted">{r.note}</div>}
+                  {(blocksPending[r.id] ?? []).length > 0 && (
+                    <div className="small appointment-warn">⚠ Liegt in der {blocksPending[r.id].map(blockText).join(', ')}</div>
+                  )}
                   {plannedFor(r).length > 0 && (
                     <div className="small appointment-warn">⚠ Schon eingeplant: {plannedText(plannedFor(r), teamName)}</div>
                   )}
                 </div>
                 <div className="vacation-actions">
-                  <button className="primary" disabled={busy} onClick={() => decide(r, true)}>Genehmigen</button>
+                  <button className="primary" disabled={busy} onClick={() => approveBlocked(r)}>Genehmigen</button>
                   <button disabled={busy} onClick={() => decide(r, false)}>Ablehnen</button>
                 </div>
               </li>
@@ -312,6 +345,17 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
                 (ohne Wochenenden und Feiertage in Rheinland-Pfalz)
               </p>
             )}
+            {sperreInForm.length > 0 && (
+              <p className="small appointment-warn">
+                ⚠ {sperreInForm.map(blockText).join(', ')}.{' '}
+                {entering ? 'Eintragen nur als Ausnahme.' : 'In diesem Zeitraum kann kein Urlaub beantragt werden. Bitte mit dem Vorgesetzten sprechen.'}
+              </p>
+            )}
+            {ferienInForm.length > 0 && (
+              <p className="small muted">
+                {ferienInForm.map(blockText).join(', ')}: Dieser Urlaub wird automatisch gebucht.
+              </p>
+            )}
             {plannedInForm.length > 0 && (
               <p className="small appointment-warn">
                 ⚠ {own ? 'Du bist' : `${displayName(byId[userId])} ist`} in diesem Zeitraum schon eingeplant:{' '}
@@ -329,7 +373,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
             )}
             <div className="actions">
               <button disabled={busy} onClick={() => setForm(null)}>Abbrechen</button>
-              <button className="primary" disabled={busy || !form.start || !form.end || !preview} onClick={submit}>{entering ? 'Eintragen' : 'Beantragen'}</button>
+              <button className="primary" disabled={busy || !form.start || !form.end || !preview || (!entering && sperreInForm.length > 0)} onClick={submit}>{entering ? 'Eintragen' : 'Beantragen'}</button>
             </div>
           </div>
         )}
@@ -359,7 +403,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
                 <div className="vacation-actions">
                   {r.state === 'beantragt' && canDecide(r) && (
                     <>
-                      <button className="primary" disabled={busy} onClick={() => decide(r, true)}>Genehmigen</button>
+                      <button className="primary" disabled={busy} onClick={() => approveBlocked(r)}>Genehmigen</button>
                       <button disabled={busy} onClick={() => decide(r, false)}>Ablehnen</button>
                     </>
                   )}

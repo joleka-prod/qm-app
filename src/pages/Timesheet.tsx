@@ -7,6 +7,7 @@ import { MonthPicker } from '../components/MonthPicker'
 import { OvertimeCard } from '../components/OvertimeCard'
 import { TeamOverview } from '../components/TeamOverview'
 import { TimeChangeNotices } from '../components/TimeChangeNotices'
+import { VacationBlocks } from '../components/VacationBlocks'
 import { VacationCard, type VacationRequest } from '../components/VacationCard'
 import { minutesOf, toLocalInput, type TimeEntry } from '../components/TimeCard'
 import { clockTime, fixedBreakMinutes, fixedBreakSegments, formatMinutes, minutesBetween, useClockChanged, workMinutes, type Attendance } from '../lib/clock'
@@ -58,12 +59,15 @@ export function Timesheet() {
   // Zwei Ansichten: "Meine Zeiten" und "Mitarbeiter" (?ansicht=mitarbeiter, Person über &person=)
   const [params, setParams] = useSearchParams()
   const staffView = hasStaffView && params.get('ansicht') === 'mitarbeiter'
+  // Urlaubssperren und Betriebsferien pflegen Admin und Personalabteilung (?ansicht=sperren)
+  const canBlocks = isAdmin || isHr
+  const blocksView = canBlocks && params.get('ansicht') === 'sperren'
   const staffId = params.get('person') ?? ''
   const installerId = staffView ? staffId : profile?.id ?? ''
-  function switchView(staff: boolean) {
+  function switchView(view: '' | 'mitarbeiter' | 'sperren') {
     setEdit(null)
     setInfo('')
-    setParams(staff ? { ansicht: 'mitarbeiter' } : {}, { replace: true })
+    setParams(view ? { ansicht: view } : {}, { replace: true })
   }
   // Person in der Mitarbeiteransicht wählen und zu deren Zeiten springen
   function pick(id: string) {
@@ -396,22 +400,31 @@ export function Timesheet() {
 
   return (
     <div>
-      {profile && !staffView && <ClockBar userId={profile.id} />}
+      {profile && !staffView && !blocksView && <ClockBar userId={profile.id} />}
       {noticeGate}
 
       {/* Reiter wie im Bereich Personal */}
-      {hasStaffView && (
+      {(hasStaffView || canBlocks) && (
         <nav className="emp-tabs" aria-label="Ansicht">
-          <button type="button" aria-pressed={!staffView} className={staffView ? '' : 'active'} onClick={() => switchView(false)}>
+          <button type="button" aria-pressed={!staffView && !blocksView} className={staffView || blocksView ? '' : 'active'} onClick={() => switchView('')}>
             Meine Zeiten
           </button>
-          <button type="button" aria-pressed={staffView} className={staffView ? 'active' : ''} onClick={() => switchView(true)}>
-            Mitarbeiter
-          </button>
+          {hasStaffView && (
+            <button type="button" aria-pressed={staffView} className={staffView ? 'active' : ''} onClick={() => switchView('mitarbeiter')}>
+              Mitarbeiter
+            </button>
+          )}
+          {canBlocks && (
+            <button type="button" aria-pressed={blocksView} className={blocksView ? 'active' : ''} onClick={() => switchView('sperren')}>
+              Urlaubssperren
+            </button>
+          )}
         </nav>
       )}
 
-      {!staffView && timesheet}
+      {blocksView && <VacationBlocks byId={byId} />}
+
+      {!staffView && !blocksView && timesheet}
 
       {staffView && profile && (
         <>
