@@ -27,7 +27,7 @@ export interface Section {
   fields?: Field[]
   tables?: string[]
   // berechnete Anzeige (Alter, Betriebszugehörigkeit)
-  computed?: ('age' | 'seniority')[]
+  computed?: ('age' | 'seniority' | 'entry_vacation')[]
 }
 
 export interface Tab {
@@ -250,7 +250,7 @@ export const TABS: Tab[] = [
       {
         title: 'Vertragsdaten',
         fields: pick('vacation_days', 'entry_date', 'exit_date', 'department', 'job_title', 'specific_experience', 'employment_type', 'wage_type', 'probation_end', 'contract_end'),
-        computed: ['seniority'],
+        computed: ['seniority', 'entry_vacation'],
       },
       { title: 'Lohnabrechnung', fields: pick('tax_id', 'church_tax', 'child_allowance', 'social_security_no', 'health_insurance', 'insurance_type', 'disability') },
       { title: 'Bankverbindung', fields: pick('iban', 'bic', 'account_holder') },
@@ -371,6 +371,18 @@ export function fullYears(from: string | null | undefined, to = new Date()) {
   let y = to.getFullYear() - d.getFullYear()
   if (to.getMonth() < d.getMonth() || (to.getMonth() === d.getMonth() && to.getDate() < d.getDate())) y--
   return y
+}
+
+// Urlaubsanspruch im Eintrittsjahr (Fabian, 2026-10-31) nach § 5 BUrlG: je vollem Beschäftigungsmonat bis
+// Jahresende 1/12 des Jahresanspruchs; Bruchteile ab einem halben Tag werden aufgerundet.
+export function entryVacation(days: unknown, entryDate: string | null | undefined) {
+  const total = Number(String(days ?? '').replace(',', '.'))
+  if (!entryDate || String(days ?? '').trim() === '' || !Number.isFinite(total)) return null
+  const d = new Date(entryDate.slice(0, 10) + 'T00:00')
+  if (Number.isNaN(d.getTime())) return null
+  const months = 12 - (d.getMonth() + 1) + (d.getDate() === 1 ? 1 : 0)
+  const v = (total * months) / 12
+  return v % 1 >= 0.5 ? Math.ceil(v) : Math.round(v * 10) / 10
 }
 
 // Lohnkonzept: Summe der Haken, je volle 3 Jahre Betriebszugehörigkeit 0,30 € (Fabian, 2026-10-26)

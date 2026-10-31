@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
-import { MAIN_FIELDS, STATUS, TABS, employeeName, isExternal, isManagingDirector, missingPayroll, norm, parse, show, toInput, type Employee, type Field } from '../lib/employee'
+import { MAIN_FIELDS, STATUS, TABS, employeeName, entryVacation, isExternal, isManagingDirector, missingPayroll, norm, parse, show, toInput, type Employee, type Field } from '../lib/employee'
 import { supabase } from '../lib/supabase'
 import { ROLE_LABEL, displayName, type Profile } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
@@ -115,7 +115,7 @@ const SECTION_OF = new Map<string, string>()
 for (const sec of TABS[0].sections) {
   const title = sec.title ?? 'Allgemein'
   for (const f of sec.fields ?? []) SECTION_OF.set(f.key, title)
-  for (const c of sec.computed ?? []) SECTION_OF.set(c === 'age' ? 'age' : 'seniority', title)
+  for (const c of sec.computed ?? []) SECTION_OF.set(c, title)
 }
 const GROUPS = [...new Set([...TABS[0].sections.map((sec) => sec.title ?? 'Allgemein'), APP_USER])]
 
@@ -153,6 +153,7 @@ const COLUMNS = ([
   userColumn('montage_capacity', 'Zählt bei Kapazitätsplanung', (p) => (p.role === 'monteur' ? ((p.montage_capacity ?? true) ? 'Ja' : 'Nein') : '–')),
   { key: 'age', label: 'Alter', num: true, value: (e) => { const y = yearsSince(e.birth_date); return y === null ? '–' : `${y} Jahre` } },
   { key: 'seniority', label: 'Betriebszugehörigkeit', num: true, value: (e) => { const y = yearsSince(e.entry_date); return y === null ? '–' : `${y} Jahre` } },
+  { key: 'entry_vacation', label: 'Urlaubsanspruch bei Firmeneintritt', num: true, value: (e) => { const v = entryVacation(e.vacation_days, e.entry_date); return v === null ? '–' : `${String(v).replace('.', ',')} Tage` } },
 ] as Column[])
   .map((c) => ({ ...c, group: c.group ?? SECTION_OF.get(c.key) ?? 'Allgemein', ...(c.key === 'personnel_number' ? { label: 'Nr.' } : {}) }))
   .sort((a, b) =>
