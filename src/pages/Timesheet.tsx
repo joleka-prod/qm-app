@@ -260,10 +260,17 @@ export function Timesheet() {
       {byId[installerId]?.supervisor_id && (
         <p className="small">Vorgesetzte(r): {displayName(byId[byId[installerId].supervisor_id!])}</p>
       )}
-      {installerId && <OvertimeCard userId={installerId} reloadKey={sessions} />}
-      {installerId && installerId === profile?.id && <TimeChangeNotices userId={installerId} byId={byId} reloadKey={sessions} />}
       {profile && installerId && (
-        <VacationCard userId={installerId} me={profile} byId={byId} year={Number(month.slice(0, 4))} onChanged={load} part="own" />
+        <VacationCard
+          userId={installerId}
+          me={profile}
+          byId={byId}
+          year={Number(month.slice(0, 4))}
+          onChanged={load}
+          part="own"
+          aside={<OvertimeCard userId={installerId} reloadKey={sessions} />}
+          below={installerId === profile.id && <TimeChangeNotices userId={installerId} byId={byId} reloadKey={sessions} />}
+        />
       )}
 
       <p className="muted small">
