@@ -8,6 +8,8 @@ SELECT
   b.BelegID AS ext_id,
   -- Belegnummer ist eindeutig; die manuelle Belegnummer teilen sich oft mehrere Aufträge (Nachträge), sie steht in notes
   b.Belegnummer AS number,
+  -- Auftragserweiterung zur Auftragsnummer (in der App direkt hinter der Nummer)
+  LTRIM(RTRIM(COALESCE(b.Auftragserweiterung, ''))) AS extension,
   COALESCE(a.Bezeichnung, b.BelegArt) AS kind,
   LEFT(COALESCE(NULLIF(LTRIM(RTRIM(b.Kommission)), ''), NULLIF(LTRIM(RTRIM(b.Bauvorhaben)), ''), ''), 300) AS title,
   CONVERT(char(10), COALESCE(b.Eingangsdatum, b.ErstelltAm, b.Datum), 23) AS doc_date,
