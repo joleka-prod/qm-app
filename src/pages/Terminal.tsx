@@ -28,6 +28,20 @@ const LOGOS = [
   { name: 'Kalverkamp', src: '/logo-kalverkamp.png' },
 ]
 
+// JOLEKA-Bildmarke (gelbes Quadrat mit hellem Bogen, wie im Logo) und der geschwungene Strich
+// unter "Einfach besonders!" (Design wie www.joleka.de, Fabian, 2026-10-31)
+const Mark = () => (
+  <svg className="terminal-mark" viewBox="0 0 512 512" aria-hidden="true">
+    <rect width="512" height="512" fill="#f9bc01" />
+    <path d="M0 0A600.6 600.6 0 0 0 512 286.7V0Z" fill="#ffde97" />
+  </svg>
+)
+const Swoosh = () => (
+  <svg className="terminal-swoosh" viewBox="0 0 400 24" aria-hidden="true">
+    <path d="M4 20 C 120 4, 280 0, 396 8" fill="none" stroke="#f9bc01" strokeWidth="5" strokeLinecap="round" />
+  </svg>
+)
+
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
 
 function beep(ok: boolean) {
@@ -244,6 +258,12 @@ export function Terminal() {
   if (!token) {
     return (
       <div className="terminal">
+        <header className="terminal-head">
+          <span className="terminal-head-name">
+            <Mark />
+            JOLEKA 360°
+          </span>
+        </header>
         <div className="terminal-center">
           <h1>Kein Stempel-Terminal</h1>
           <p>Dieses Gerät ist noch nicht als Terminal eingerichtet.</p>
@@ -259,6 +279,12 @@ export function Terminal() {
   if (blocked) {
     return (
       <div className="terminal">
+        <header className="terminal-head">
+          <span className="terminal-head-name">
+            <Mark />
+            JOLEKA 360°
+          </span>
+        </header>
         <div className="terminal-center">
           <h1>Terminal gesperrt</h1>
           <p>{blocked}. Bitte den Admin fragen.</p>
@@ -270,7 +296,10 @@ export function Terminal() {
   return (
     <div className="terminal" onPointerDown={enterFullscreen} onClick={needsTap ? beginNfc : undefined}>
       <header className="terminal-head">
-        <span>{name || 'Stempel-Terminal'}</span>
+        <span className="terminal-head-name">
+          <Mark />
+          {name || 'Stempel-Terminal'}
+        </span>
         <span className={online ? '' : 'terminal-offline'}>{online ? '' : 'Offline'}</span>
       </header>
 
@@ -283,9 +312,12 @@ export function Terminal() {
       ) : (
         <div className="terminal-center">
           <div className="terminal-clock">{now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</div>
+          <Swoosh />
           <div className="terminal-date">{now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
           <p className="terminal-prompt">{needsTap ? 'Einmal auf den Bildschirm tippen, um das Lesen zu starten' : 'Chip vorhalten'}</p>
-          <p className="terminal-tag">#wirsindjoleka</p>
+          <p className="terminal-tag">
+            <span>#</span>wirsindjoleka
+          </p>
         </div>
       )}
 
