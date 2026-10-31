@@ -253,7 +253,7 @@ export function Timesheet() {
           userId={installerId}
           me={profile}
           byId={byId}
-          year={Number(month.slice(0, 4))}
+          year={Number(today.slice(0, 4))}
           onChanged={load}
           part="own"
           aside={<OvertimeCard userId={installerId} reloadKey={sessions} />}
@@ -392,7 +392,7 @@ export function Timesheet() {
       {staffView && profile && (
         <>
           <AttendanceApprovals me={profile} byId={byId} onChanged={load} />
-          <VacationCard userId={profile.id} me={profile} byId={byId} year={Number(month.slice(0, 4))} onChanged={load} part="approvals" />
+          <VacationCard userId={profile.id} me={profile} byId={byId} year={Number(today.slice(0, 4))} onChanged={load} part="approvals" />
           <TeamOverview
             members={others}
             selected={installerId}
