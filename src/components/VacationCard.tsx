@@ -80,6 +80,8 @@ interface Props {
 export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', aside, below }: Props) {
   const [list, setList] = useState<VacationRequest[]>([])
   const [pending, setPending] = useState<VacationRequest[]>([])
+  // Resturlaub aus dem Vorjahr (festgelegt oder berechnet)
+  const [carryover, setCarryover] = useState(0)
   const [form, setForm] = useState<{ start: string; end: string; note: string; kind: VacationKind; half?: boolean } | null>(null)
   const [preview, setPreview] = useState<number | null>(null)
   // Schon eingeplante Tage im gewählten Zeitraum (Hinweis, keine Sperre)
@@ -94,7 +96,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
   const own = userId === me.id
 
   const load = useCallback(async () => {
-    const [mine, open] = await Promise.all([
+    const [mine, open, carry] = await Promise.all([
       supabase
         .from('vacation_requests')
         .select('*')
@@ -104,7 +106,9 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
         .order('start_date'),
       // Offene Anträge anderer, die ich sehen darf (Mitarbeiter bzw. Admin)
       supabase.from('vacation_requests').select('*').eq('state', 'beantragt').neq('user_id', me.id).order('start_date'),
+      supabase.rpc('vacation_carryover_days', { p_user: userId, p_year: year }),
     ])
+    setCarryover(Number(carry.data ?? 0))
     const openList = (open.data ?? []) as VacationRequest[]
     setList((mine.data ?? []) as VacationRequest[])
     setPending(openList)
@@ -163,7 +167,8 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
   const sum = (s: VacationState) => list.filter((r) => r.state === s && r.kind === 'urlaub').reduce((a, r) => a + r.days, 0)
   const approved = sum('genehmigt')
   const requested = sum('beantragt')
-  const rest = allowance - approved - requested
+  const total = carryover + allowance
+  const rest = total - approved - requested
 
   async function submit() {
     if (!form) return
@@ -231,7 +236,9 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
       <section className="card">
         <h2>Urlaub {year}</h2>
         <div className="vacation-sum">
-          <div><span className="muted small">Urlaubsanspruch</span><strong>{dayWord(allowance)}</strong></div>
+          <div><span className="muted small">Resturlaub aus {year - 1}</span><strong>{dayWord(carryover)}</strong></div>
+          <div><span className="muted small">Urlaubsanspruch {year}</span><strong>{dayWord(allowance)}</strong></div>
+          <div><span className="muted small">Urlaubsanspruch gesamt</span><strong>{dayWord(total)}</strong></div>
           <div><span className="muted small">Genehmigt</span><strong>{dayWord(approved)}</strong></div>
           <div><span className="muted small">Beantragt</span><strong>{dayWord(requested)}</strong></div>
           <div><span className="muted small">Resturlaub</span><strong className={rest < 0 ? 'appointment-warn' : ''}>{dayWord(rest)}</strong></div>

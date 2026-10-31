@@ -15,17 +15,21 @@ const WEEKDAYS = [
 
 type Creds = { badge_uid: string | null }
 
-type Form = { weekly_hours: string; work_days: number[]; core_start: string; core_end: string; overtime_start: string; overtime_opening: string; badge: string }
+type Form = { weekly_hours: string; work_days: number[]; core_start: string; core_end: string; overtime_start: string; overtime_opening: string; badge: string; carryover: string }
 
 const num = (s: string) => Number(s.trim().replace(',', '.'))
 // Postgres liefert time als "07:00:00", das Eingabefeld braucht "07:00"
 const hhmm = (v: unknown) => (typeof v === 'string' ? v.slice(0, 5) : '')
+const YEAR = new Date().getFullYear()
+const decimal = (n: number) => String(n).replace('.', ',')
 
 // Reiter "Zeiterfassung" der Personalakte: Wochenstunden, Arbeitstage und Kernarbeitszeit (Personalakte), Stundenkonto und
 // Stempel-Terminal (App-Benutzer). Pflegen Admin und Personalabteilung, Stundenkonto nicht das eigene.
 export function TimeSettings({ emp, user, onSaved }: { emp: Employee; user: Profile | null; onSaved: () => Promise<void> }) {
   const { profile: me } = useAuth()
   const [creds, setCreds] = useState<Creds | null>(null)
+  // Resturlaub aus dem Vorjahr: festgelegter Wert (null = automatisch) und der Wert, der gerade gilt
+  const [carry, setCarry] = useState<{ fixed: number | null; current: number } | null>(null)
   const [form, setForm] = useState<Form | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -36,11 +40,18 @@ export function TimeSettings({ emp, user, onSaved }: { emp: Employee; user: Prof
 
   const reset = useCallback(async () => {
     let c: Creds | null = null
+    let cy: { fixed: number | null; current: number } | null = null
     if (user) {
-      const { data } = await supabase.rpc('terminal_credentials_list')
+      const [{ data }, fixed, current] = await Promise.all([
+        supabase.rpc('terminal_credentials_list'),
+        supabase.from('vacation_carryover').select('days').eq('user_id', user.id).eq('year', YEAR).maybeSingle(),
+        supabase.rpc('vacation_carryover_days', { p_user: user.id, p_year: YEAR }),
+      ])
       c = ((data ?? []) as ({ user_id: string } & Creds)[]).find((r) => r.user_id === user.id) ?? null
+      cy = { fixed: fixed.data ? Number(fixed.data.days) : null, current: Number(current.data ?? 0) }
     }
     setCreds(c)
+    setCarry(cy)
     setForm({
       weekly_hours: emp.weekly_hours != null ? String(emp.weekly_hours).replace('.', ',') : '',
       work_days: ((emp.work_days as number[] | undefined) ?? [1, 2, 3, 4, 5]).map(Number),
@@ -49,6 +60,7 @@ export function TimeSettings({ emp, user, onSaved }: { emp: Employee; user: Prof
       overtime_start: user?.overtime_start ?? '',
       overtime_opening: String(user?.overtime_opening ?? 0).replace('.', ','),
       badge: formatBadge(c?.badge_uid),
+      carryover: cy?.fixed != null ? decimal(cy.fixed) : '',
     })
   }, [emp, user])
 
@@ -105,6 +117,13 @@ export function TimeSettings({ emp, user, onSaved }: { emp: Employee; user: Prof
         if (!form.overtime_start) throw new Error('Bitte ein Startdatum für das Stundenkonto eintragen.')
         if (!ownAccount && (form.overtime_start !== user.overtime_start || opening !== Number(user.overtime_opening))) {
           const { error } = await supabase.rpc('set_time_account', { p_user: user.id, p_start: form.overtime_start, p_opening: opening })
+          if (error) throw error
+        }
+        const carryover = form.carryover.trim() ? num(form.carryover) : null
+        if (carryover != null && (!Number.isFinite(carryover) || Math.abs(carryover) > 366 || carryover * 2 !== Math.round(carryover * 2)))
+          throw new Error('Bitte beim Resturlaub ganze oder halbe Tage eintragen (z. B. 3 oder 2,5) oder das Feld leer lassen.')
+        if (!ownAccount && carryover !== (carry?.fixed ?? null)) {
+          const { error } = await supabase.rpc('set_vacation_carryover', { p_user: user.id, p_year: YEAR, p_days: carryover })
           if (error) throw error
         }
         const badge = normalizeBadge(form.badge)
@@ -170,6 +189,25 @@ export function TimeSettings({ emp, user, onSaved }: { emp: Employee; user: Prof
           <p className="small muted">
             Ab diesem Datum rechnet die App Soll gegen gestempelte Zeit. Der Übertrag ist der Überstundenstand am Tag davor (z. B. aus TimeTac).
             {ownAccount && ' Dein eigenes Stundenkonto pflegt der Admin.'}
+          </p>
+
+          <h3 className="emp-heading">Urlaub</h3>
+          <div className="emp-grid">
+            <label>
+              Resturlaub aus {YEAR - 1} (Tage)
+              <input
+                inputMode="decimal"
+                disabled={ownAccount}
+                value={form.carryover}
+                placeholder={carry ? `automatisch: ${decimal(carry.current)}` : 'automatisch'}
+                onChange={(e) => setForm({ ...form, carryover: e.target.value })}
+              />
+            </label>
+          </div>
+          <p className="small muted">
+            Leer lassen: die App rechnet den nicht genommenen Urlaub aus {YEAR - 1} aus (Anspruch minus genehmigter Urlaub) und zählt ihn
+            zum Anspruch {YEAR} dazu. Ein eingetragener Wert (z. B. aus TimeTac) gilt stattdessen.
+            {ownAccount && ' Deinen eigenen Resturlaub pflegt der Admin.'}
           </p>
 
           <h3 className="emp-heading">Stempel-Terminal</h3>
