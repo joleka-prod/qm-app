@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { AttendanceApprovals, requestText, span, type AttendanceRequest } from '../components/AttendanceApprovals'
 import { ClockBar } from '../components/ClockBar'
+import { CoreTimeApprovals, coreTimeText, useCoreTimeCount, type CoreTimeReview } from '../components/CoreTimeApprovals'
 import { LongDayApprovals, longDayText, useLongDayCount, type LongDayReview } from '../components/LongDayApprovals'
 import { MonthPicker } from '../components/MonthPicker'
 import { OvertimeCard } from '../components/OvertimeCard'
@@ -113,6 +114,9 @@ export function Timesheet() {
   // Meldungen "über 10 Stunden" der Person im Monat
   const [longDays, setLongDays] = useState<LongDayReview[]>([])
   const longDayCount = useLongDayCount(profile ?? null, byId, sessions)
+  // Meldungen "Kernzeit nicht eingehalten" der Person im Monat
+  const [coreDays, setCoreDays] = useState<CoreTimeReview[]>([])
+  const coreTimeCount = useCoreTimeCount(profile ?? null, byId, sessions)
   const [info, setInfo] = useState('')
 
   const range = useMemo(() => {
@@ -122,7 +126,7 @@ export function Timesheet() {
 
   const load = useCallback(async () => {
     if (!installerId) return
-    const [att, te, vac, req, allReq, ld] = await Promise.all([
+    const [att, te, vac, req, allReq, ld, ct] = await Promise.all([
       supabase.from('attendance').select('*').eq('installer_id', installerId).gte('started_at', range.from).lte('started_at', range.to).order('started_at'),
       supabase.from('time_entries').select('*').eq('installer_id', installerId).gte('started_at', range.from).lte('started_at', range.to),
       supabase
@@ -142,8 +146,10 @@ export function Timesheet() {
         .order('started_at'),
       supabase.from('attendance_requests').select('*').eq('user_id', installerId).order('started_at', { ascending: false }).limit(500),
       supabase.from('long_day_reviews').select('*').eq('user_id', installerId).gte('day', range.all[0]).lte('day', range.all.at(-1)!),
+      supabase.from('core_time_reviews').select('*').eq('user_id', installerId).gte('day', range.all[0]).lte('day', range.all.at(-1)!),
     ])
     setLongDays((ld.data ?? []) as LongDayReview[])
+    setCoreDays((ct.data ?? []) as CoreTimeReview[])
     setAllRequests((allReq.data ?? []) as AttendanceRequest[])
     setRequests((req.data ?? []) as AttendanceRequest[])
     setVacation((vac.data ?? []) as VacationRequest[])
@@ -470,6 +476,13 @@ export function Timesheet() {
                         <span>{longDayText(r, byId)}</span>
                       </div>
                     ))}
+                  {coreDays
+                    .filter((r) => r.day === d)
+                    .map((r) => (
+                      <div key={`ct${r.id}`} className={`ts-request small ${r.state === 'offen' ? 'long-day-open' : ''}`}>
+                        <span>{coreTimeText(r, byId)}</span>
+                      </div>
+                    ))}
                   {edit && !edit.id && edit.start.startsWith(d) && editor}
                 </div>
               )
@@ -517,7 +530,9 @@ export function Timesheet() {
           {hasStaffView && (
             <button type="button" aria-pressed={staffView} className={staffView ? 'active' : ''} onClick={() => switchView('mitarbeiter')}>
               Mitarbeiter
-              {longDayCount > 0 && <span className="tab-badge" title="Tage über 10 Stunden warten auf deine Freigabe">{longDayCount}</span>}
+              {longDayCount + coreTimeCount > 0 && (
+                <span className="tab-badge" title="Tage über 10 Stunden oder Kernzeitverletzungen warten auf deine Freigabe">{longDayCount + coreTimeCount}</span>
+              )}
             </button>
           )}
           {canBlocks && (
@@ -534,6 +549,12 @@ export function Timesheet() {
       {!staffView && !blocksView && longDayCount > 0 && (
         <p className="info">
           {longDayCount === 1 ? 'Ein Arbeitstag' : `${longDayCount} Arbeitstage`} über 10 Stunden {longDayCount === 1 ? 'wartet' : 'warten'} auf deine Freigabe.{' '}
+          <button type="button" className="link" onClick={() => switchView('mitarbeiter')}>Zur Mitarbeiterübersicht</button>
+        </p>
+      )}
+      {!staffView && !blocksView && coreTimeCount > 0 && (
+        <p className="info">
+          {coreTimeCount === 1 ? 'Ein Tag' : `${coreTimeCount} Tage`} mit nicht eingehaltener Kernzeit {coreTimeCount === 1 ? 'wartet' : 'warten'} auf deine Freigabe.{' '}
           <button type="button" className="link" onClick={() => switchView('mitarbeiter')}>Zur Mitarbeiterübersicht</button>
         </p>
       )}
@@ -555,6 +576,7 @@ export function Timesheet() {
           ) : (
             <>
               <LongDayApprovals me={profile} byId={byId} onChanged={load} />
+              <CoreTimeApprovals me={profile} byId={byId} onChanged={load} />
               <AttendanceApprovals me={profile} byId={byId} onChanged={load} />
               <VacationCard userId={profile.id} me={profile} byId={byId} year={Number(today.slice(0, 4))} onChanged={load} part="approvals" />
               <TeamOverview
