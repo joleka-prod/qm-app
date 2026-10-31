@@ -8,7 +8,7 @@ export function Layout() {
   const path = useLocation().pathname
   const isPlanner = isPlannerRole(profile?.role)
   // Kalender und die Startseite der Planer (mit Spalte "Dringender Handlungsbedarf") nutzen die volle Breite
-  const wide = path === '/kalender' || path === '/fenster' || path.startsWith('/personal') || (isPlanner && (path === '/' || path === '/tickets'))
+  const wide = path === '/kalender' || path === '/fenster' || path.startsWith('/personal') || path === '/zeiterfassung' || (isPlanner && (path === '/' || path === '/tickets'))
   return (
     <div className="app">
       <header className="topbar">

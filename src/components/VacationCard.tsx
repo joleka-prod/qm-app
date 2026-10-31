@@ -251,18 +251,20 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
 
       {(own || canEnter || form || error || list.length > 0) && (
       <section className="card">
-        <h2>{own ? 'Urlaubsanträge' : 'Abwesenheiten'} {year}</h2>
-
-        {own && !form && (
-          <button className="primary" onClick={() => { setError(''); setForm({ start: '', end: '', note: '', kind: 'urlaub' }) }}>
-            + Urlaub beantragen
-          </button>
-        )}
-        {!own && canEnter && !form && (
-          <button onClick={() => { setError(''); setForm({ start: '', end: '', note: '', kind: 'urlaub' }) }}>
-            + Abwesenheit eintragen
-          </button>
-        )}
+        {/* Kopf wie in der Personalübersicht: Überschrift links, Knopf rechts */}
+        <div className="card-head">
+          <h2>{own ? 'Urlaubsanträge' : 'Abwesenheiten'} {year}</h2>
+          {own && !form && (
+            <button className="primary" onClick={() => { setError(''); setForm({ start: '', end: '', note: '', kind: 'urlaub' }) }}>
+              + Urlaub beantragen
+            </button>
+          )}
+          {!own && canEnter && !form && (
+            <button onClick={() => { setError(''); setForm({ start: '', end: '', note: '', kind: 'urlaub' }) }}>
+              + Abwesenheit eintragen
+            </button>
+          )}
+        </div>
         {form && (
           <div className="form vacation-form">
             <div className={entering ? 'segmented' : 'segmented two'} role="radiogroup" aria-label={entering ? 'Art der Abwesenheit' : 'Freizeit über'}>

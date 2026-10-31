@@ -79,51 +79,51 @@ export function TeamOverview({ members, selected, onPick, reloadKey }: {
 
   if (members.length === 0) return null
 
+  // Aufbau wie die Personalübersicht: Suchfeld über der Tabelle, Tabelle in einer Karte
   return (
-    <section className="card team-overview">
-      <h2>Meine Mitarbeiter</h2>
+    <div className="team-overview">
       <div className="filters">
         <input type="search" placeholder="Name suchen…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Mitarbeiter suchen" />
       </div>
-      <div className="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Jetzt</th>
-              <th>Heute</th>
-              <th>Diese Woche</th>
-              <th>Überstunden</th>
-              <th>Offene Anträge</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((m) => {
-              const r = rows[m.id]
-              return (
-                <tr key={m.id} className={m.id === selected ? 'selected' : ''} onClick={() => onPick(m.id)}>
-                  <td>
-                    <button className="link" onClick={() => onPick(m.id)}>{lastFirst(m)}</button>
-                  </td>
-                  <td>
-                    {r?.running ? <span className="time-running">● seit {clockTime(r.running.started_at)}</span> : <span className="muted">–</span>}
-                  </td>
-                  <td>{r ? formatMinutes(r.today) : '…'}</td>
-                  <td>{r ? formatMinutes(r.week) : '…'}</td>
-                  <td className={r?.balance != null && r.balance < 0 ? 'overtime-minus' : 'overtime-plus'}>
-                    {r?.balance != null ? signed(r.balance) : '…'}
-                  </td>
-                  <td>{r?.open ? <strong className="appointment-warn">{r.open}</strong> : <span className="muted">–</span>}</td>
-                </tr>
-              )
-            })}
-            {shown.length === 0 && (
-              <tr><td colSpan={6} className="muted">Keine Treffer.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      <p className="small muted">Auf einen Namen tippen, um die Zeiterfassung dieser Person anzuzeigen.</p>
-    </section>
+      <section className="card">
+        <div className="cal-scroll">
+          <table className="import-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Jetzt</th>
+                <th className="num">Heute</th>
+                <th className="num">Diese Woche</th>
+                <th className="num">Überstunden</th>
+                <th className="num">Offene Anträge</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((m) => {
+                const r = rows[m.id]
+                return (
+                  <tr key={m.id} className={`clickable ${m.id === selected ? 'selected' : ''}`} onClick={() => onPick(m.id)}>
+                    <td>
+                      <button className="link name-link" onClick={(ev) => { ev.stopPropagation(); onPick(m.id) }}>{lastFirst(m)}</button>
+                    </td>
+                    <td>
+                      {r?.running ? <span className="time-running">● seit {clockTime(r.running.started_at)}</span> : <span className="muted">–</span>}
+                    </td>
+                    <td className="num">{r ? formatMinutes(r.today) : '…'}</td>
+                    <td className="num">{r ? formatMinutes(r.week) : '…'}</td>
+                    <td className={`num ${r?.balance != null && r.balance < 0 ? 'overtime-minus' : 'overtime-plus'}`}>
+                      {r?.balance != null ? signed(r.balance) : '…'}
+                    </td>
+                    <td className="num">{r?.open ? <strong className="appointment-warn">{r.open}</strong> : <span className="muted">–</span>}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        {shown.length === 0 && <p className="muted">Keine Einträge.</p>}
+        <p className="small muted">Auf einen Namen tippen, um die Zeiterfassung dieser Person anzuzeigen.</p>
+      </section>
+    </div>
   )
 }
