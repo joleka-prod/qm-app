@@ -10,8 +10,19 @@ interface Notice {
 }
 
 // Infos, wenn jemand anderes (Personalabteilung, Vorgesetzte, Admin) die eigenen Zeiten geändert hat.
-// Bleiben stehen, bis die Person sie bestätigt.
-export function TimeChangeNotices({ userId, byId, reloadKey }: { userId: string; byId: Record<string, Profile>; reloadKey?: unknown }) {
+// Bleiben stehen, bis die Person sie bestätigt. Solange offene Infos da sind, sperrt die
+// Zeiterfassung alles andere (außer Start/Stopp); onCount meldet die Anzahl offener Infos.
+export function TimeChangeNotices({
+  userId,
+  byId,
+  reloadKey,
+  onCount,
+}: {
+  userId: string
+  byId: Record<string, Profile>
+  reloadKey?: unknown
+  onCount?: (n: number) => void
+}) {
   const [list, setList] = useState<Notice[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -23,8 +34,10 @@ export function TimeChangeNotices({ userId, byId, reloadKey }: { userId: string;
       .eq('user_id', userId)
       .is('confirmed_at', null)
       .order('created_at')
-    setList((data ?? []) as Notice[])
-  }, [userId])
+    const rows = (data ?? []) as Notice[]
+    setList(rows)
+    onCount?.(rows.length)
+  }, [userId, onCount])
 
   useEffect(() => {
     load()
@@ -43,7 +56,9 @@ export function TimeChangeNotices({ userId, byId, reloadKey }: { userId: string;
   return (
     <section className="card highlight">
       <h2>Änderungen an deinen Zeiten</h2>
-      <p className="small muted">Bitte lesen und bestätigen.</p>
+      <p className="small">
+        Bitte lies die Änderungen und bestätige sie. Erst danach kannst du in der Zeiterfassung weiterarbeiten (Start und Stopp gehen trotzdem).
+      </p>
       <ul className="vacation-list">
         {list.map((n) => (
           <li key={n.id}>

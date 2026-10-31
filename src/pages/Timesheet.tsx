@@ -75,6 +75,7 @@ export function Timesheet() {
     else window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   const [month, setMonth] = useState(today.slice(0, 7))
+  const [openNotices, setOpenNotices] = useState<number | null>(null)
   const [sessions, setSessions] = useState<Attendance[]>([])
   const [jobs, setJobs] = useState<TimeEntry[]>([])
   const [vacation, setVacation] = useState<VacationRequest[]>([])
@@ -254,7 +255,6 @@ export function Timesheet() {
           onChanged={load}
           part="own"
           aside={<OvertimeCard userId={installerId} reloadKey={sessions} />}
-          below={installerId === profile.id && <TimeChangeNotices userId={installerId} byId={byId} reloadKey={sessions} />}
         />
       )}
 
@@ -369,9 +369,22 @@ export function Timesheet() {
     </>
   )
 
+  // Offene Änderungsinfos zu den eigenen Zeiten müssen zuerst bestätigt werden;
+  // bis dahin bleibt nur Start/Stopp nutzbar, damit keine Arbeitszeit verloren geht.
+  const noticeGate = profile && <TimeChangeNotices userId={profile.id} byId={byId} reloadKey={sessions} onCount={setOpenNotices} />
+  if (profile && openNotices !== 0) {
+    return (
+      <div>
+        <ClockBar userId={profile.id} />
+        {noticeGate}
+      </div>
+    )
+  }
+
   return (
     <div>
       {profile && !staffView && <ClockBar userId={profile.id} />}
+      {noticeGate}
 
       {hasStaffView && (
         <div className="segmented two view-switch" role="radiogroup" aria-label="Ansicht">
