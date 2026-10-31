@@ -6,6 +6,7 @@ import { formatDay, ticketNo, type Ticket } from '../lib/types'
 export interface ErpOrder {
   id: number
   doc_number: string
+  doc_extension?: string
   doc_kind: string
   title: string
   doc_date: string | null
@@ -57,6 +58,7 @@ export function ErpOrderItem({ order: o, tickets, showProject, showCustomer }: {
     <li>
       <span className="customer-ticket">
         <strong>{o.doc_number || 'ohne Nummer'}</strong>
+        {o.doc_extension && <span> · Erweiterung {o.doc_extension}</span>}
         {[o.doc_kind, o.status].filter(Boolean).map((x) => <span key={x} className="muted small"> · {x}</span>)}
       </span>
       <span>{o.title}</span>

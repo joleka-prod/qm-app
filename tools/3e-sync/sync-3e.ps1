@@ -120,7 +120,7 @@ if (($Nur -eq '' -or $Nur -eq 'Bauvorhaben') -and (Test-Path (Join-Path $dir $pr
 $orderQuery = if ($cfg.AuftragAbfrage) { $cfg.AuftragAbfrage } else { 'auftraege.sql' }
 if (($Nur -eq '' -or $Nur -eq 'Auftraege') -and (Test-Path (Join-Path $dir $orderQuery))) {
   try {
-    Sync 'Aufträge' $orderQuery 'orders' @('ext_id', 'number', 'kind', 'title', 'doc_date', 'delivery_date', 'status', 'amount_net', 'notes', 'customer_ext_id', 'project_ext_id') 'vorschau-auftraege.csv'
+    Sync 'Aufträge' $orderQuery 'orders' @('ext_id', 'number', 'extension', 'kind', 'title', 'doc_date', 'delivery_date', 'status', 'amount_net', 'notes', 'customer_ext_id', 'project_ext_id') 'vorschau-auftraege.csv'
   }
   catch {
     Log "FEHLER Aufträge: $($_.Exception.Message)"
