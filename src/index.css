@@ -83,8 +83,15 @@ button.link { border: none; background: none; color: var(--primary); padding: 0.
   background: var(--card);
   border-bottom: 1px solid var(--border);
 }
-.brand { font-weight: 700; text-decoration: none; color: var(--text); }
-.topbar nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 1rem; }
+.brand { display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 700; text-decoration: none; color: var(--text); }
+.brand-logo { width: 1.6rem; height: 1.6rem; border-radius: 4px; flex: none; }
+.topbar-user { order: 2; margin-left: auto; text-decoration: none; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.topbar-user.active { color: var(--primary); }
+.topbar nav { order: 3; flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 1rem; }
+@media (min-width: 900px) {
+  .topbar nav { order: 1; flex-basis: auto; flex: 1; justify-content: flex-end; }
+  .topbar-user { order: 2; margin-left: 0.5rem; padding-left: 1rem; border-left: 1px solid var(--border); }
+}
 .topbar nav a { text-decoration: none; color: var(--muted); }
 .topbar nav a.active { color: var(--primary); font-weight: 600; }
 

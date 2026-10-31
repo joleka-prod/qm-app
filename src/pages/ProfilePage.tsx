@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useAuth } from '../auth'
+import { useOfflineState } from '../lib/offline'
 import { supabase } from '../lib/supabase'
 import { ROLE_LABEL } from '../lib/types'
 
@@ -7,6 +8,7 @@ export function ProfilePage() {
   const { profile, reloadProfile, setNeedsPassword } = useAuth()
   const [name, setName] = useState(profile?.full_name ?? '')
   const [msg, setMsg] = useState('')
+  const offline = useOfflineState()
 
   if (!profile) return null
 
@@ -17,7 +19,17 @@ export function ProfilePage() {
     await reloadProfile()
   }
 
+  function logout() {
+    if (
+      offline.pending > 0 &&
+      !confirm(`Es warten noch ${offline.pending} Änderungen auf Übertragung. Sie werden übertragen, sobald du dich wieder anmeldest. Trotzdem abmelden?`)
+    )
+      return
+    supabase.auth.signOut()
+  }
+
   return (
+    <>
     <form className="card form" onSubmit={save}>
       <h1>Mein Profil</h1>
       <p className="muted">{profile.email} · {ROLE_LABEL[profile.role]}</p>
@@ -31,5 +43,13 @@ export function ProfilePage() {
         <button className="primary">Speichern</button>
       </div>
     </form>
+    <div className="card">
+      <h2>Abmelden</h2>
+      <p className="muted">Beendet deine Anmeldung auf diesem Gerät.</p>
+      <div className="actions">
+        <button type="button" className="danger" onClick={logout}>Abmelden</button>
+      </div>
+    </div>
+    </>
   )
 }
