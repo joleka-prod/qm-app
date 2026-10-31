@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
-import { AttendanceApprovals, requestText, type AttendanceRequest } from '../components/AttendanceApprovals'
+import { AttendanceApprovals, requestText, span, type AttendanceRequest } from '../components/AttendanceApprovals'
 import { ClockBar } from '../components/ClockBar'
 import { MonthPicker } from '../components/MonthPicker'
 import { OvertimeCard } from '../components/OvertimeCard'
@@ -13,7 +13,7 @@ import { minutesOf, toLocalInput, type TimeEntry } from '../components/TimeCard'
 import { clockTime, fixedBreakMinutes, fixedBreakSegments, formatMinutes, minutesBetween, useClockChanged, workMinutes, type Attendance } from '../lib/clock'
 import { holidayName } from '../lib/holidays'
 import { supabase } from '../lib/supabase'
-import { canSeePersonnel, displayName, formatDay, isoDate, parseDate, weekNumber } from '../lib/types'
+import { canSeePersonnel, displayName, formatDate, formatDay, isoDate, parseDate, weekNumber } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 
 // Gesetzliche Mindestpause (ArbZG): über 6 Std. 30 Min., über 9 Std. 45 Min.
@@ -36,6 +36,8 @@ const VACATION_TEXT = {
   urlaub: 'Urlaub ', ueberstunden: 'Frei (Überstunden) ', krank: 'Krank ', sonderurlaub: 'Sonderurlaub ',
   schulung: 'Schulung ', schule: 'Schule ', unbezahlt: 'Unbezahlter Urlaub ', kindkrank: 'Kindkrank ',
 }
+
+const REQUEST_STATE = { beantragt: 'Beantragt', genehmigt: 'Genehmigt', abgelehnt: 'Abgelehnt', storniert: 'Zurückgezogen' }
 
 export function Timesheet() {
   const { profile } = useAuth()
@@ -64,6 +66,21 @@ export function Timesheet() {
   const blocksView = canBlocks && params.get('ansicht') === 'einstellungen'
   const staffId = params.get('person') ?? ''
   const installerId = staffView ? staffId : profile?.id ?? ''
+  // Unter Urlaub/Überstunden: Kalender (Tagesliste) oder Anträge (&bereich=antraege)
+  const requestsView = params.get('bereich') === 'antraege'
+  function switchArea(area: 'kalender' | 'antraege') {
+    setEdit(null)
+    setInfo('')
+    setParams(
+      (p) => {
+        const next = new URLSearchParams(p)
+        if (area === 'antraege') next.set('bereich', 'antraege')
+        else next.delete('bereich')
+        return next
+      },
+      { replace: true },
+    )
+  }
   function switchView(view: '' | 'mitarbeiter' | 'einstellungen') {
     setEdit(null)
     setInfo('')
@@ -90,6 +107,8 @@ export function Timesheet() {
   const canCorrect = installerId === profile?.id || isAdmin || isHr || isAbove(installerId)
   const changesDirectly = installerId !== profile?.id && (isAdmin || isHr || isAbove(installerId))
   const [requests, setRequests] = useState<AttendanceRequest[]>([])
+  // Alle Zeitnachträge/-korrekturen der Person für den Bereich Anträge
+  const [allRequests, setAllRequests] = useState<AttendanceRequest[]>([])
   const [info, setInfo] = useState('')
 
   const range = useMemo(() => {
@@ -99,7 +118,7 @@ export function Timesheet() {
 
   const load = useCallback(async () => {
     if (!installerId) return
-    const [att, te, vac, req] = await Promise.all([
+    const [att, te, vac, req, allReq] = await Promise.all([
       supabase.from('attendance').select('*').eq('installer_id', installerId).gte('started_at', range.from).lte('started_at', range.to).order('started_at'),
       supabase.from('time_entries').select('*').eq('installer_id', installerId).gte('started_at', range.from).lte('started_at', range.to),
       supabase
@@ -117,7 +136,9 @@ export function Timesheet() {
         .gte('started_at', range.from)
         .lte('started_at', range.to)
         .order('started_at'),
+      supabase.from('attendance_requests').select('*').eq('user_id', installerId).order('started_at', { ascending: false }).limit(500),
     ])
+    setAllRequests((allReq.data ?? []) as AttendanceRequest[])
     setRequests((req.data ?? []) as AttendanceRequest[])
     setVacation((vac.data ?? []) as VacationRequest[])
     setSessions((att.data ?? []) as Attendance[])
@@ -257,8 +278,77 @@ export function Timesheet() {
           onChanged={load}
           part="own"
           aside={<OvertimeCard userId={installerId} reloadKey={sessions} />}
+          showRequests={requestsView}
+          between={
+            <nav className="emp-tabs" aria-label="Bereich">
+              <button type="button" aria-pressed={!requestsView} className={requestsView ? '' : 'active'} onClick={() => switchArea('kalender')}>
+                Kalender
+              </button>
+              <button type="button" aria-pressed={requestsView} className={requestsView ? 'active' : ''} onClick={() => switchArea('antraege')}>
+                Anträge
+              </button>
+            </nav>
+          }
         />
       )}
+
+      {requestsView && (
+        <section className="card">
+          <div className="card-head">
+            <h2>Zeitnachträge und Korrekturen</h2>
+          </div>
+          {allRequests.length === 0 ? (
+            <p className="muted small">Keine Zeitnachträge. Fehlende oder falsche Zeiten trägst du im Kalender am jeweiligen Tag nach.</p>
+          ) : (
+            <div className="cal-scroll">
+              <table className="import-table request-table">
+                <thead>
+                  <tr>
+                    <th>Tag</th>
+                    <th>Zeit</th>
+                    <th>Art</th>
+                    <th>Status</th>
+                    <th>Grund / Entscheidung</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {allRequests.map((r) => (
+                    <tr key={r.id} className={r.state === 'storniert' || r.state === 'abgelehnt' ? 'muted' : ''}>
+                      <td>{formatDay(isoDate(new Date(r.started_at)))}</td>
+                      <td>
+                        {span(r.started_at, r.ended_at)}
+                        {r.old_started_at && <div className="small muted">vorher {span(r.old_started_at, r.old_ended_at)}</div>}
+                      </td>
+                      <td>{r.old_started_at ? 'Korrektur' : 'Nachtrag'}</td>
+                      <td><span className={`badge badge-urlaub-${r.state}`}>{REQUEST_STATE[r.state]}</span></td>
+                      <td className="small">
+                        <div>{r.reason}</div>
+                        {r.requested_by !== r.user_id && <div className="muted">eingetragen von {displayName(byId[r.requested_by])}</div>}
+                        {r.decided_by && r.state !== 'beantragt' && (
+                          <div className="muted">
+                            {REQUEST_STATE[r.state]} von {displayName(byId[r.decided_by])}
+                            {r.decided_at && <> am {formatDate(r.decided_at)}</>}
+                            {r.decision_note && <> · {r.decision_note}</>}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {r.state === 'beantragt' && (r.requested_by === profile?.id || r.user_id === profile?.id) && (
+                          <button className="link" onClick={() => cancelRequest(r.id)}>Zurückziehen</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {!requestsView && (
+      <>
 
       <p className="muted small">
         Die Arbeitszeit kommt aus Start und Stopp der Zeiterfassung oben, abzüglich der festen Pausen 09:00–09:15 und 12:00–12:30. „Aufträge“ zeigt die Zeit, die auf
@@ -383,6 +473,8 @@ export function Timesheet() {
         <strong>{formatMinutes(sum(range.all, workOf))}</strong>
         <span className="muted small">davon auf Aufträge gebucht {formatMinutes(sum(range.all, (d) => jobsByDay[d] ?? 0))}</span>
       </div>
+      </>
+      )}
     </>
   )
 

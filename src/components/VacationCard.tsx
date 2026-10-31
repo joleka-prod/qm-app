@@ -75,11 +75,16 @@ interface Props {
   // Neben der Urlaubsübersicht (z. B. Überstunden) und darunter über volle Breite (z. B. Änderungsinfos)
   aside?: ReactNode
   below?: ReactNode
+  // Zwischen Übersicht und Anträgen (z. B. Umschalter Kalender/Anträge); showRequests=false blendet die Anträge aus
+  between?: ReactNode
+  showRequests?: boolean
 }
 
 // Urlaub in der Zeiterfassung: Anträge stellen, Übersicht des Jahres, Genehmigung durch Vorgesetzte
-export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', aside, below }: Props) {
+export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', aside, below, between, showRequests = true }: Props) {
   const [list, setList] = useState<VacationRequest[]>([])
+  // Alle Anträge der Person (alle Jahre, neueste zuerst) für den Reiter Anträge
+  const [allList, setAllList] = useState<VacationRequest[]>([])
   const [pending, setPending] = useState<VacationRequest[]>([])
   // Resturlaub aus dem Vorjahr (festgelegt oder berechnet)
   const [carryover, setCarryover] = useState(0)
@@ -100,7 +105,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
   const own = userId === me.id
 
   const load = useCallback(async () => {
-    const [mine, open, carry] = await Promise.all([
+    const [mine, open, carry, all] = await Promise.all([
       supabase
         .from('vacation_requests')
         .select('*')
@@ -111,7 +116,9 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
       // Offene Anträge anderer, die ich sehen darf (Mitarbeiter bzw. Admin)
       supabase.from('vacation_requests').select('*').eq('state', 'beantragt').neq('user_id', me.id).order('start_date'),
       supabase.rpc('vacation_carryover_days', { p_user: userId, p_year: year }),
+      supabase.from('vacation_requests').select('*').eq('user_id', userId).order('start_date', { ascending: false }).limit(500),
     ])
+    setAllList((all.data ?? []) as VacationRequest[])
     setCarryover(Number(carry.data ?? 0))
     const openList = (open.data ?? []) as VacationRequest[]
     setList((mine.data ?? []) as VacationRequest[])
@@ -281,15 +288,16 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
       {aside}
       </div>
       {below}
+      {between}
 
-      {(own || canEnter || form || error || list.length > 0) && (
+      {showRequests && (
       <section className="card">
         {/* Kopf wie in der Personalübersicht: Überschrift links, Knopf rechts */}
         <div className="card-head">
-          <h2>{own ? 'Urlaubsanträge' : 'Abwesenheiten'} {year}</h2>
+          <h2>{own ? 'Urlaub und Zeitausgleich' : 'Abwesenheiten'}</h2>
           {own && !form && (
             <button className="primary" onClick={() => { setError(''); setForm({ start: '', end: '', note: '', kind: 'urlaub' }) }}>
-              + Urlaub beantragen
+              + Neuer Antrag
             </button>
           )}
           {!own && canEnter && !form && (
@@ -379,44 +387,61 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
         )}
         {error && <p className="error">{error}</p>}
 
-        {list.length > 0 && (
-          <ul className="vacation-list">
-            {list.map((r) => (
-              <li key={r.id} className={r.state === 'storniert' || r.state === 'abgelehnt' ? 'muted' : ''}>
-                <div>
-                  <div>
-                    {period(r)} · {dayWord(r.days)}
-                    {KIND_NOTE[r.kind] && <span className="muted"> · {KIND_NOTE[r.kind]}</span>}{' '}
-                    <span className={`badge badge-urlaub-${r.state}`}>{STATE_LABEL[r.state]}</span>
-                  </div>
-                  {r.note && <div className="small muted">{r.note}</div>}
-                  {(r.decided_by || r.decided_by_name) ? (
-                    <div className="small muted">
-                      {STATE_LABEL[r.state]} von {r.decided_by ? displayName(byId[r.decided_by]) : r.decided_by_name}
-                      {r.decided_at && <> am {formatDate(r.decided_at)}</>}
-                      {r.decision_note && <> · {r.decision_note}</>}
-                    </div>
-                  ) : r.decision_note && r.state !== 'beantragt' ? (
-                    <div className="small muted">{r.decision_note}</div>
-                  ) : null}
-                </div>
-                <div className="vacation-actions">
-                  {r.state === 'beantragt' && canDecide(r) && (
-                    <>
-                      <button className="primary" disabled={busy} onClick={() => approveBlocked(r)}>Genehmigen</button>
-                      <button disabled={busy} onClick={() => decide(r, false)}>Ablehnen</button>
-                    </>
-                  )}
-                  {r.state === 'beantragt' && r.user_id === me.id && (
-                    <button className="link" disabled={busy} onClick={() => cancel(r)}>Zurückziehen</button>
-                  )}
-                  {r.state === 'genehmigt' && (canDecide(r) || (canSeePersonnel(me) && r.user_id !== me.id)) && (
-                    <button className="link danger" disabled={busy} onClick={() => cancel(r)}>Stornieren</button>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
+        {allList.length === 0 ? (
+          !form && <p className="muted small">{own ? 'Noch keine Anträge.' : 'Noch keine Abwesenheiten.'}</p>
+        ) : (
+          <div className="cal-scroll">
+            <table className="import-table request-table">
+              <thead>
+                <tr>
+                  <th>Zeitraum</th>
+                  <th>Art</th>
+                  <th className="num">Tage</th>
+                  <th>Status</th>
+                  <th>Bemerkung / Entscheidung</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {allList.map((r) => (
+                  <tr key={r.id} className={r.state === 'storniert' || r.state === 'abgelehnt' ? 'muted' : ''}>
+                    <td>{period(r)}</td>
+                    <td>{ABSENCE_LABEL[r.kind] ?? r.kind}</td>
+                    <td className="num">{r.days.toLocaleString('de-DE')}</td>
+                    <td><span className={`badge badge-urlaub-${r.state}`}>{STATE_LABEL[r.state]}</span></td>
+                    <td className="small">
+                      {r.note && <div>{r.note}</div>}
+                      {(r.decided_by || r.decided_by_name) ? (
+                        <div className="muted">
+                          {STATE_LABEL[r.state]} von {r.decided_by ? displayName(byId[r.decided_by]) : r.decided_by_name}
+                          {r.decided_at && <> am {formatDate(r.decided_at)}</>}
+                          {r.decision_note && <> · {r.decision_note}</>}
+                        </div>
+                      ) : r.decision_note && r.state !== 'beantragt' ? (
+                        <div className="muted">{r.decision_note}</div>
+                      ) : null}
+                    </td>
+                    <td>
+                      <div className="vacation-actions">
+                        {r.state === 'beantragt' && canDecide(r) && (
+                          <>
+                            <button className="primary" disabled={busy} onClick={() => approveBlocked(r)}>Genehmigen</button>
+                            <button disabled={busy} onClick={() => decide(r, false)}>Ablehnen</button>
+                          </>
+                        )}
+                        {r.state === 'beantragt' && r.user_id === me.id && (
+                          <button className="link" disabled={busy} onClick={() => cancel(r)}>Zurückziehen</button>
+                        )}
+                        {r.state === 'genehmigt' && (canDecide(r) || (canSeePersonnel(me) && r.user_id !== me.id)) && (
+                          <button className="link danger" disabled={busy} onClick={() => cancel(r)}>Stornieren</button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
       )}
