@@ -293,8 +293,8 @@ export function TimetacImport() {
       setTtRange([from, to])
       const names: Record<string, string> = Object.fromEntries(taskList.map((t) => [str(t.id), str(t.name) || `Aufgabe ${str(t.id)}`]))
       setTasks(names)
-      // Pausen zählen nicht als Arbeitszeit: Aufgaben mit "Pause" im Namen gleich abwählen
-      setSkipTasks(Object.keys(names).filter((id) => /pause/i.test(names[id])))
+      // keine Arbeitszeit: Pausen, und Abwesenheiten (kommen über Schritt 4, sonst doppelt) gleich abwählen
+      setSkipTasks(Object.keys(names).filter((id) => /pause|urlaub|krank|feiertag|zeitausgleich/i.test(names[id])))
     } catch (e) {
       setError((e as Error).message)
     }
@@ -549,7 +549,7 @@ export function TimetacImport() {
               <p className="small">{trackings.length.toLocaleString('de-DE')} Buchungen gefunden.</p>
               {taskCounts.length > 1 && (
                 <>
-                  <p className="muted small">Aufgaben, die nicht als Arbeitszeit zählen (z. B. Pause), abwählen:</p>
+                  <p className="muted small">Aufgaben, die nicht als Arbeitszeit zählen (Pause, Urlaub, Krank, Feiertag, Zeitausgleich sind schon abgewählt, Abwesenheiten kommen über Schritt 4):</p>
                   <div className="filters">
                     {taskCounts.map(([t, n]) => (
                       <label key={t} className="small">
