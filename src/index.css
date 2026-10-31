@@ -791,3 +791,5 @@ button.link.danger-link { color: var(--danger); }
 .ts-session, .ts-meta { align-items: baseline; }
 .ts-session button.link, .ts-meta button.link, .ts-request button.link { font-size: inherit; padding: 0; }
 .page-head.wrap { flex-wrap: wrap; }
+.tabs-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.tabs-row .emp-tabs { margin-bottom: 0; }

@@ -346,15 +346,35 @@ export function Personnel() {
   const [params, setParams] = useSearchParams()
   const users = profile?.role === 'admin' && params.get('ansicht') === 'benutzer'
   const external = !users && params.get('art') === 'extern'
+  const navigate = useNavigate()
+  const [error, setError] = useState('')
+
+  async function create() {
+    setError('')
+    const { data, error } = await supabase.from('employees').insert({ status: 'Aktiv', employee_type: external ? 'extern' : 'mitarbeiter' }).select('id').single()
+    if (error) setError(error.message)
+    else navigate(`/personal/${data.id}`)
+  }
+
   return (
     <div>
-      <nav className="emp-tabs">
-        <button type="button" className={users || external ? '' : 'active'} onClick={() => setParams({})}>Mitarbeiter</button>
-        <button type="button" className={external ? 'active' : ''} onClick={() => setParams({ art: 'extern' })}>Externe Mitarbeiter</button>
-        {profile?.role === 'admin' && (
-          <button type="button" className={users ? 'active' : ''} onClick={() => setParams({ ansicht: 'benutzer' })}>Stempel-Terminals</button>
+      {/* Reiter links, Knöpfe zum Anlegen rechts in derselben Zeile (Fabian, 2026-10-31) */}
+      <div className="tabs-row">
+        <nav className="emp-tabs">
+          <button type="button" className={users || external ? '' : 'active'} onClick={() => setParams({})}>Mitarbeiter</button>
+          <button type="button" className={external ? 'active' : ''} onClick={() => setParams({ art: 'extern' })}>Externe Mitarbeiter</button>
+          {profile?.role === 'admin' && (
+            <button type="button" className={users ? 'active' : ''} onClick={() => setParams({ ansicht: 'benutzer' })}>Stempel-Terminals</button>
+          )}
+        </nav>
+        {!users && (
+          <div className="card-head-actions">
+            {profile?.role === 'admin' && !external && <Link to="/personal/timetac" className="button">Import aus TimeTac</Link>}
+            <button className="primary" onClick={create}>{external ? '+ Externer Mitarbeiter' : '+ Mitarbeiter'}</button>
+          </div>
         )}
-      </nav>
+      </div>
+      {error && <p className="error">{error}</p>}
       {users ? <Users /> : <EmployeeList key={external ? 'extern' : 'intern'} external={external} />}
     </div>
   )
@@ -365,7 +385,6 @@ export function Personnel() {
 function EmployeeList({ external }: { external: boolean }) {
   const { profile } = useAuth()
   const { profiles, byId, reload: reloadProfiles } = useProfiles()
-  const navigate = useNavigate()
   const [list, setList] = useState<Employee[]>([])
   const [error, setError] = useState('')
   const [q, setQ] = useState('')
@@ -570,21 +589,8 @@ function EmployeeList({ external }: { external: boolean }) {
       .sort((a, b) => String(a.last_name).localeCompare(String(b.last_name), 'de') || String(a.first_name).localeCompare(String(b.first_name), 'de'))
   }, [byStatus, q, activeFilters, choices, colFilter, byId, extra])
 
-  async function create() {
-    const { data, error } = await supabase.from('employees').insert({ status: 'Aktiv', employee_type: external ? 'extern' : 'mitarbeiter' }).select('id').single()
-    if (error) setError(error.message)
-    else navigate(`/personal/${data.id}`)
-  }
-
   return (
     <div>
-      <div className="page-head">
-        <h1>{external ? 'Externe Mitarbeiter' : 'Personal'}</h1>
-        <div className="card-head-actions">
-          {profile?.role === 'admin' && !external && <Link to="/personal/timetac" className="button">Import aus TimeTac</Link>}
-          <button className="primary" onClick={create}>{external ? '+ Externer Mitarbeiter' : '+ Mitarbeiter'}</button>
-        </div>
-      </div>
       {error && <p className="error">{error}</p>}
       <KeyFigures list={list} />
       {dupes.length > 0 && (
