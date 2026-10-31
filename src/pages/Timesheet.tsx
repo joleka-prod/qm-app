@@ -9,7 +9,7 @@ import { OvertimeCard } from '../components/OvertimeCard'
 import { TeamOverview } from '../components/TeamOverview'
 import { TimeChangeNotices } from '../components/TimeChangeNotices'
 import { VacationBlocks } from '../components/VacationBlocks'
-import { VacationCard, type VacationRequest } from '../components/VacationCard'
+import { ABSENCE_LABEL, VacationCard, type VacationKind, type VacationRequest } from '../components/VacationCard'
 import { minutesOf, toLocalInput, type TimeEntry } from '../components/TimeCard'
 import { clockTime, fixedBreakMinutes, fixedBreakSegments, formatMinutes, minutesBetween, useClockChanged, workMinutes, type Attendance } from '../lib/clock'
 import { holidayName } from '../lib/holidays'
@@ -30,6 +30,9 @@ function monthDays(month: string) {
 }
 
 type Edit = { id?: number; start: string; end: string; reason: string }
+// Fehlzeit für einen einzelnen Tag (Personalbüro, Vorgesetzte, Admin)
+type DayAbsence = { day: string; kind: VacationKind; half: boolean; note: string }
+const DAY_ABSENCE_KINDS: VacationKind[] = ['urlaub', 'sonderurlaub', 'schulung', 'schule', 'unbezahlt', 'kindkrank', 'ueberstunden']
 
 // Stundenkonto: Tage, Wochen und Monat aus den Stempelzeiten. Mitarbeiter sehen ihr eigenes,
 // Vorgesetzte ihre Mitarbeiter, Personalabteilung und Admin alle; sie können Zeiten korrigieren oder nachtragen.
@@ -71,6 +74,7 @@ export function Timesheet() {
   const requestsView = params.get('bereich') === 'antraege'
   function switchArea(area: 'kalender' | 'antraege') {
     setEdit(null)
+    setAbsence(null)
     setInfo('')
     setParams(
       (p) => {
@@ -84,12 +88,14 @@ export function Timesheet() {
   }
   function switchView(view: '' | 'mitarbeiter' | 'einstellungen') {
     setEdit(null)
+    setAbsence(null)
     setInfo('')
     setParams(view ? { ansicht: view } : {}, { replace: true })
   }
   // Person in der Mitarbeiteransicht wählen und zu deren Zeiten springen
   function pick(id: string) {
     setEdit(null)
+    setAbsence(null)
     setInfo('')
     setParams(id ? { ansicht: 'mitarbeiter', person: id } : { ansicht: 'mitarbeiter' })
     window.scrollTo({ top: 0 })
@@ -100,6 +106,7 @@ export function Timesheet() {
   const [jobs, setJobs] = useState<TimeEntry[]>([])
   const [vacation, setVacation] = useState<VacationRequest[]>([])
   const [edit, setEdit] = useState<Edit | null>(null)
+  const [absence, setAbsence] = useState<DayAbsence | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const now = Date.now()
@@ -205,6 +212,26 @@ export function Timesheet() {
     setBusy(false)
   }
 
+  // Fehlzeit für einen Tag eintragen: gilt sofort, der Mitarbeiter bekommt eine Info in der Zeiterfassung
+  async function saveAbsence() {
+    if (!absence) return
+    const name = displayName(byId[installerId])
+    if ((byDay[absence.day] ?? []).length && !confirm(`${name} hat an diesem Tag schon Stempelzeiten. Fehlzeit trotzdem eintragen?`)) return
+    setBusy(true)
+    setError('')
+    setInfo('')
+    const { error } = await supabase.rpc('enter_absence', {
+      p_user: installerId, p_start: absence.day, p_end: absence.day, p_kind: absence.kind, p_note: absence.note, p_half: absence.half,
+    })
+    if (error) setError(error.message)
+    else {
+      setInfo(`${ABSENCE_LABEL[absence.kind]} am ${formatDay(absence.day)} eingetragen. ${name} bekommt dazu eine Info in der Zeiterfassung.`)
+      setAbsence(null)
+    }
+    await load()
+    setBusy(false)
+  }
+
   async function cancelRequest(id: number) {
     if (!confirm('Nachtrag zurückziehen?')) return
     const { error } = await supabase.rpc('cancel_attendance_change', { p_id: id })
@@ -230,6 +257,40 @@ export function Timesheet() {
   }
   const sum = (list: string[], f: (d: string) => number) => list.reduce((a, d) => a + f(d), 0)
   const monthName = parseDate(`${month}-01`).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+
+  const absenceForm = absence && (
+    <div className="form time-edit">
+      <div className="segmented" role="radiogroup" aria-label="Art der Fehlzeit">
+        {DAY_ABSENCE_KINDS.map((k) => (
+          <button
+            type="button"
+            key={k}
+            role="radio"
+            aria-checked={absence.kind === k}
+            className={absence.kind === k ? 'active' : ''}
+            onClick={() => setAbsence({ ...absence, kind: k, half: k === 'ueberstunden' ? false : absence.half })}
+          >
+            {ABSENCE_LABEL[k]}
+          </button>
+        ))}
+      </div>
+      {absence.kind !== 'ueberstunden' && (
+        <label className="checkbox-row">
+          <input type="checkbox" checked={absence.half} onChange={(e) => setAbsence({ ...absence, half: e.target.checked })} /> Nur halber Tag
+        </label>
+      )}
+      <label>
+        Notiz (optional)
+        <input value={absence.note} maxLength={300} onChange={(e) => setAbsence({ ...absence, note: e.target.value })} />
+      </label>
+      <p className="small muted">Die Fehlzeit gilt sofort. {displayName(byId[installerId])} bekommt dazu eine Info in der Zeiterfassung.</p>
+      {error && <p className="error">{error}</p>}
+      <div className="actions">
+        <button disabled={busy} onClick={() => setAbsence(null)}>Abbrechen</button>
+        <button className="primary" disabled={busy} onClick={saveAbsence}>Eintragen</button>
+      </div>
+    </div>
+  )
 
   const editor = edit && (
     <div className="form time-edit">
@@ -437,7 +498,7 @@ export function Timesheet() {
                     {pause > 0 && <span>Pause {formatMinutes(pause)}</span>}
                     {!!jobsByDay[d] && <span>Aufträge {formatMinutes(jobsByDay[d])}</span>}
                     {short && <span className="appointment-warn">Pause unter {minBreak(work)} Min.</span>}
-                    {canCorrect && !edit && d <= today && (
+                    {canCorrect && !edit && !absence && d <= today && (
                       <button
                         className="link"
                         onClick={() => {
@@ -448,7 +509,19 @@ export function Timesheet() {
                         + Zeit nachtragen
                       </button>
                     )}
+                    {changesDirectly && !edit && !absence && !onVacation && weekday !== 0 && weekday !== 6 && !holidayName(d) && (
+                      <button
+                        className="link"
+                        onClick={() => {
+                          setError('')
+                          setAbsence({ day: d, kind: 'urlaub', half: false, note: '' })
+                        }}
+                      >
+                        + Fehlzeit eintragen
+                      </button>
+                    )}
                   </div>
+                  {absence?.day === d && absenceForm}
                   {requests
                     .filter((r) => isoDate(new Date(r.started_at)) === d)
                     .map((r) => (
