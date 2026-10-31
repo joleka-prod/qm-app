@@ -38,7 +38,7 @@ const DAY_ABSENCE_KINDS: VacationKind[] = ['urlaub', 'sonderurlaub', 'schulung',
 // Stundenkonto: Tage, Wochen und Monat aus den Stempelzeiten. Mitarbeiter sehen ihr eigenes,
 // Vorgesetzte ihre Mitarbeiter, Personalabteilung und Admin alle; sie können Zeiten korrigieren oder nachtragen.
 const VACATION_TEXT = {
-  urlaub: 'Urlaub ', ueberstunden: 'Frei (Überstunden) ', krank: 'Krank ', sonderurlaub: 'Sonderurlaub ',
+  urlaub: 'Urlaub ', ueberstunden: 'Zeitausgleich ', krank: 'Krank ', sonderurlaub: 'Sonderurlaub ',
   schulung: 'Schulung ', schule: 'Schule ', unbezahlt: 'Unbezahlter Urlaub ', kindkrank: 'Kindkrank ',
 }
 
@@ -455,7 +455,7 @@ export function Timesheet() {
                       {holidayName(d) && <span className="holiday-name">{holidayName(d)}</span>}
                     </strong>
                     <span className="ts-work">
-                      {vac && <span className="ts-vacation">{VACATION_TEXT[vac.kind as keyof typeof VACATION_TEXT] ?? 'Urlaub '}</span>}
+                      {vac && <span className="ts-vacation">{VACATION_TEXT[vac.kind as keyof typeof VACATION_TEXT] ?? 'Urlaub '}{vac.start_time && vac.end_time ? `${vac.start_time.slice(0, 5)}–${vac.end_time.slice(0, 5)} ` : ''}</span>}
                       {work > 0 ? formatMinutes(work) : !onVacation && <span className="muted">–</span>}
                     </span>
                   </div>
