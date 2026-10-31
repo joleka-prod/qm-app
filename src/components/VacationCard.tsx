@@ -231,10 +231,10 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
       <section className="card">
         <h2>Urlaub {year}</h2>
         <div className="vacation-sum">
-          <div><span className="muted small">Anspruch</span><strong>{dayWord(allowance)}</strong></div>
+          <div><span className="muted small">Urlaubsanspruch</span><strong>{dayWord(allowance)}</strong></div>
           <div><span className="muted small">Genehmigt</span><strong>{dayWord(approved)}</strong></div>
           <div><span className="muted small">Beantragt</span><strong>{dayWord(requested)}</strong></div>
-          <div><span className="muted small">Rest</span><strong className={rest < 0 ? 'appointment-warn' : ''}>{dayWord(rest)}</strong></div>
+          <div><span className="muted small">Resturlaub</span><strong className={rest < 0 ? 'appointment-warn' : ''}>{dayWord(rest)}</strong></div>
         </div>
         {allowance === 0 && <p className="small muted">Kein Urlaubsanspruch eingetragen. Der Admin kann ihn in der Benutzerverwaltung ändern.</p>}
       </section>

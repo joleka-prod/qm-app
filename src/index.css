@@ -493,10 +493,12 @@ button.link.danger { color: #b42318; }
 /* Überstunden */
 /* Urlaub und Überstunden oben nebeneinander (Handy untereinander) */
 .time-summary { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 0.9rem; }
-@media (min-width: 700px) {
-  .time-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .time-summary .vacation-sum { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
+@media (min-width: 700px) { .time-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Werte untereinander: Bezeichnung links, Wert rechts */
+.time-summary .vacation-sum { display: flex; flex-direction: column; gap: 0; }
+.time-summary .vacation-sum > div { flex-direction: row; justify-content: space-between; align-items: baseline; gap: 1rem; padding: 0.3rem 0; border-top: 1px solid var(--border); }
+.time-summary .vacation-sum > div:first-child { border-top: 0; }
+.time-summary .vacation-sum span.small { font-size: 0.95rem; }
 .overtime-plus { color: #067647; }
 .overtime-minus { color: #b42318; }
 .overtime p { margin: 0.35rem 0 0; }
