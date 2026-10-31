@@ -123,7 +123,7 @@ export function TeamOverview({ members, selected, onPick, reloadKey }: {
           </tbody>
         </table>
       </div>
-      <p className="small muted">Auf einen Namen tippen, um die Zeiterfassung dieser Person darunter anzuzeigen.</p>
+      <p className="small muted">Auf einen Namen tippen, um die Zeiterfassung dieser Person anzuzeigen.</p>
     </section>
   )
 }
