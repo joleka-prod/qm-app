@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { AttendanceApprovals, requestText, type AttendanceRequest } from '../components/AttendanceApprovals'
 import { ClockBar } from '../components/ClockBar'
+import { MonthPicker } from '../components/MonthPicker'
 import { OvertimeCard } from '../components/OvertimeCard'
 import { TeamOverview } from '../components/TeamOverview'
 import { TimeChangeNotices } from '../components/TimeChangeNotices'
@@ -24,12 +25,6 @@ function monthDays(month: string) {
   const days: string[] = []
   for (let d = new Date(y, m - 1, 1); d.getMonth() === m - 1; d.setDate(d.getDate() + 1)) days.push(isoDate(d))
   return days
-}
-
-function shiftMonth(month: string, n: number) {
-  const [y, m] = month.split('-').map(Number)
-  const d = new Date(y, m - 1 + n, 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
 type Edit = { id?: number; start: string; end: string; reason: string }
@@ -245,13 +240,6 @@ export function Timesheet() {
     </div>
   )
 
-  const monthNav = (
-    <div className="week-nav">
-      <button onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Voriger Monat">←</button>
-      <button onClick={() => setMonth(today.slice(0, 7))}>{monthName}</button>
-      <button onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Nächster Monat">→</button>
-    </div>
-  )
 
   // Monatsübersicht der gewählten Person (eigene Zeiten oder Mitarbeiter)
   const timesheet = installerId && (
@@ -280,6 +268,10 @@ export function Timesheet() {
             ? ' Fehlende oder falsche Zeiten kannst du hier mit Grund nachtragen oder korrigieren; sie gelten sofort.'
             : ' Fehlende oder falsche Zeiten kannst du hier mit Grund nachtragen oder korrigieren; sie gelten nach Genehmigung durch den Vorgesetzten.')}
       </p>
+
+      <div className="ts-month-nav">
+        <MonthPicker month={month} onChange={setMonth} current={today.slice(0, 7)} />
+      </div>
 
       <div className="timesheet-days">
         {weeks.map((w) => (
@@ -384,11 +376,6 @@ export function Timesheet() {
     <div>
       {profile && !staffView && <ClockBar userId={profile.id} />}
 
-      <div className="page-head">
-        <h1>Zeiterfassung</h1>
-        {!staffView && monthNav}
-      </div>
-
       {hasStaffView && (
         <div className="segmented two view-switch" role="radiogroup" aria-label="Ansicht">
           <button role="radio" aria-checked={!staffView} className={staffView ? '' : 'active'} onClick={() => switchView(false)}>
@@ -415,10 +402,7 @@ export function Timesheet() {
 
           {installerId && (
             <div className="staff-section" ref={staffTimes}>
-              <div className="page-head">
-                <h2>Zeiterfassung von {displayName(byId[installerId])}</h2>
-                {monthNav}
-              </div>
+              <h2>Zeiterfassung von {displayName(byId[installerId])}</h2>
               {timesheet}
             </div>
           )}
