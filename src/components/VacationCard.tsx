@@ -3,13 +3,14 @@ import { rejectReason } from '../lib/rejectReason'
 import { supabase } from '../lib/supabase'
 import { loadMembers, useTeams, type TeamMember } from '../lib/teams'
 import { canSeePersonnel, displayName, formatDate, formatDay, type Profile } from '../lib/types'
+import { formatMinutes } from '../lib/clock'
 import { blockText, type VacationBlock } from '../lib/vacationBlocks'
 
 export type VacationState = 'beantragt' | 'genehmigt' | 'abgelehnt' | 'storniert'
 export type VacationKind = 'urlaub' | 'ueberstunden' | 'krank' | 'sonderurlaub' | 'schulung' | 'schule' | 'unbezahlt' | 'kindkrank'
 
 export const KIND_LABEL: Record<VacationKind, string> = {
-  urlaub: 'Urlaubstage', ueberstunden: 'Überstunden', krank: 'Krank', sonderurlaub: 'Sonderurlaub',
+  urlaub: 'Urlaubstage', ueberstunden: 'Zeitausgleich', krank: 'Krank', sonderurlaub: 'Sonderurlaub',
   schulung: 'Schulung', schule: 'Schule', unbezahlt: 'Unbezahlter Urlaub', kindkrank: 'Kindkrank',
 }
 
@@ -41,6 +42,10 @@ export interface VacationRequest {
   decided_at: string | null
   decision_note: string
   created_at: string
+  // Zeitausgleich stundenweise: Uhrzeit von/bis, Dauer ohne feste Pausen
+  start_time?: string | null
+  end_time?: string | null
+  minutes?: number | null
 }
 
 const STATE_LABEL: Record<VacationState, string> = {
@@ -50,9 +55,15 @@ const STATE_LABEL: Record<VacationState, string> = {
   storniert: 'Storniert',
 }
 
+const hhmm = (t: string) => t.slice(0, 5)
+
 function period(r: VacationRequest) {
+  if (r.start_time && r.end_time) return `${formatDay(r.start_date)}, ${hhmm(r.start_time)} – ${hhmm(r.end_time)} Uhr`
   return r.start_date === r.end_date ? formatDay(r.start_date) : `${formatDay(r.start_date)} – ${formatDay(r.end_date)}`
 }
+
+// Dauer: stundenweiser Zeitausgleich in Stunden, sonst in Tagen
+const duration = (r: VacationRequest) => (r.minutes ? `${formatMinutes(r.minutes)} h` : dayWord(r.days))
 
 // Tage, an denen der Mitarbeiter schon in einem Team eingeplant ist, z. B. "Mo 03.11. (Montage 1)"
 function plannedText(list: TeamMember[], teamName: (id: number) => string) {
@@ -63,6 +74,16 @@ function plannedText(list: TeamMember[], teamName: (id: number) => string) {
 }
 
 const dayWord = (n: number) => `${n.toLocaleString('de-DE')} ${n === 1 ? 'Tag' : 'Tage'}`
+
+// Minuten zwischen zwei Uhrzeiten "HH:MM" ohne die festen Pausen 09:00–09:15 und 12:00–12:30
+function timeMinutes(from: string, to: string) {
+  const m = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))
+  const a = m(from)
+  const b = m(to)
+  if (!(b > a)) return 0
+  const overlap = (x: number, y: number) => Math.max(0, Math.min(b, y) - Math.max(a, x))
+  return b - a - overlap(9 * 60, 9 * 60 + 15) - overlap(12 * 60, 12 * 60 + 30)
+}
 
 interface Props {
   userId: string
@@ -88,7 +109,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
   const [pending, setPending] = useState<VacationRequest[]>([])
   // Resturlaub aus dem Vorjahr (festgelegt oder berechnet)
   const [carryover, setCarryover] = useState(0)
-  const [form, setForm] = useState<{ start: string; end: string; note: string; kind: VacationKind; half?: boolean } | null>(null)
+  const [form, setForm] = useState<{ start: string; end: string; note: string; kind: VacationKind; half?: boolean; from?: string; to?: string } | null>(null)
   const [preview, setPreview] = useState<number | null>(null)
   // Schon eingeplante Tage im gewählten Zeitraum (Hinweis, keine Sperre)
   const [plannedInForm, setPlannedInForm] = useState<TeamMember[]>([])
@@ -199,9 +220,16 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
   const total = carryover + allowance
   const rest = total - approved - requested
 
+  // Zeitausgleich mit Uhrzeit (nur für einen einzelnen Tag)
+  const timesAllowed = !!form && form.kind === 'ueberstunden' && !!form.start && form.start === form.end
+  const hourlyMin = form && timesAllowed && form.from && form.to ? timeMinutes(form.from, form.to) : 0
+  const hourly = hourlyMin > 0
+
   async function submit() {
     if (!form) return
     const days = form.half && preview === 1 ? 0.5 : preview
+    if ((form.from || form.to) && !hourly) return setError('Bitte bei der Uhrzeit von und bis eintragen (bis nach von).')
+    const times = hourly ? { p_start_time: form.from, p_end_time: form.to } : {}
     if (plannedInForm.length) {
       const who = own ? 'Du bist' : `${displayName(byId[userId])} ist`
       const msg = `${who} in diesem Zeitraum schon eingeplant: ${plannedText(plannedInForm, teamName)}.\n\nBitte mit der Einsatzplanung abstimmen. Trotzdem ${entering ? 'eintragen' : 'beantragen'}?`
@@ -211,12 +239,12 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
     if (form.kind === 'urlaub' && days != null && days > rest && !confirm(`${entering ? 'Der Eintrag' : 'Der Antrag'} (${dayWord(days)}) ist mehr als der Resturlaub (${dayWord(rest)}). Trotzdem ${entering ? 'eintragen' : 'beantragen'}?`)) return
     if (entering) {
       const ok = await run(() =>
-        supabase.rpc('enter_absence', { p_user: userId, p_start: form.start, p_end: form.end, p_kind: form.kind, p_note: form.note, p_half: !!form.half }),
+        supabase.rpc('enter_absence', { p_user: userId, p_start: form.start, p_end: form.end, p_kind: form.kind, p_note: form.note, p_half: !!form.half, ...times }),
       )
       if (ok) setForm(null)
       return
     }
-    const ok = await run(() => supabase.rpc('request_vacation', { p_start: form.start, p_end: form.end, p_note: form.note, p_kind: form.kind }))
+    const ok = await run(() => supabase.rpc('request_vacation', { p_start: form.start, p_end: form.end, p_note: form.note, p_kind: form.kind, ...times }))
     if (ok) setForm(null)
   }
 
@@ -249,7 +277,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
                 <div>
                   <strong>{displayName(byId[r.user_id])}</strong>
                   <div className="small">
-                    {period(r)} · {dayWord(r.days)}
+                    {period(r)} · {duration(r)}
                     {KIND_NOTE[r.kind] && <> · {KIND_NOTE[r.kind]}</>}
                   </div>
                   {r.note && <div className="small muted">{r.note}</div>}
@@ -294,7 +322,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
       <section className="card">
         {/* Kopf wie in der Personalübersicht: Überschrift links, Knopf rechts */}
         <div className="card-head">
-          <h2>{own ? 'Urlaub und Zeitausgleich' : 'Abwesenheiten'}</h2>
+          {own ? <span /> : <h2>Abwesenheiten</h2>}
           {own && !form && (
             <button className="primary" onClick={() => { setError(''); setForm({ start: '', end: '', note: '', kind: 'urlaub' }) }}>
               + Neuer Antrag
@@ -316,7 +344,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
                   role="radio"
                   aria-checked={form.kind === k}
                   className={form.kind === k ? 'active' : ''}
-                  onClick={() => setForm({ ...form, kind: k, half: k === 'ueberstunden' ? false : form.half })}
+                  onClick={() => setForm({ ...form, kind: k, half: k === 'ueberstunden' ? false : form.half, from: k === 'ueberstunden' ? form.from : '', to: k === 'ueberstunden' ? form.to : '' })}
                 >
                   {entering ? ABSENCE_LABEL[k] : KIND_LABEL[k]}
                 </button>
@@ -332,6 +360,22 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
                 <input type="date" value={form.end} min={form.start} onChange={(e) => setForm({ ...form, end: e.target.value })} />
               </label>
             </div>
+            {form.kind === 'ueberstunden' && (
+              timesAllowed ? (
+                <div className="row">
+                  <label>
+                    Uhrzeit von
+                    <input type="time" value={form.from ?? ''} onChange={(e) => setForm({ ...form, from: e.target.value })} />
+                  </label>
+                  <label>
+                    Uhrzeit bis
+                    <input type="time" value={form.to ?? ''} min={form.from} onChange={(e) => setForm({ ...form, to: e.target.value })} />
+                  </label>
+                </div>
+              ) : (
+                <p className="small muted">Für einen Zeitausgleich nur über einige Stunden bei Von und Bis denselben Tag wählen, dann lässt sich die Uhrzeit eintragen.</p>
+              )
+            )}
             {entering && preview === 1 && form.kind !== 'ueberstunden' && (
               <label className="checkbox-row">
                 <input type="checkbox" checked={!!form.half} onChange={(e) => setForm({ ...form, half: e.target.checked })} /> Nur halber Tag
@@ -341,7 +385,12 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
               Bemerkung
               <input value={form.note} maxLength={300} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="optional" />
             </label>
-            {preview != null && (
+            {preview != null && hourly && (
+              <p className="small">
+                {formatMinutes(hourlyMin)} Std. Zeitausgleich von {form.from} bis {form.to} Uhr (ohne die festen Pausen 09:00–09:15 und 12:00–12:30)
+              </p>
+            )}
+            {preview != null && !hourly && (
               <p className="small">
                 {entering
                   ? form.kind === 'ueberstunden'
@@ -396,7 +445,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
                 <tr>
                   <th>Zeitraum</th>
                   <th>Art</th>
-                  <th className="num">Tage</th>
+                  <th className="num">Dauer</th>
                   <th>Status</th>
                   <th>Bemerkung / Entscheidung</th>
                   <th />
@@ -407,7 +456,7 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
                   <tr key={r.id} className={r.state === 'storniert' || r.state === 'abgelehnt' ? 'muted' : ''}>
                     <td>{period(r)}</td>
                     <td>{ABSENCE_LABEL[r.kind] ?? r.kind}</td>
-                    <td className="num">{r.days.toLocaleString('de-DE')}</td>
+                    <td className="num">{duration(r)}</td>
                     <td><span className={`badge badge-urlaub-${r.state}`}>{STATE_LABEL[r.state]}</span></td>
                     <td className="small">
                       {r.note && <div>{r.note}</div>}
