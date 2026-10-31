@@ -162,12 +162,12 @@ export function VacationCard({ userId, me, byId, year, onChanged, part = 'all', 
     load()
   }, [load])
 
-  // Arbeitstage des gewählten Zeitraums (ohne Wochenende und Feiertage)
+  // Arbeitstage des gewählten Zeitraums (nur vereinbarte Arbeitstage der Person, ohne Feiertage)
   useEffect(() => {
     setPreview(null)
     if (!form?.start || !form.end || form.end < form.start) return
-    supabase.rpc('vacation_workdays', { p_start: form.start, p_end: form.end }).then(({ data }) => setPreview(data as number))
-  }, [form?.start, form?.end])
+    supabase.rpc('vacation_workdays', { p_start: form.start, p_end: form.end, p_user: userId }).then(({ data }) => setPreview(data as number))
+  }, [form?.start, form?.end, userId])
 
   useEffect(() => {
     setPlannedInForm([])
