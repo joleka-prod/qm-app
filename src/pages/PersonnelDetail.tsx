@@ -9,6 +9,7 @@ import {
   WAGE_GROUPS,
   employeeName,
   euro,
+  entryVacation,
   fullYears,
   parse,
   show,
@@ -400,6 +401,7 @@ export function PersonnelDetail() {
   const byKind = (k: string) => entries.filter((e) => e.kind === k)
   const age = fullYears(String(form.birth_date || '') || null)
   const seniority = fullYears(String(form.entry_date || '') || null)
+  const entryVac = entryVacation(form.vacation_days, String(form.entry_date || '') || null)
   const wc = wageConcept(wage, String(form.entry_date || '') || null)
   const user = emp.user_id ? byId[emp.user_id] : null
   const external = isExternal(emp)
@@ -491,6 +493,12 @@ export function PersonnelDetail() {
                 )}
                 {s.computed?.includes('seniority') && (
                   <label>Betriebszugehörigkeit<input readOnly value={seniority != null ? `${seniority} Jahre` : ''} /></label>
+                )}
+                {s.computed?.includes('entry_vacation') && (
+                  <label>
+                    Urlaubsanspruch bei Firmeneintritt
+                    <input readOnly value={entryVac != null ? `${String(entryVac).replace('.', ',')} Tage (${String(form.entry_date).slice(0, 4)})` : ''} />
+                  </label>
                 )}
               </div>
             ) : null}
