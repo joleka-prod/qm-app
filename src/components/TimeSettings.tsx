@@ -15,11 +15,13 @@ const WEEKDAYS = [
 
 type Creds = { badge_uid: string | null }
 
-type Form = { weekly_hours: string; work_days: number[]; overtime_start: string; overtime_opening: string; badge: string }
+type Form = { weekly_hours: string; work_days: number[]; core_start: string; core_end: string; overtime_start: string; overtime_opening: string; badge: string }
 
 const num = (s: string) => Number(s.trim().replace(',', '.'))
+// Postgres liefert time als "07:00:00", das Eingabefeld braucht "07:00"
+const hhmm = (v: unknown) => (typeof v === 'string' ? v.slice(0, 5) : '')
 
-// Reiter "Zeiterfassung" der Personalakte: Wochenstunden und Arbeitstage (Personalakte), Stundenkonto und
+// Reiter "Zeiterfassung" der Personalakte: Wochenstunden, Arbeitstage und Kernarbeitszeit (Personalakte), Stundenkonto und
 // Stempel-Terminal (App-Benutzer). Pflegen Admin und Personalabteilung, Stundenkonto nicht das eigene.
 export function TimeSettings({ emp, user, onSaved }: { emp: Employee; user: Profile | null; onSaved: () => Promise<void> }) {
   const { profile: me } = useAuth()
@@ -42,6 +44,8 @@ export function TimeSettings({ emp, user, onSaved }: { emp: Employee; user: Prof
     setForm({
       weekly_hours: emp.weekly_hours != null ? String(emp.weekly_hours).replace('.', ',') : '',
       work_days: ((emp.work_days as number[] | undefined) ?? [1, 2, 3, 4, 5]).map(Number),
+      core_start: hhmm(emp.core_start),
+      core_end: hhmm(emp.core_end),
       overtime_start: user?.overtime_start ?? '',
       overtime_opening: String(user?.overtime_opening ?? 0).replace('.', ','),
       badge: formatBadge(c?.badge_uid),
@@ -88,6 +92,9 @@ export function TimeSettings({ emp, user, onSaved }: { emp: Employee; user: Prof
       if (hours !== (emp.weekly_hours != null ? Number(emp.weekly_hours) : null)) empChange.weekly_hours = hours
       const oldDays = ((emp.work_days as number[] | undefined) ?? [1, 2, 3, 4, 5]).map(Number)
       if (JSON.stringify(form.work_days) !== JSON.stringify(oldDays)) empChange.work_days = form.work_days
+      if (form.core_start && form.core_end && form.core_end <= form.core_start) throw new Error('Das Ende der Kernarbeitszeit muss nach dem Beginn liegen.')
+      if (form.core_start !== hhmm(emp.core_start)) empChange.core_start = form.core_start || null
+      if (form.core_end !== hhmm(emp.core_end)) empChange.core_end = form.core_end || null
       if (Object.keys(empChange).length) {
         const { error } = await supabase.from('employees').update(empChange).eq('id', emp.id)
         if (error) throw error
@@ -134,6 +141,16 @@ export function TimeSettings({ emp, user, onSaved }: { emp: Employee; user: Prof
         ))}
       </div>
       <p className="small muted">Das Soll im Überstundenkonto zählt nur an diesen Tagen: Wochenstunden geteilt durch die Anzahl der Arbeitstage.</p>
+      <div className="emp-grid" style={{ marginTop: '0.8rem' }}>
+        <label>
+          Kernarbeitszeit Beginn
+          <input type="time" value={form.core_start} onChange={(e) => setForm({ ...form, core_start: e.target.value })} />
+        </label>
+        <label>
+          Kernarbeitszeit Ende
+          <input type="time" value={form.core_end} onChange={(e) => setForm({ ...form, core_end: e.target.value })} />
+        </label>
+      </div>
 
       <h3 className="emp-heading">Stundenkonto</h3>
       {!user ? (
