@@ -291,7 +291,10 @@ export function TimetacImport() {
       const taskList = await timetac({ action: 'tasks' }).catch(() => [] as Row[])
       setTrackings(list)
       setTtRange([from, to])
-      setTasks(Object.fromEntries(taskList.map((t) => [str(t.id), str(t.name) || `Aufgabe ${str(t.id)}`])))
+      const names: Record<string, string> = Object.fromEntries(taskList.map((t) => [str(t.id), str(t.name) || `Aufgabe ${str(t.id)}`]))
+      setTasks(names)
+      // Pausen zählen nicht als Arbeitszeit: Aufgaben mit "Pause" im Namen gleich abwählen
+      setSkipTasks(Object.keys(names).filter((id) => /pause/i.test(names[id])))
     } catch (e) {
       setError((e as Error).message)
     }
