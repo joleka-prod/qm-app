@@ -808,3 +808,7 @@ button.link.danger-link { color: var(--danger); }
 .page-head.wrap { flex-wrap: wrap; }
 .tabs-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 .tabs-row .emp-tabs { margin-bottom: 0; }
+
+/* Über 10 Stunden: Meldung am Tag und Zähler am Reiter Mitarbeiter */
+.ts-request.long-day-open { background: var(--highlight-bg, rgba(255, 196, 0, 0.18)); }
+.tab-badge { display: inline-block; min-width: 1.3em; margin-left: 0.4em; padding: 0 0.35em; border-radius: 999px; background: var(--primary); color: #fff; font-size: 0.75em; line-height: 1.4; text-align: center; }

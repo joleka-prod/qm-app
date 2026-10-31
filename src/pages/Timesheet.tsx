@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { AttendanceApprovals, requestText, span, type AttendanceRequest } from '../components/AttendanceApprovals'
 import { ClockBar } from '../components/ClockBar'
+import { LongDayApprovals, longDayText, useLongDayCount, type LongDayReview } from '../components/LongDayApprovals'
 import { MonthPicker } from '../components/MonthPicker'
 import { OvertimeCard } from '../components/OvertimeCard'
 import { TeamOverview } from '../components/TeamOverview'
@@ -109,6 +110,9 @@ export function Timesheet() {
   const [requests, setRequests] = useState<AttendanceRequest[]>([])
   // Alle Zeitnachträge/-korrekturen der Person für den Bereich Anträge
   const [allRequests, setAllRequests] = useState<AttendanceRequest[]>([])
+  // Meldungen "über 10 Stunden" der Person im Monat
+  const [longDays, setLongDays] = useState<LongDayReview[]>([])
+  const longDayCount = useLongDayCount(profile ?? null, byId, sessions)
   const [info, setInfo] = useState('')
 
   const range = useMemo(() => {
@@ -118,7 +122,7 @@ export function Timesheet() {
 
   const load = useCallback(async () => {
     if (!installerId) return
-    const [att, te, vac, req, allReq] = await Promise.all([
+    const [att, te, vac, req, allReq, ld] = await Promise.all([
       supabase.from('attendance').select('*').eq('installer_id', installerId).gte('started_at', range.from).lte('started_at', range.to).order('started_at'),
       supabase.from('time_entries').select('*').eq('installer_id', installerId).gte('started_at', range.from).lte('started_at', range.to),
       supabase
@@ -137,7 +141,9 @@ export function Timesheet() {
         .lte('started_at', range.to)
         .order('started_at'),
       supabase.from('attendance_requests').select('*').eq('user_id', installerId).order('started_at', { ascending: false }).limit(500),
+      supabase.from('long_day_reviews').select('*').eq('user_id', installerId).gte('day', range.all[0]).lte('day', range.all.at(-1)!),
     ])
+    setLongDays((ld.data ?? []) as LongDayReview[])
     setAllRequests((allReq.data ?? []) as AttendanceRequest[])
     setRequests((req.data ?? []) as AttendanceRequest[])
     setVacation((vac.data ?? []) as VacationRequest[])
@@ -457,6 +463,13 @@ export function Timesheet() {
                         )}
                       </div>
                     ))}
+                  {longDays
+                    .filter((r) => r.day === d)
+                    .map((r) => (
+                      <div key={`ld${r.id}`} className={`ts-request small ${r.state === 'offen' ? 'long-day-open' : ''}`}>
+                        <span>{longDayText(r, byId)}</span>
+                      </div>
+                    ))}
                   {edit && !edit.id && edit.start.startsWith(d) && editor}
                 </div>
               )
@@ -504,6 +517,7 @@ export function Timesheet() {
           {hasStaffView && (
             <button type="button" aria-pressed={staffView} className={staffView ? 'active' : ''} onClick={() => switchView('mitarbeiter')}>
               Mitarbeiter
+              {longDayCount > 0 && <span className="tab-badge" title="Tage über 10 Stunden warten auf deine Freigabe">{longDayCount}</span>}
             </button>
           )}
           {canBlocks && (
@@ -515,6 +529,14 @@ export function Timesheet() {
       )}
 
       {blocksView && <VacationBlocks byId={byId} />}
+
+      {/* Hinweis für Vorgesetzte und Admin: Tage über 10 Stunden warten auf Freigabe */}
+      {!staffView && !blocksView && longDayCount > 0 && (
+        <p className="info">
+          {longDayCount === 1 ? 'Ein Arbeitstag' : `${longDayCount} Arbeitstage`} über 10 Stunden {longDayCount === 1 ? 'wartet' : 'warten'} auf deine Freigabe.{' '}
+          <button type="button" className="link" onClick={() => switchView('mitarbeiter')}>Zur Mitarbeiterübersicht</button>
+        </p>
+      )}
 
       {!staffView && !blocksView && timesheet}
 
@@ -532,6 +554,7 @@ export function Timesheet() {
             </div>
           ) : (
             <>
+              <LongDayApprovals me={profile} byId={byId} onChanged={load} />
               <AttendanceApprovals me={profile} byId={byId} onChanged={load} />
               <VacationCard userId={profile.id} me={profile} byId={byId} year={Number(today.slice(0, 4))} onChanged={load} part="approvals" />
               <TeamOverview
