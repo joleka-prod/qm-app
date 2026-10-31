@@ -88,18 +88,26 @@ export const FIXED_BREAKS: [number, number, number, number][] = [
   [9, 0, 9, 15], // Frühstückspause
   [12, 0, 12, 30], // Mittagspause
 ]
+export const FIXED_BREAK_NAMES = ['Frühstückspause', 'Mittagspause']
+
+// Die festen Pausen, die in eine Stempelzeit fallen, als einzelne Zeitspannen (ms). Werden in der
+// Zeiterfassung als eigene Buchung "Pause (automatisch)" angezeigt (Fabian 2026-10-31).
+export function fixedBreakSegments(start: string, end: string | null, now = Date.now()) {
+  const s = new Date(start).getTime()
+  const e = end ? new Date(end).getTime() : Math.max(s, now)
+  const out: { from: number; to: number; label: string }[] = []
+  for (let d = new Date(s); d.getTime() <= e; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+    FIXED_BREAKS.forEach(([h1, m1, h2, m2], i) => {
+      const from = Math.max(s, new Date(d.getFullYear(), d.getMonth(), d.getDate(), h1, m1).getTime())
+      const to = Math.min(e, new Date(d.getFullYear(), d.getMonth(), d.getDate(), h2, m2).getTime())
+      if (to > from) out.push({ from, to, label: FIXED_BREAK_NAMES[i] })
+    })
+  }
+  return out.sort((a, b) => a.from - b.from)
+}
 
 export function fixedBreakMinutes(start: string, end: string | null, now = Date.now()) {
-  const s = new Date(start).getTime()
-  const e = end ? new Date(end).getTime() : now
-  let ms = 0
-  for (let d = new Date(s); d.getTime() <= e; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
-    for (const [h1, m1, h2, m2] of FIXED_BREAKS) {
-      const from = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h1, m1).getTime()
-      const to = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h2, m2).getTime()
-      ms += Math.max(0, Math.min(e, to) - Math.max(s, from))
-    }
-  }
+  const ms = fixedBreakSegments(start, end, now).reduce((a, b) => a + b.to - b.from, 0)
   return Math.round(ms / 60000)
 }
 
