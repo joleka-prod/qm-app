@@ -399,23 +399,11 @@ export function Timesheet() {
           <AttendanceApprovals me={profile} byId={byId} onChanged={load} />
           <VacationCard userId={profile.id} me={profile} byId={byId} year={Number(month.slice(0, 4))} onChanged={load} part="approvals" />
           <TeamOverview
-            members={staff.filter((p) => p.id !== profile?.id && (isAbove(p.id) || isAdmin || isHr))}
+            members={others}
             selected={installerId}
             onPick={pick}
             reloadKey={sessions}
           />
-
-          {others.length > 0 && (
-            <label className="filters">
-              Zeiterfassung einer Person ansehen
-              <select value={installerId} onChange={(e) => pick(e.target.value)} aria-label="Mitarbeiter">
-                <option value="">– Person wählen –</option>
-                {others.map((p) => (
-                  <option key={p.id} value={p.id}>{displayName(p)}</option>
-                ))}
-              </select>
-            </label>
-          )}
 
           {installerId && (
             <div className="staff-section" ref={staffTimes}>
