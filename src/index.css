@@ -464,6 +464,7 @@ button.link.danger { color: #b42318; }
 .timesheet-week { padding: 0.25rem 0.75rem; }
 .ts-day { padding: 0.5rem 0; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.2rem; }
 .ts-day.today .ts-day-head strong { color: #1d4ed8; }
+.ts-day.weekend .ts-day-head strong { color: var(--muted, #6b7280); }
 .ts-day-head { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
 .ts-work { font-weight: 700; }
 .ts-session { display: flex; justify-content: space-between; gap: 0.5rem; font-variant-numeric: tabular-nums; }
