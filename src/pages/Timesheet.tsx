@@ -445,10 +445,10 @@ export function Timesheet() {
               const weekday = parseDate(d).getDay()
               const vac = weekday !== 0 && weekday !== 6 && !holidayName(d) ? vacation.find((v) => v.start_date <= d && v.end_date >= d) : undefined
               const onVacation = !!vac
-              if (list.length === 0 && !jobsByDay[d] && !onVacation && !requests.some((r) => isoDate(new Date(r.started_at)) === d) && (weekday === 0 || weekday === 6 || d > today)) return null
+              if (list.length === 0 && !jobsByDay[d] && !onVacation && !requests.some((r) => isoDate(new Date(r.started_at)) === d) && d > today) return null
               const short = work > 0 && pause < minBreak(work)
               return (
-                <div key={d} className={`ts-day ${d === today ? 'today' : ''}`}>
+                <div key={d} className={`ts-day ${d === today ? 'today' : ''} ${weekday === 0 || weekday === 6 ? 'weekend' : ''}`}>
                   <div className="ts-day-head">
                     <strong>
                       {formatDay(d).replace(/\.\d{4}$/, '.')}
