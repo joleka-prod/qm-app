@@ -50,6 +50,21 @@ input, select, textarea {
   background: var(--card);
 }
 textarea { resize: vertical; }
+/* iOS Safari: Datums-/Zeitfelder haben sonst eine feste Mindestbreite und ragen über den Rand */
+input[type='date'], input[type='time'], input[type='datetime-local'], input[type='month'] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 2.75rem;
+  text-align: left;
+}
+input::-webkit-date-and-time-value { text-align: left; }
+/* Beginn/Ende mit Datum + Uhrzeit passen auf schmalen Bildschirmen nicht nebeneinander */
+@media (max-width: 560px) {
+  .row:has(> label > input[type='datetime-local']) { grid-template-columns: 1fr; }
+}
 button, .button {
   display: inline-flex;
   align-items: center;
@@ -813,7 +828,7 @@ button.link.danger-link { color: var(--danger); }
 .ts-request.long-day-open { background: var(--highlight-bg, rgba(255, 196, 0, 0.18)); }
 .tab-badge { display: inline-block; min-width: 1.3em; margin-left: 0.4em; padding: 0 0.35em; border-radius: 999px; background: var(--primary); color: #fff; font-size: 0.75em; line-height: 1.4; text-align: center; }
 .long-day-edit { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.3rem; }
-.long-day-edit input { width: auto; }
+.long-day-edit input { width: auto; flex: 1 1 11rem; }
 /* Handy: Meldungen untereinander statt Tabelle */
 @media (max-width: 640px) {
   .long-day-table thead { display: none; }
