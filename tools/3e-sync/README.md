@@ -7,7 +7,8 @@ Kommunikation und Bauvorhaben bleiben in der App pflegbar.
 
 Danach liest es die Projekte (`OPR_Projekt`, alle, auch abgeschlossene) und legt sie als **Bauvorhaben** an
 (`projekte.sql`). Jedes Bauvorhaben wird mit seinem 3E-Kunden (Kundennummer) verknüpft und bekommt dessen Adresse,
-weil Projekte in 3E keine eigene Adresse haben. Nummer, Bezeichnung, Status und Adresse sind in der App
+weil Projekte in 3E keine eigene Adresse haben. Hat ein Beleg des Projekts eine **Baustellenadresse** (OBE_Adresse Typ 3,
+zuerst Aufträge, dann Angebote, jeweils der neueste), gilt diese (Migration `20261101040000_3e_bauvorhaben_baustellenadresse.sql`). Nummer, Bezeichnung, Status und Adresse sind in der App
 schreibgeschützt; Bemerkung, weitere Beteiligte, Aufträge und Kommunikation bleiben pflegbar.
 
 ## Einmalig in Supabase
