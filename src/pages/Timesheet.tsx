@@ -517,7 +517,6 @@ export function Timesheet() {
                     ]
                   })}
                   <div className="ts-meta small muted">
-                    {pause > 0 && <span>Pause {formatMinutes(pause)}</span>}
                     {!!jobsByDay[d] && <span>Aufträge {formatMinutes(jobsByDay[d])}</span>}
                     {short && <span className="appointment-warn">Pause unter {minBreak(work)} Min.</span>}
                     {canCorrect && !edit && !absence && d <= today && (
