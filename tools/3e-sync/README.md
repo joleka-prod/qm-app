@@ -74,3 +74,14 @@ Belegart „Auftrag (alte Auftragsverwaltung)“ bzw. „Angebot (alte Auftragsv
 (AuAlpha, z. B. KD, REP, REKL) steht als Erweiterung dahinter. Sie hängen nur am Kunden, nicht an einem Bauvorhaben.
 Anfragen (AuftragsTyp 2) und die neuen Belege (AuftragsTyp 2001) kommen nicht mit. Der Lesebenutzer braucht dafür
 Leserechte (`db_datareader`) auch auf `JOLEKA_LIVE_BWG`. Prüfen: `-Nur AlteAuftraege -Probe` bzw. `-Nur AlteAngebote -Probe`.
+
+## Bauvorhaben für alte Belege (2011–2021)
+
+Die alte Auftragsverwaltung kennt keine Projekte. `alte-auftraege.sql` und `alte-angebote.sql` liefern deshalb die
+Baustellenadresse (A_Adresse Nummer 1, sonst die Belegadresse Nummer 0) und den Text „Bauvorhaben“ mit. Die App legt je
+Kunde + Baustelle ein Bauvorhaben an (Nummer BV-…, Status abgeschlossen, Migration
+`20261101030000_3e_alte_belege_bauvorhaben.sql`) und hängt alle Belege dieser Baustelle daran. Gruppiert wird nach dem
+Text „Bauvorhaben“/„Kommission“ (gleicher Text beim gleichen Kunden = ein Bauvorhaben), ohne Text nach der
+Baustellenadresse, sonst nach der Belegadresse.
+Die erzeugten Bauvorhaben sind normale App-Bauvorhaben und dürfen geändert werden; der Abgleich verknüpft danach nur noch.
+Probelauf: `-Nur AlteAuftraege -Probe` zeigt im Protokoll „neue Bauvorhaben …“.

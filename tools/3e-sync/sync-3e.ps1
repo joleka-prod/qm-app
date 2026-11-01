@@ -57,7 +57,7 @@ function Sync($label, $queryFile, $key, $fields, $previewFile) {
   # --- an die App schicken (in Paketen) ---
   $url = $cfg.SupabaseUrl.TrimEnd('/') + '/functions/v1/sync-3e'
   $headers = @{ 'x-sync-key' = $cfg.SyncSchluessel }
-  $sum = [ordered]@{ neu = 0; verknuepft = 0; aktualisiert = 0; unveraendert = 0; uebersprungen = 0; ohne_kunde = 0; ohne_bauvorhaben = 0 }
+  $sum = [ordered]@{ neu = 0; verknuepft = 0; aktualisiert = 0; unveraendert = 0; uebersprungen = 0; ohne_kunde = 0; ohne_bauvorhaben = 0; bauvorhaben_neu = 0 }
   $preview = @()
   $errors = @()
   $size = 500
@@ -73,7 +73,7 @@ function Sync($label, $queryFile, $key, $fields, $previewFile) {
 
   $mode = if ($Probe) { 'Probelauf (nichts geändert)' } else { 'Abgleich' }
   $extra = if ($key -eq 'projects') { ", ohne Kunde in der App $($sum.ohne_kunde)" }
-    elseif ($key -eq 'orders' -or $key -eq 'offers') { ", ohne Kunde in der App $($sum.ohne_kunde), ohne Bauvorhaben in der App $($sum.ohne_bauvorhaben)" }
+    elseif ($key -eq 'orders' -or $key -eq 'offers') { ", ohne Kunde in der App $($sum.ohne_kunde), ohne Bauvorhaben in der App $($sum.ohne_bauvorhaben), neue Bauvorhaben $($sum.bauvorhaben_neu)" }
     else { '' }
   Log "$mode $label`: neu $($sum.neu), verknüpft $($sum.verknuepft), aktualisiert $($sum.aktualisiert), unverändert $($sum.unveraendert), übersprungen $($sum.uebersprungen)$extra"
   foreach ($e in $errors) { Log "  Fehler: $($e | ConvertTo-Json -Compress -Depth 4)" }
@@ -147,7 +147,7 @@ foreach ($old in @(@('AlteAuftraege', 'alte Aufträge', 'alte-auftraege.sql', 'o
                    @('AlteAngebote', 'alte Angebote', 'alte-angebote.sql', 'offers', 'vorschau-alte-angebote.csv'))) {
   if (($Nur -eq '' -or $Nur -eq $old[0]) -and (Test-Path (Join-Path $dir $old[2]))) {
     try {
-      Sync $old[1] $old[2] $old[3] $docFields $old[4]
+      Sync $old[1] $old[2] $old[3] ($docFields + @('site_key', 'site_name', 'site_street', 'site_zip', 'site_city', 'site_country')) $old[4]
     }
     catch {
       Log "FEHLER $($old[1]): $($_.Exception.Message)"
