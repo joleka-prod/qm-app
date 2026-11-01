@@ -5,9 +5,13 @@ import { supabase } from '../lib/supabase'
 
 const LIMIT = 100
 
+// eigene Aufträge + Aufträge aus 3E
+const orderCount = (p: Row) => (p.tickets[0]?.count ?? 0) + (p.erp_orders ?? 0)
+
 type Row = Project & {
   project_customers: { role: ProjectRole; customers: { name: string; customer_number: string } | null }[]
   tickets: { count: number }[]
+  erp_orders?: number
 }
 
 // Bauvorhaben: Liste mit Suche und Status. Seit dem 3E-Abgleich über 18.000: Suche macht die Datenbank (RPC search_projects)
@@ -68,7 +72,7 @@ export function Projects() {
                 <div className="ticket-row-top">
                   <span className="ticket-no">{p.project_number}</span>
                   <span className="small muted">
-                    {p.tickets[0]?.count ?? 0} {p.tickets[0]?.count === 1 ? 'Auftrag' : 'Aufträge'}
+                    {orderCount(p)} {orderCount(p) === 1 ? 'Auftrag' : 'Aufträge'}
                     {p.status === 'abgeschlossen' && ' · abgeschlossen'}
                   </span>
                 </div>
