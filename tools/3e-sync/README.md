@@ -66,3 +66,12 @@ Zum Schluss liest es die **Angebote** (`angebote.sql`, `OBE_Beleg` mit BelegTyp 
 sind nur Druckfassungen). Sie landen ebenfalls schreibgeschützt in `erp_documents` (Belegart `angebot`) und erscheinen im
 Bauvorhaben und beim Kunden unter „Angebote aus 3E“. Nur diesen Teil prüfen: `-Nur Angebote -Probe`
 (Vorschau in `vorschau-angebote.csv`). Fehlt `angebote.sql` im Ordner, werden keine Angebote abgeglichen.
+
+## Alte Auftragsverwaltung (2011 bis ca. 2021)
+
+Vor 2021 liefen Angebote und Aufträge in der alten Auftragsverwaltung ohne Projekte (`JOLEKA_LIVE_BWG`, Tabelle `A_Kopf`).
+`alte-auftraege.sql` (AuftragsTyp 1) und `alte-angebote.sql` (AuftragsTyp 0) holen sie in dieselbe Tabelle `erp_documents`,
+Belegart „Auftrag (alte Auftragsverwaltung)“ bzw. „Angebot (alte Auftragsverwaltung)“. Nummer = AuNummer, die Endung
+(AuAlpha, z. B. KD, REP, REKL) steht als Erweiterung dahinter. Sie hängen nur am Kunden, nicht an einem Bauvorhaben.
+Anfragen (AuftragsTyp 2) und die neuen Belege (AuftragsTyp 2001) kommen nicht mit. Der Lesebenutzer braucht dafür
+Leserechte (`db_datareader`) auch auf `JOLEKA_LIVE_BWG`. Prüfen: `-Nur AlteAuftraege -Probe` bzw. `-Nur AlteAngebote -Probe`.

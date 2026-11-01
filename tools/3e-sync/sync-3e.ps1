@@ -1,14 +1,14 @@
 ﻿# Abgleich 3E Look -> JOLEKA 360° (nur lesend gegenüber 3E).
 # Liest die Kunden (kunden.sql), danach die Projekte als Bauvorhaben (projekte.sql), die Aufträge (auftraege.sql)
-# und die Angebote (angebote.sql)
+# und die Angebote (angebote.sql), dazu die alte Auftragsverwaltung 2011–2021 (alte-auftraege.sql, alte-angebote.sql)
 # und schickt sie an die Edge Function sync-3e.
 #
 #   .\sync-3e.ps1 -Probe                    Probelauf: ändert nichts, schreibt die Vorschau nach vorschau.csv, vorschau-bauvorhaben.csv, vorschau-auftraege.csv, vorschau-angebote.csv
 #   .\sync-3e.ps1                           Abgleich (für die geplante Aufgabe)
-#   .\sync-3e.ps1 -Nur Bauvorhaben -Probe   nur einen Teil (Kunden, Bauvorhaben, Auftraege oder Angebote)
+#   .\sync-3e.ps1 -Nur Bauvorhaben -Probe   nur einen Teil (Kunden, Bauvorhaben, Auftraege, Angebote, AlteAuftraege oder AlteAngebote)
 #
 # Einstellungen stehen in einstellungen.json im selben Ordner (Vorlage: einstellungen.beispiel.json).
-param([switch]$Probe, [ValidateSet('', 'Kunden', 'Bauvorhaben', 'Auftraege', 'Angebote')][string]$Nur = '')
+param([switch]$Probe, [ValidateSet('', 'Kunden', 'Bauvorhaben', 'Auftraege', 'Angebote', 'AlteAuftraege', 'AlteAngebote')][string]$Nur = '')
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -138,6 +138,21 @@ if (($Nur -eq '' -or $Nur -eq 'Angebote') -and (Test-Path (Join-Path $dir $offer
   catch {
     Log "FEHLER Angebote: $($_.Exception.Message)"
     $failed = $true
+  }
+}
+
+# Alte Auftragsverwaltung (2011 bis ca. 2021, JOLEKA_LIVE_BWG): nur wenn die Dateien im Ordner liegen
+$docFields = @('ext_id', 'number', 'extension', 'kind', 'title', 'doc_date', 'delivery_date', 'status', 'amount_net', 'notes', 'customer_ext_id', 'project_ext_id')
+foreach ($old in @(@('AlteAuftraege', 'alte Aufträge', 'alte-auftraege.sql', 'orders', 'vorschau-alte-auftraege.csv'),
+                   @('AlteAngebote', 'alte Angebote', 'alte-angebote.sql', 'offers', 'vorschau-alte-angebote.csv'))) {
+  if (($Nur -eq '' -or $Nur -eq $old[0]) -and (Test-Path (Join-Path $dir $old[2]))) {
+    try {
+      Sync $old[1] $old[2] $old[3] $docFields $old[4]
+    }
+    catch {
+      Log "FEHLER $($old[1]): $($_.Exception.Message)"
+      $failed = $true
+    }
   }
 }
 
