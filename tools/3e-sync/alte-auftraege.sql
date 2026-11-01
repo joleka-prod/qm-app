@@ -16,7 +16,24 @@ SELECT
   CONVERT(varchar(30), CAST(ROUND(k.A_Summe, 2) AS decimal(14, 2))) AS amount_net,
   CASE WHEN NULLIF(LTRIM(RTRIM(k.Kommission)), '') IS NOT NULL THEN COALESCE(LTRIM(RTRIM(k.Bauvorhaben)), '') ELSE '' END AS notes,
   NULLIF(LTRIM(RTRIM(k.KundenNr)), '') AS customer_ext_id,
-  CAST(NULL AS varchar(64)) AS project_ext_id
+  CAST(NULL AS varchar(64)) AS project_ext_id,
+  -- Bauvorhaben für die App (je Kunde + Baustelle): Baustellenadresse (A_Adresse Nummer 1), sonst Belegadresse (Nummer 0).
+  -- site_key = Baustellenadresse, sonst Text "Bauvorhaben"/"Kommission", sonst Belegadresse.
+  CASE WHEN s.hat_baustelle = 1 THEN 'A|' + COALESCE(a1.Strasse, '') + '|' + COALESCE(a1.PLZ, '')
+       WHEN s.bv <> '' THEN 'T|' + s.bv
+       ELSE 'B|' + COALESCE(a0.Strasse, '') + '|' + COALESCE(a0.PLZ, '') END AS site_key,
+  COALESCE(NULLIF(s.bv, ''), CASE WHEN s.hat_baustelle = 1 THEN LTRIM(RTRIM(a1.Strasse)) + ', ' + LTRIM(RTRIM(a1.Ort)) END, '') AS site_name,
+  CASE WHEN s.hat_baustelle = 1 THEN a1.Strasse ELSE a0.Strasse END AS site_street,
+  CASE WHEN s.hat_baustelle = 1 THEN a1.PLZ ELSE a0.PLZ END AS site_zip,
+  CASE WHEN s.hat_baustelle = 1 THEN a1.Ort ELSE a0.Ort END AS site_city,
+  CASE WHEN s.hat_baustelle = 1 THEN a1.Land ELSE a0.Land END AS site_country
 FROM JOLEKA_LIVE_BWG.dbo.A_Kopf k
+LEFT JOIN JOLEKA_LIVE_BWG.dbo.A_Adresse a0 ON a0.ID_A_Kopf = k.ID AND a0.Nummer = 0
+LEFT JOIN JOLEKA_LIVE_BWG.dbo.A_Adresse a1 ON a1.ID_A_Kopf = k.ID AND a1.Nummer = 1
+CROSS APPLY (SELECT
+  CASE WHEN NULLIF(LTRIM(RTRIM(COALESCE(a1.Strasse, ''))), '') IS NOT NULL AND NULLIF(LTRIM(RTRIM(COALESCE(a1.Ort, ''))), '') IS NOT NULL
+       THEN 1 ELSE 0 END AS hat_baustelle,
+  LEFT(COALESCE(NULLIF(LTRIM(RTRIM(k.Bauvorhaben)), ''), NULLIF(LTRIM(RTRIM(k.Kommission)), ''), ''), 200) AS bv
+) s
 WHERE k.AuftragsTyp = 1
 ORDER BY k.AuNummer, k.AuAlpha
