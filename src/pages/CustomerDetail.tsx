@@ -284,6 +284,7 @@ export function CustomerDetail() {
       <CustomerProjectsCard customerId={customer.id} rows={projects} tickets={tickets} />
 
       <ErpOrdersCard customerId={customer.id} tickets={tickets} />
+      <ErpOrdersCard customerId={customer.id} tickets={tickets} docType="angebot" />
 
       <NotesCard
         customerId={customer.id}

@@ -256,6 +256,7 @@ export function ProjectDetail() {
       </section>
 
       <ErpOrdersCard projectId={project.id} tickets={tickets} />
+      <ErpOrdersCard projectId={project.id} tickets={tickets} docType="angebot" />
 
       {customers.length > 0 ? (
         <NotesCard

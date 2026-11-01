@@ -1,13 +1,14 @@
 ﻿# Abgleich 3E Look -> JOLEKA 360° (nur lesend gegenüber 3E).
-# Liest die Kunden (kunden.sql), danach die Projekte als Bauvorhaben (projekte.sql) und die Aufträge (auftraege.sql)
+# Liest die Kunden (kunden.sql), danach die Projekte als Bauvorhaben (projekte.sql), die Aufträge (auftraege.sql)
+# und die Angebote (angebote.sql)
 # und schickt sie an die Edge Function sync-3e.
 #
-#   .\sync-3e.ps1 -Probe                    Probelauf: ändert nichts, schreibt die Vorschau nach vorschau.csv, vorschau-bauvorhaben.csv, vorschau-auftraege.csv
+#   .\sync-3e.ps1 -Probe                    Probelauf: ändert nichts, schreibt die Vorschau nach vorschau.csv, vorschau-bauvorhaben.csv, vorschau-auftraege.csv, vorschau-angebote.csv
 #   .\sync-3e.ps1                           Abgleich (für die geplante Aufgabe)
-#   .\sync-3e.ps1 -Nur Bauvorhaben -Probe   nur einen Teil (Kunden, Bauvorhaben oder Auftraege)
+#   .\sync-3e.ps1 -Nur Bauvorhaben -Probe   nur einen Teil (Kunden, Bauvorhaben, Auftraege oder Angebote)
 #
 # Einstellungen stehen in einstellungen.json im selben Ordner (Vorlage: einstellungen.beispiel.json).
-param([switch]$Probe, [ValidateSet('', 'Kunden', 'Bauvorhaben', 'Auftraege')][string]$Nur = '')
+param([switch]$Probe, [ValidateSet('', 'Kunden', 'Bauvorhaben', 'Auftraege', 'Angebote')][string]$Nur = '')
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -72,7 +73,7 @@ function Sync($label, $queryFile, $key, $fields, $previewFile) {
 
   $mode = if ($Probe) { 'Probelauf (nichts geändert)' } else { 'Abgleich' }
   $extra = if ($key -eq 'projects') { ", ohne Kunde in der App $($sum.ohne_kunde)" }
-    elseif ($key -eq 'orders') { ", ohne Kunde in der App $($sum.ohne_kunde), ohne Bauvorhaben in der App $($sum.ohne_bauvorhaben)" }
+    elseif ($key -eq 'orders' -or $key -eq 'offers') { ", ohne Kunde in der App $($sum.ohne_kunde), ohne Bauvorhaben in der App $($sum.ohne_bauvorhaben)" }
     else { '' }
   Log "$mode $label`: neu $($sum.neu), verknüpft $($sum.verknuepft), aktualisiert $($sum.aktualisiert), unverändert $($sum.unveraendert), übersprungen $($sum.uebersprungen)$extra"
   foreach ($e in $errors) { Log "  Fehler: $($e | ConvertTo-Json -Compress -Depth 4)" }
@@ -124,6 +125,18 @@ if (($Nur -eq '' -or $Nur -eq 'Auftraege') -and (Test-Path (Join-Path $dir $orde
   }
   catch {
     Log "FEHLER Aufträge: $($_.Exception.Message)"
+    $failed = $true
+  }
+}
+
+# Angebote: Abfrage aus den Einstellungen (AngebotAbfrage), sonst angebote.sql, wenn vorhanden.
+$offerQuery = if ($cfg.AngebotAbfrage) { $cfg.AngebotAbfrage } else { 'angebote.sql' }
+if (($Nur -eq '' -or $Nur -eq 'Angebote') -and (Test-Path (Join-Path $dir $offerQuery))) {
+  try {
+    Sync 'Angebote' $offerQuery 'offers' @('ext_id', 'number', 'extension', 'kind', 'title', 'doc_date', 'delivery_date', 'status', 'amount_net', 'notes', 'customer_ext_id', 'project_ext_id') 'vorschau-angebote.csv'
+  }
+  catch {
+    Log "FEHLER Angebote: $($_.Exception.Message)"
     $failed = $true
   }
 }
