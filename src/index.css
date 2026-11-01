@@ -628,6 +628,9 @@ button.link.danger-link { color: var(--danger); }
 .wd-label { fill: var(--muted); font-weight: 700; }
 .wd-dim line { stroke: var(--muted); stroke-width: 3; }
 .wd-dim text { fill: var(--text); }
+.wd-box { fill: #e5e7eb; stroke: var(--text); stroke-width: 5; }
+.wd-box-label { fill: var(--text); font-weight: 600; }
+.wd-rail { fill: #9ca3af; fill-opacity: 0.55; stroke: var(--text); stroke-width: 3; }
 .window-spec { width: 100%; border-collapse: collapse; margin-top: 0.6rem; font-size: 0.9rem; }
 .window-spec th { text-align: left; color: var(--muted); font-weight: 500; padding: 0.25rem 0.75rem 0.25rem 0; vertical-align: top; white-space: nowrap; }
 .window-spec td { padding: 0.25rem 0; }
@@ -638,7 +641,7 @@ button.link.danger-link { color: var(--danger); }
 .window-item.active { border-color: var(--primary); }
 .window-item .window-drawing { width: 64px; height: 64px; flex: 0 0 64px; }
 .print-only { display: none; }
-@media (prefers-color-scheme: dark) { .wd-glass { fill: #1e3a5f; } .wd-field.active .wd-glass { fill: #24497a; } }
+@media (prefers-color-scheme: dark) { .wd-box { fill: #374151; } .wd-glass { fill: #1e3a5f; } .wd-field.active .wd-glass { fill: #24497a; } }
 @media print {
   .topbar, .app-version, .no-print { display: none !important; }
   .print-only { display: block; }
@@ -647,6 +650,7 @@ button.link.danger-link { color: var(--danger); }
   .window-preview { position: static; border: none; padding: 0; }
   .window-drawing { max-height: 70vh; }
   .wd-glass, .wd-field.active .wd-glass { fill: #fff; stroke: #000; stroke-width: 3; }
+  .wd-box { fill: #f3f4f6; stroke: #000; }
 }
 
 /* Vorplanung (Grobplanung nach Kalenderwoche) */
