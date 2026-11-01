@@ -4,5 +4,6 @@
   "SyncSchluessel": "HIER_DENSELBEN_WERT_WIE_SYNC_3E_KEY",
   "KundenAbfrage": "kunden.sql",
   "ProjektAbfrage": "projekte.sql",
-  "AuftragAbfrage": "auftraege.sql"
+  "AuftragAbfrage": "auftraege.sql",
+  "AngebotAbfrage": "angebote.sql"
 }

@@ -55,4 +55,11 @@ Service-, Produktions-, Zukaufaufträge und Restarbeiten aller Firmen; Auftragsb
 (Migration `20261028140000_3e_auftraege.sql`) und erscheinen im Bauvorhaben und beim Kunden unter „Aufträge aus 3E“.
 Zuordnung über die 3E-ProjektID (Bauvorhaben) und die Kundennummer; fehlt die Kundennummer, gilt der Kunde des Bauvorhabens.
 Über „+ Montageauftrag anlegen“ entsteht daraus ein normaler Auftrag mit der 3E-Auftragsnummer. Nur diesen Teil prüfen:
-`-Nur Auftraege -Probe` (Vorschau in `vorschau-auftraege.csv`). Angebote und Rechnungen folgen später in derselben Tabelle.
+`-Nur Auftraege -Probe` (Vorschau in `vorschau-auftraege.csv`). Rechnungen folgen später in derselben Tabelle.
+
+## Angebote
+
+Zum Schluss liest es die **Angebote** (`angebote.sql`, `OBE_Beleg` mit BelegTyp 0, Nummern ANG…; Angebotsdokumente
+sind nur Druckfassungen). Sie landen ebenfalls schreibgeschützt in `erp_documents` (Belegart `angebot`) und erscheinen im
+Bauvorhaben und beim Kunden unter „Angebote aus 3E“. Nur diesen Teil prüfen: `-Nur Angebote -Probe`
+(Vorschau in `vorschau-angebote.csv`). Fehlt `angebote.sql` im Ordner, werden keine Angebote abgeglichen.

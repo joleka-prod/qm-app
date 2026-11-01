@@ -22,35 +22,59 @@ export interface ErpOrder {
 
 const euro = (n: number) => n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
 
-// Aufträge aus 3E (schreibgeschützt) im Bauvorhaben bzw. beim Kunden. Muss einer montiert werden, wird daraus ein
-// Montageauftrag angelegt; vorhandene App-Aufträge mit derselben Auftragsnummer werden daneben angezeigt.
-export function ErpOrdersCard({ projectId, customerId, tickets }: { projectId?: number; customerId?: number; tickets: Ticket[] }) {
+// Aufträge bzw. Angebote (docType) aus 3E, schreibgeschützt, im Bauvorhaben oder beim Kunden. Muss ein Auftrag montiert
+// werden, wird daraus ein Montageauftrag angelegt; vorhandene App-Aufträge mit derselben Auftragsnummer stehen daneben.
+export function ErpOrdersCard({
+  projectId,
+  customerId,
+  tickets,
+  docType = 'auftrag',
+}: {
+  projectId?: number
+  customerId?: number
+  tickets: Ticket[]
+  docType?: 'auftrag' | 'angebot'
+}) {
   const [orders, setOrders] = useState<ErpOrder[]>([])
 
   useEffect(() => {
-    let q = supabase.from('erp_documents').select('*, projects(project_number, name)').eq('doc_type', 'auftrag')
+    let q = supabase.from('erp_documents').select('*, projects(project_number, name)').eq('doc_type', docType)
     q = projectId ? q.eq('project_id', projectId) : q.eq('customer_id', customerId ?? 0)
     // ohne die Migration gibt es die Tabelle noch nicht: dann bleibt die Liste einfach leer
     q.order('doc_date', { ascending: false, nullsFirst: false }).limit(200).then(({ data }) => setOrders((data ?? []) as ErpOrder[]))
-  }, [projectId, customerId])
+  }, [projectId, customerId, docType])
 
   if (orders.length === 0) return null
 
   return (
     <section className="card">
-      <h2>Aufträge aus 3E ({orders.length})</h2>
+      <h2>
+        {docType === 'angebot' ? 'Angebote' : 'Aufträge'} aus 3E ({orders.length})
+      </h2>
       <ul className="history">
         {orders.map((o) => (
-          <ErpOrderItem key={o.id} order={o} tickets={tickets} showProject={!projectId} />
+          <ErpOrderItem key={o.id} order={o} tickets={tickets} showProject={!projectId} offer={docType === 'angebot'} />
         ))}
       </ul>
     </section>
   )
 }
 
-// Ein 3E-Auftrag als Listenzeile; showProject/showCustomer zeigen Bauvorhaben bzw. Kunde mit Link
-export function ErpOrderItem({ order: o, tickets, showProject, showCustomer }: { order: ErpOrder; tickets: Ticket[]; showProject?: boolean; showCustomer?: boolean }) {
-  const linked = o.doc_number ? tickets.filter((t) => t.order_number.trim() === o.doc_number) : []
+// Ein 3E-Auftrag (oder mit offer ein Angebot) als Listenzeile; showProject/showCustomer zeigen Bauvorhaben bzw. Kunde mit Link
+export function ErpOrderItem({
+  order: o,
+  tickets,
+  showProject,
+  showCustomer,
+  offer,
+}: {
+  order: ErpOrder
+  tickets: Ticket[]
+  showProject?: boolean
+  showCustomer?: boolean
+  offer?: boolean
+}) {
+  const linked = o.doc_number && !offer ? tickets.filter((t) => t.order_number.trim() === o.doc_number) : []
   const params = new URLSearchParams({ art: 'montageauftrag', auftrag: o.doc_number, titel: o.title })
   if (o.project_id) params.set('bv', String(o.project_id))
   if (o.customer_id) params.set('kunde', String(o.customer_id))
@@ -84,14 +108,16 @@ export function ErpOrderItem({ order: o, tickets, showProject, showCustomer }: {
         </span>
       )}
       {o.notes && <span className="pre small muted">{o.notes}</span>}
-      <span className="small">
-        {linked.map((t) => (
-          <span key={t.id}>
-            <Link to={`/ticket/${t.id}`}>{ticketNo(t.id, t.ticket_type)}</Link>{' · '}
-          </span>
-        ))}
-        <Link to={`/neu?${params}`}>+ Montageauftrag anlegen</Link>
-      </span>
+      {!offer && (
+        <span className="small">
+          {linked.map((t) => (
+            <span key={t.id}>
+              <Link to={`/ticket/${t.id}`}>{ticketNo(t.id, t.ticket_type)}</Link>{' · '}
+            </span>
+          ))}
+          <Link to={`/neu?${params}`}>+ Montageauftrag anlegen</Link>
+        </span>
+      )}
     </li>
   )
 }
