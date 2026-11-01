@@ -17,6 +17,9 @@ SELECT
   CASE WHEN NULLIF(LTRIM(RTRIM(k.Kommission)), '') IS NOT NULL THEN COALESCE(LTRIM(RTRIM(k.Bauvorhaben)), '') ELSE '' END AS notes,
   NULLIF(LTRIM(RTRIM(k.KundenNr)), '') AS customer_ext_id,
   CAST(NULL AS varchar(64)) AS project_ext_id,
+  -- Zuständige laut 3E (Kürzel), in der App unter dem Beleg
+  LTRIM(RTRIM(COALESCE(k.Vertreter, ''))) AS vertreter1,
+  LTRIM(RTRIM(COALESCE(k.Aufmesser, ''))) AS aufmesser,
   -- Bauvorhaben für die App (je Kunde + Baustelle): Baustellenadresse (A_Adresse Nummer 1), sonst Belegadresse (Nummer 0).
   -- site_key = Text "Bauvorhaben"/"Kommission" (Entscheidung Fabian 2026-11-01), sonst Baustellenadresse, sonst Belegadresse.
   CASE WHEN s.bv <> '' THEN 'T|' + s.bv

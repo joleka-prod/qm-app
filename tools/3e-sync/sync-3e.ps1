@@ -147,7 +147,7 @@ foreach ($old in @(@('AlteAuftraege', 'alte Aufträge', 'alte-auftraege.sql', 'o
                    @('AlteAngebote', 'alte Angebote', 'alte-angebote.sql', 'offers', 'vorschau-alte-angebote.csv'))) {
   if (($Nur -eq '' -or $Nur -eq $old[0]) -and (Test-Path (Join-Path $dir $old[2]))) {
     try {
-      Sync $old[1] $old[2] $old[3] ($docFields + @('site_key', 'site_name', 'site_street', 'site_zip', 'site_city', 'site_country')) $old[4]
+      Sync $old[1] $old[2] $old[3] ($docFields + @('vertreter1', 'aufmesser', 'site_key', 'site_name', 'site_street', 'site_zip', 'site_city', 'site_country')) $old[4]
     }
     catch {
       Log "FEHLER $($old[1]): $($_.Exception.Message)"
