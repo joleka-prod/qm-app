@@ -14,11 +14,24 @@ export interface ErpOrder {
   status: string
   amount_net: number | null
   notes: string
+  staff?: Record<string, string>
   customer_id: number | null
   project_id: number | null
   projects: { project_number: string; name: string } | null
   customers?: { name: string; customer_number: string } | null
 }
+
+// Zuständige aus 3E (OBE_Beleg), Schlüssel wie in erp_documents.staff; Vertreter heißen bei JOLEKA Fachberater
+const STAFF_LABELS: [string, string][] = [
+  ['vertreter1', 'Fachberater'],
+  ['vertreter2', 'Fachberater 2'],
+  ['techniker', 'Techniker'],
+  ['sachbearbeiter1', 'Sachbearbeiter'],
+  ['sachbearbeiter2', 'Sachbearbeiter 2'],
+  ['projektleiter', 'Projektleiter'],
+  ['montageplaner', 'Montageplaner'],
+  ['sachbearbeiter_mawi', 'Sachbearbeiter MaWi'],
+]
 
 const euro = (n: number) => n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
 
@@ -95,6 +108,17 @@ export function ErpOrderItem({
           .filter(Boolean)
           .join(' · ')}
       </span>
+      {o.staff && STAFF_LABELS.some(([k]) => o.staff?.[k]) && (
+        <span className="small">
+          {STAFF_LABELS.filter(([k]) => o.staff?.[k]).map(([k, label], i) => (
+            <span key={k}>
+              {i > 0 && ' · '}
+              <span className="muted">{label}: </span>
+              {o.staff?.[k]}
+            </span>
+          ))}
+        </span>
+      )}
       {showCustomer && o.customer_id && o.customers && (
         <span className="small">
           <span className="muted">Kunde: </span>
