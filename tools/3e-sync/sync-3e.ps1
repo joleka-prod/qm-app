@@ -121,7 +121,7 @@ if (($Nur -eq '' -or $Nur -eq 'Bauvorhaben') -and (Test-Path (Join-Path $dir $pr
 $orderQuery = if ($cfg.AuftragAbfrage) { $cfg.AuftragAbfrage } else { 'auftraege.sql' }
 if (($Nur -eq '' -or $Nur -eq 'Auftraege') -and (Test-Path (Join-Path $dir $orderQuery))) {
   try {
-    Sync 'Aufträge' $orderQuery 'orders' @('ext_id', 'number', 'extension', 'kind', 'title', 'doc_date', 'delivery_date', 'status', 'amount_net', 'notes', 'customer_ext_id', 'project_ext_id', 'projektleiter', 'sachbearbeiter1', 'sachbearbeiter2', 'vertreter1', 'vertreter2', 'techniker', 'sachbearbeiter_mawi', 'montageplaner') 'vorschau-auftraege.csv'
+    Sync 'Aufträge' $orderQuery 'orders' @('ext_id', 'number', 'extension', 'kind', 'title', 'doc_date', 'delivery_date', 'status', 'amount_net', 'notes', 'customer_ext_id', 'project_ext_id', 'vertreter1', 'aufmesser') 'vorschau-auftraege.csv'
   }
   catch {
     Log "FEHLER Aufträge: $($_.Exception.Message)"
@@ -133,7 +133,7 @@ if (($Nur -eq '' -or $Nur -eq 'Auftraege') -and (Test-Path (Join-Path $dir $orde
 $offerQuery = if ($cfg.AngebotAbfrage) { $cfg.AngebotAbfrage } else { 'angebote.sql' }
 if (($Nur -eq '' -or $Nur -eq 'Angebote') -and (Test-Path (Join-Path $dir $offerQuery))) {
   try {
-    Sync 'Angebote' $offerQuery 'offers' @('ext_id', 'number', 'extension', 'kind', 'title', 'doc_date', 'delivery_date', 'status', 'amount_net', 'notes', 'customer_ext_id', 'project_ext_id', 'projektleiter', 'sachbearbeiter1', 'sachbearbeiter2', 'vertreter1', 'vertreter2', 'techniker', 'sachbearbeiter_mawi', 'montageplaner') 'vorschau-angebote.csv'
+    Sync 'Angebote' $offerQuery 'offers' @('ext_id', 'number', 'extension', 'kind', 'title', 'doc_date', 'delivery_date', 'status', 'amount_net', 'notes', 'customer_ext_id', 'project_ext_id', 'vertreter1', 'aufmesser') 'vorschau-angebote.csv'
   }
   catch {
     Log "FEHLER Angebote: $($_.Exception.Message)"
