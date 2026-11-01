@@ -55,7 +55,10 @@ Service-, Produktions-, Zukaufaufträge und Restarbeiten aller Firmen; Auftragsb
 (Migration `20261028140000_3e_auftraege.sql`) und erscheinen im Bauvorhaben und beim Kunden unter „Aufträge aus 3E“.
 Zuordnung über die 3E-ProjektID (Bauvorhaben) und die Kundennummer; fehlt die Kundennummer, gilt der Kunde des Bauvorhabens.
 Über „+ Montageauftrag anlegen“ entsteht daraus ein normaler Auftrag mit der 3E-Auftragsnummer. Nur diesen Teil prüfen:
-`-Nur Auftraege -Probe` (Vorschau in `vorschau-auftraege.csv`). Rechnungen folgen später in derselben Tabelle.
+`-Nur Auftraege -Probe` (Vorschau in `vorschau-auftraege.csv`).
+Mit übernommen werden die **Zuständigen** aus dem Beleg (Kürzel aus 3E): Vertreter 1/2 (in der App „Fachberater“), Techniker,
+Sachbearbeiter 1/2, Projektleiter, Montageplaner und Sachbearbeiter MaWi (Migration `20261101010000_3e_zustaendige.sql`,
+Spalte `erp_documents.staff`). Gilt auch für die Angebote. Rechnungen folgen später in derselben Tabelle.
 
 ## Angebote
 
