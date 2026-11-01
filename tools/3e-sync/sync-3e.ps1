@@ -109,7 +109,7 @@ if ($Nur -eq '' -or $Nur -eq 'Kunden') {
 $projectQuery = if ($cfg.ProjektAbfrage) { $cfg.ProjektAbfrage } else { 'projekte.sql' }
 if (($Nur -eq '' -or $Nur -eq 'Bauvorhaben') -and (Test-Path (Join-Path $dir $projectQuery))) {
   try {
-    Sync 'Bauvorhaben' $projectQuery 'projects' @('ext_id', 'project_number', 'name', 'customer_ext_id', 'status') 'vorschau-bauvorhaben.csv'
+    Sync 'Bauvorhaben' $projectQuery 'projects' @('ext_id', 'project_number', 'name', 'customer_ext_id', 'status', 'site_street', 'site_zip', 'site_city', 'site_country') 'vorschau-bauvorhaben.csv'
   }
   catch {
     Log "FEHLER Bauvorhaben: $($_.Exception.Message)"
