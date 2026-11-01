@@ -21,16 +21,10 @@ export interface ErpOrder {
   customers?: { name: string; customer_number: string } | null
 }
 
-// Zuständige aus 3E (OBE_Beleg), Schlüssel wie in erp_documents.staff; Vertreter heißen bei JOLEKA Fachberater
+// Zuständige aus 3E (OBE_Beleg), Schlüssel wie in erp_documents.staff
 const STAFF_LABELS: [string, string][] = [
-  ['vertreter1', 'Fachberater'],
-  ['vertreter2', 'Fachberater 2'],
-  ['techniker', 'Techniker'],
-  ['sachbearbeiter1', 'Sachbearbeiter'],
-  ['sachbearbeiter2', 'Sachbearbeiter 2'],
-  ['projektleiter', 'Projektleiter'],
-  ['montageplaner', 'Montageplaner'],
-  ['sachbearbeiter_mawi', 'Sachbearbeiter MaWi'],
+  ['vertreter1', 'Vertreter 1'],
+  ['aufmesser', 'Aufmesser'],
 ]
 
 const euro = (n: number) => n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })

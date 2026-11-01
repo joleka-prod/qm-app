@@ -20,15 +20,9 @@ SELECT
     COALESCE(CHAR(10) + CASE WHEN LTRIM(RTRIM(COALESCE(b.ManuelleBelegnummer, ''))) NOT IN ('', b.Belegnummer)
                              THEN 'Manuelle Belegnummer: ' + LTRIM(RTRIM(b.ManuelleBelegnummer)) END, ''),
     1, 1, ''), '') AS notes,
-  -- Zuständige laut 3E (Kürzel), in der App unter dem Beleg; Vertreter = Fachberater
-  LTRIM(RTRIM(COALESCE(b.Projektleiter, ''))) AS projektleiter,
-  LTRIM(RTRIM(COALESCE(b.Sachbearbeiter1, ''))) AS sachbearbeiter1,
-  LTRIM(RTRIM(COALESCE(b.Sachbearbeiter2, ''))) AS sachbearbeiter2,
+  -- Zuständige laut 3E (Kürzel), in der App unter dem Beleg
   LTRIM(RTRIM(COALESCE(b.Vertreter1, ''))) AS vertreter1,
-  LTRIM(RTRIM(COALESCE(b.Vertreter2, ''))) AS vertreter2,
-  LTRIM(RTRIM(COALESCE(b.Techniker, ''))) AS techniker,
-  LTRIM(RTRIM(COALESCE(b.SachbearbeiterMaWi, ''))) AS sachbearbeiter_mawi,
-  LTRIM(RTRIM(COALESCE(b.Montageplaner, ''))) AS montageplaner,
+  LTRIM(RTRIM(COALESCE(b.Aufmesser, ''))) AS aufmesser,
   b.KundenNr AS customer_ext_id,
   NULLIF(b.ProjektID, '') AS project_ext_id
 FROM dbo.OBE_Beleg b
