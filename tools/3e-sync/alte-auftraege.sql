@@ -18,9 +18,9 @@ SELECT
   NULLIF(LTRIM(RTRIM(k.KundenNr)), '') AS customer_ext_id,
   CAST(NULL AS varchar(64)) AS project_ext_id,
   -- Bauvorhaben für die App (je Kunde + Baustelle): Baustellenadresse (A_Adresse Nummer 1), sonst Belegadresse (Nummer 0).
-  -- site_key = Baustellenadresse, sonst Text "Bauvorhaben"/"Kommission", sonst Belegadresse.
-  CASE WHEN s.hat_baustelle = 1 THEN 'A|' + COALESCE(a1.Strasse, '') + '|' + COALESCE(a1.PLZ, '')
-       WHEN s.bv <> '' THEN 'T|' + s.bv
+  -- site_key = Text "Bauvorhaben"/"Kommission" (Entscheidung Fabian 2026-11-01), sonst Baustellenadresse, sonst Belegadresse.
+  CASE WHEN s.bv <> '' THEN 'T|' + s.bv
+       WHEN s.hat_baustelle = 1 THEN 'A|' + COALESCE(a1.Strasse, '') + '|' + COALESCE(a1.PLZ, '')
        ELSE 'B|' + COALESCE(a0.Strasse, '') + '|' + COALESCE(a0.PLZ, '') END AS site_key,
   COALESCE(NULLIF(s.bv, ''), CASE WHEN s.hat_baustelle = 1 THEN LTRIM(RTRIM(a1.Strasse)) + ', ' + LTRIM(RTRIM(a1.Ort)) END, '') AS site_name,
   CASE WHEN s.hat_baustelle = 1 THEN a1.Strasse ELSE a0.Strasse END AS site_street,

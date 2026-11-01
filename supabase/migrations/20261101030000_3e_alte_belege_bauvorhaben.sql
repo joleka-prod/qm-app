@@ -1,6 +1,6 @@
 -- 3E-Belege ohne Bauvorhaben (alte Auftragsverwaltung 2011–2021): Bauvorhaben erzeugen (Fabian, 2026-11-01).
 -- Ein Bauvorhaben je Kunde + Baustelle. Die Abfragen alte-auftraege.sql / alte-angebote.sql liefern site_key
--- (Baustellenadresse bzw. Text "Bauvorhaben"), site_name und die Adresse (Baustellenadresse aus A_Adresse Nummer 1,
+-- (Text "Bauvorhaben", sonst Baustellenadresse, sonst Belegadresse), site_name und die Adresse (Baustellenadresse aus A_Adresse Nummer 1,
 -- sonst Belegadresse Nummer 0). import_3e_documents legt das Bauvorhaben beim ersten Beleg an und verknüpft die
 -- weiteren. Rückgabe zusätzlich bauvorhaben_neu.
 

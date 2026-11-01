@@ -80,7 +80,8 @@ Leserechte (`db_datareader`) auch auf `JOLEKA_LIVE_BWG`. Prüfen: `-Nur AlteAuft
 Die alte Auftragsverwaltung kennt keine Projekte. `alte-auftraege.sql` und `alte-angebote.sql` liefern deshalb die
 Baustellenadresse (A_Adresse Nummer 1, sonst die Belegadresse Nummer 0) und den Text „Bauvorhaben“ mit. Die App legt je
 Kunde + Baustelle ein Bauvorhaben an (Nummer BV-…, Status abgeschlossen, Migration
-`20261101030000_3e_alte_belege_bauvorhaben.sql`) und hängt alle Belege dieser Baustelle daran. Gruppiert wird nach der
-Baustellenadresse, ohne Baustellenadresse nach dem Text „Bauvorhaben“/„Kommission“, sonst nach der Belegadresse.
+`20261101030000_3e_alte_belege_bauvorhaben.sql`) und hängt alle Belege dieser Baustelle daran. Gruppiert wird nach dem
+Text „Bauvorhaben“/„Kommission“ (gleicher Text beim gleichen Kunden = ein Bauvorhaben), ohne Text nach der
+Baustellenadresse, sonst nach der Belegadresse.
 Die erzeugten Bauvorhaben sind normale App-Bauvorhaben und dürfen geändert werden; der Abgleich verknüpft danach nur noch.
 Probelauf: `-Nur AlteAuftraege -Probe` zeigt im Protokoll „neue Bauvorhaben …“.
