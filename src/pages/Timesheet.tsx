@@ -18,6 +18,20 @@ import { supabase } from '../lib/supabase'
 import { canSeePersonnel, displayName, formatDate, formatDay, isoDate, parseDate, weekNumber } from '../lib/types'
 import { useProfiles } from '../lib/useProfiles'
 
+// Handy = Bildschirm bis 700 px Breite; reagiert auch auf Drehen/Größenänderung
+const PHONE_QUERY = '(max-width: 700px)'
+function useIsPhone() {
+  const [phone, setPhone] = useState(() => typeof window !== 'undefined' && window.matchMedia(PHONE_QUERY).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(PHONE_QUERY)
+    const update = () => setPhone(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+  return phone
+}
+
 // Gesetzliche Mindestpause (ArbZG): über 6 Std. 30 Min., über 9 Std. 45 Min.
 function minBreak(work: number) {
   return work > 9 * 60 ? 45 : work > 6 * 60 ? 30 : 0
@@ -67,7 +81,9 @@ export function Timesheet() {
   const [params, setParams] = useSearchParams()
   const staffView = hasStaffView && params.get('ansicht') === 'mitarbeiter'
   // Urlaubssperren und Betriebsferien pflegen Admin und Personalabteilung (Reiter Einstellungen, ?ansicht=einstellungen)
-  const canBlocks = isAdmin || isHr
+  // Auf dem Handy (schmaler Bildschirm) gibt es den Reiter nicht, nur am PC (Fabian, 2026-11-01)
+  const isPhone = useIsPhone()
+  const canBlocks = (isAdmin || isHr) && !isPhone
   const blocksView = canBlocks && params.get('ansicht') === 'einstellungen'
   const staffId = params.get('person') ?? ''
   const installerId = staffView ? staffId : profile?.id ?? ''
