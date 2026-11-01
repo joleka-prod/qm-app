@@ -1,4 +1,4 @@
-import { OPENING_SHORT, type Opening, type WindowDesign } from '../lib/windows'
+import { OPENING_SHORT, SHADE_LABEL, type Opening, type WindowDesign } from '../lib/windows'
 
 // Ansicht von innen, Maße in mm. Öffnungssymbole: die Spitze des Dreiecks zeigt zur Griffseite (Kipp: nach oben).
 const FRAME = 60
@@ -17,10 +17,16 @@ export function WindowDrawing({ w, selected, onSelect }: Props) {
   const left = w.transom ? dim * 2 + font : dim + font
   const bottom = w.columns.length > 1 ? dim * 2 + font : dim + font
   const pad = font
-  const vbW = left + w.width + pad
-  const vbH = pad + w.height + bottom
-  const ox = left
-  const oy = pad
+  // Sonnenschutz: Kasten über dem Fenster, mittig in der Breite des Sonnenschutzes
+  const sh = w.shade ?? null
+  const box = sh ? Math.max(sh.boxHeight, font * 1.4) : 0
+  const over = sh ? Math.max(0, (sh.width - w.width) / 2) : 0
+  const vbW = left + over * 2 + w.width + pad
+  const vbH = pad + box + w.height + bottom
+  const ox = left + over
+  const oy = pad + box
+  const sx = ox + w.width / 2 - (sh?.width ?? 0) / 2
+  const rail = 40
   const th = w.transom?.height ?? 0
 
   const fields: { x: number; y: number; w: number; h: number; opening: Opening; index: number }[] = []
@@ -38,6 +44,21 @@ export function WindowDrawing({ w, selected, onSelect }: Props) {
         <Field key={f.index} f={f} active={selected === f.index} onSelect={onSelect} font={font} />
       ))}
 
+      {sh && (
+        <g className="wd-shade">
+          <rect x={sx} y={pad} width={sh.width} height={box} className="wd-box" />
+          <text x={sx + sh.width / 2} y={pad + box / 2} fontSize={font * 0.8} className="wd-box-label" dominantBaseline="middle" textAnchor="middle">
+            {SHADE_LABEL[sh.type]} · {sh.mounting}
+          </text>
+          {sh.type !== 'rollladen' && (
+            <>
+              <rect x={sx} y={oy} width={rail} height={w.height} className="wd-rail" />
+              <rect x={sx + sh.width - rail} y={oy} width={rail} height={w.height} className="wd-rail" />
+            </>
+          )}
+        </g>
+      )}
+
       {/* Breiten */}
       {w.columns.length > 1 &&
         w.columns.map((cw, i) => {
@@ -54,6 +75,7 @@ export function WindowDrawing({ w, selected, onSelect }: Props) {
         </>
       )}
       <Dim x1={font} y1={oy} x2={font} y2={oy + w.height} label={w.height} font={font} vertical />
+      {sh && <Dim x1={font} y1={pad} x2={font} y2={oy} label={sh.boxHeight} font={font} vertical />}
     </svg>
   )
 }

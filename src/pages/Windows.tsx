@@ -6,14 +6,23 @@ import {
   OPENINGS,
   OPENING_LABEL,
   OPENING_SHORT,
+  SHADE_DRIVES,
+  SHADE_HANGING_HINT,
+  SHADE_HANGING_LABEL,
+  SHADE_LABEL,
+  SHADE_MOUNTINGS,
+  SHADE_TYPES,
   loadWindows,
+  newShade,
   newWindow,
   splitEven,
   storeWindows,
   windowProblems,
   windowSummary,
   type Opening,
+  type ShadeType,
   type WindowDesign,
+  type WindowShade,
 } from '../lib/windows'
 
 // Fenster konstruieren (nur Admin): Maße, Teilung, Oberlicht, Öffnungsarten, Zeichnung zum Drucken
@@ -58,6 +67,16 @@ export function Windows() {
   function toggleTransom(on: boolean) {
     update({ transom: on ? { height: Math.round(w.height * 0.3), opening: 'k' } : null })
     setField(on ? -1 : 0)
+  }
+
+  function setShadeType(type: ShadeType | null) {
+    if (!type) update({ shade: null })
+    else if (w.shade) update({ shade: { ...w.shade, type } })
+    else update({ shade: newShade(w, type) })
+  }
+
+  function updateShade(patch: Partial<WindowShade>) {
+    if (w.shade) update({ shade: { ...w.shade, ...patch } })
   }
 
   function save() {
@@ -117,6 +136,20 @@ export function Windows() {
               </tr>
               <tr><th>Material</th><td>{w.material}{w.color && `, ${w.color}`}</td></tr>
               <tr><th>Verglasung</th><td>{w.glazing}</td></tr>
+              {w.shade && (
+                <tr>
+                  <th>Sonnenschutz</th>
+                  <td>
+                    {SHADE_LABEL[w.shade.type]} {w.shade.mounting}, {w.shade.width} × {w.shade.height} mm, Kasten {w.shade.boxHeight} mm
+                    <br />Antrieb {w.shade.drive}, Bedienseite {w.shade.side}
+                    {w.shade.hanging && <><br />{SHADE_HANGING_LABEL[w.shade.type]}: {w.shade.hanging}</>}
+                    {(w.shade.color || w.shade.boxColor) && (
+                      <><br />Farbe {[w.shade.color && `Behang ${w.shade.color}`, w.shade.boxColor && `Kasten/Schienen ${w.shade.boxColor}`].filter(Boolean).join(', ')}</>
+                    )}
+                    {w.shade.note && <><br /><span className="pre">{w.shade.note}</span></>}
+                  </td>
+                </tr>
+              )}
               {w.note && <tr><th>Hinweis</th><td className="pre">{w.note}</td></tr>}
             </tbody>
           </table>
@@ -230,6 +263,80 @@ export function Windows() {
             Hinweis
             <textarea rows={2} value={w.note} onChange={(e) => update({ note: e.target.value })} />
           </label>
+
+          <div className="field">
+            Sonnenschutz
+            <div className="chip-row">
+              <button type="button" className={!w.shade ? 'chip active' : 'chip'} onClick={() => setShadeType(null)}>keiner</button>
+              {SHADE_TYPES.map((t) => (
+                <button type="button" key={t} className={w.shade?.type === t ? 'chip active' : 'chip'} onClick={() => setShadeType(t)}>
+                  {SHADE_LABEL[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+          {w.shade && (
+            <>
+              <div className="window-row">
+                <label>
+                  Einbau
+                  <select value={w.shade.mounting} onChange={(e) => updateShade({ mounting: e.target.value })}>
+                    {SHADE_MOUNTINGS.map((m) => <option key={m}>{m}</option>)}
+                  </select>
+                </label>
+                <label>
+                  Antrieb
+                  <select value={w.shade.drive} onChange={(e) => updateShade({ drive: e.target.value })}>
+                    {SHADE_DRIVES.map((d) => <option key={d}>{d}</option>)}
+                  </select>
+                </label>
+                <label>
+                  Bedienseite
+                  <select value={w.shade.side} onChange={(e) => updateShade({ side: e.target.value as WindowShade['side'] })}>
+                    <option value="links">links</option>
+                    <option value="rechts">rechts</option>
+                  </select>
+                </label>
+              </div>
+              <div className="window-row">
+                <label>
+                  Breite (mm)
+                  <input type="number" inputMode="numeric" step={10} value={w.shade.width} onChange={(e) => updateShade({ width: Number(e.target.value) || 0 })} />
+                </label>
+                <label>
+                  Höhe (mm)
+                  <input type="number" inputMode="numeric" step={10} value={w.shade.height} onChange={(e) => updateShade({ height: Number(e.target.value) || 0 })} />
+                </label>
+                <label>
+                  Kastenhöhe (mm)
+                  <input type="number" inputMode="numeric" step={5} value={w.shade.boxHeight} onChange={(e) => updateShade({ boxHeight: Number(e.target.value) || 0 })} />
+                </label>
+              </div>
+              {(w.shade.width !== w.width || w.shade.height !== w.height) && (
+                <button type="button" onClick={() => updateShade({ width: w.width, height: w.height })}>
+                  Maße vom Fenster übernehmen ({w.width} × {w.height} mm)
+                </button>
+              )}
+              <label>
+                {SHADE_HANGING_LABEL[w.shade.type]}
+                <input value={w.shade.hanging} placeholder={SHADE_HANGING_HINT[w.shade.type]} onChange={(e) => updateShade({ hanging: e.target.value })} />
+              </label>
+              <div className="window-row">
+                <label>
+                  Farbe Behang
+                  <input value={w.shade.color} onChange={(e) => updateShade({ color: e.target.value })} />
+                </label>
+                <label>
+                  Farbe Kasten / Schienen
+                  <input value={w.shade.boxColor} onChange={(e) => updateShade({ boxColor: e.target.value })} />
+                </label>
+              </div>
+              <label>
+                Bemerkung Sonnenschutz
+                <textarea rows={2} value={w.shade.note} onChange={(e) => updateShade({ note: e.target.value })} />
+              </label>
+            </>
+          )}
 
           {problems.map((p) => <p key={p} className="error">{p}</p>)}
           {notice && <p className="info">{notice}</p>}

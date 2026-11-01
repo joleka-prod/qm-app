@@ -18,6 +18,55 @@ export const OPENINGS = Object.keys(OPENING_LABEL) as Opening[]
 export const MATERIALS = ['Kunststoff', 'Holz', 'Holz-Alu', 'Aluminium'] as const
 export const GLAZINGS = ['2-fach Isolierglas', '3-fach Isolierglas', 'Sicherheitsglas (VSG)', 'Schallschutzglas', 'Ornamentglas'] as const
 
+// Sonnenschutz zum Fenster
+export type ShadeType = 'rollladen' | 'raffstore' | 'zip'
+
+export const SHADE_LABEL: Record<ShadeType, string> = { rollladen: 'Rollladen', raffstore: 'Raffstore', zip: 'ZIP Screen' }
+export const SHADE_TYPES = Object.keys(SHADE_LABEL) as ShadeType[]
+export const SHADE_MOUNTINGS = ['Aufsatz', 'Vorbau', 'Unterputz'] as const
+export const SHADE_DRIVES = ['Gurt', 'Kurbel', 'Motor', 'Funkmotor'] as const
+// Bezeichnung des Behangs je Art
+export const SHADE_HANGING_LABEL: Record<ShadeType, string> = { rollladen: 'Profil / Material', raffstore: 'Lamelle', zip: 'Stoff' }
+export const SHADE_HANGING_HINT: Record<ShadeType, string> = {
+  rollladen: 'z. B. Aluminium 37 mm',
+  raffstore: 'z. B. 80 mm Flachlamelle, 90 mm Z-Lamelle',
+  zip: 'z. B. Soltis 86, Serge 600',
+}
+
+export interface WindowShade {
+  type: ShadeType
+  mounting: string
+  width: number
+  height: number
+  boxHeight: number
+  drive: string
+  side: 'links' | 'rechts'
+  hanging: string
+  color: string
+  boxColor: string
+  note: string
+}
+
+export function newShade(w: WindowDesign, type: ShadeType = 'rollladen'): WindowShade {
+  return {
+    type,
+    mounting: type === 'rollladen' ? 'Aufsatz' : 'Vorbau',
+    width: w.width,
+    height: w.height,
+    boxHeight: type === 'raffstore' ? 200 : 250,
+    drive: 'Motor',
+    side: 'rechts',
+    hanging: '',
+    color: '',
+    boxColor: '',
+    note: '',
+  }
+}
+
+export function shadeSummary(s: WindowShade): string {
+  return `${SHADE_LABEL[s.type]} ${s.mounting}, ${s.width} × ${s.height} mm, ${s.drive} ${s.side}`
+}
+
 export interface WindowDesign {
   id: string
   name: string
@@ -33,6 +82,8 @@ export interface WindowDesign {
   color: string
   glazing: string
   note: string
+  // fehlt bei älteren gespeicherten Fenstern
+  shade?: WindowShade | null
   updatedAt: string
 }
 
@@ -50,6 +101,7 @@ export function newWindow(): WindowDesign {
     color: 'Weiß',
     glazing: GLAZINGS[1],
     note: '',
+    shade: null,
     updatedAt: new Date().toISOString(),
   }
 }
@@ -62,7 +114,7 @@ export function splitEven(width: number, count: number): number[] {
 
 export function windowSummary(w: WindowDesign): string {
   const parts = w.openings.map((o) => OPENING_SHORT[o]).join(' | ')
-  return `${w.width} × ${w.height} mm · ${parts}${w.transom ? ` · Oberlicht ${OPENING_SHORT[w.transom.opening]}` : ''}`
+  return `${w.width} × ${w.height} mm · ${parts}${w.transom ? ` · Oberlicht ${OPENING_SHORT[w.transom.opening]}` : ''}${w.shade ? ` · ${SHADE_LABEL[w.shade.type]}` : ''}`
 }
 
 export function windowProblems(w: WindowDesign): string[] {
@@ -71,6 +123,11 @@ export function windowProblems(w: WindowDesign): string[] {
   if (w.columns.some((c) => c < 250)) out.push('Jedes Feld muss mindestens 250 mm breit sein.')
   if (w.columns.reduce((a, b) => a + b, 0) !== w.width) out.push('Die Feldbreiten ergeben nicht die Gesamtbreite.')
   if (w.transom && (w.transom.height < 200 || w.height - w.transom.height < 300)) out.push('Oberlicht mindestens 200 mm, darunter mindestens 300 mm.')
+  const sh = w.shade
+  if (sh) {
+    if (sh.width < 300 || sh.height < 300) out.push('Sonnenschutz: Breite und Höhe müssen mindestens 300 mm sein.')
+    if (sh.boxHeight < 50 || sh.boxHeight > 600) out.push('Sonnenschutz: Kastenhöhe zwischen 50 und 600 mm.')
+  }
   return out
 }
 
